@@ -1,0 +1,2 @@
+-PostgreSQL 18.1
+-Java 17
