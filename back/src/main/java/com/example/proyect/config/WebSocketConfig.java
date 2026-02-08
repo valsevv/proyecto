@@ -9,9 +9,15 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
 @EnableWebSocket
 public class WebSocketConfig implements WebSocketConfigurer {
 
+    private final GameWebSocketHandler gameHandler;
+
+    public WebSocketConfig(GameWebSocketHandler gameHandler) {
+        this.gameHandler = gameHandler;
+    }
+
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
-        registry.addHandler(new GameWebSocketHandler(), "/ws")
+        registry.addHandler(gameHandler, "/ws")
                 .setAllowedOriginPatterns("*");
     }
 }

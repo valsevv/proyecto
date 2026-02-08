@@ -1,32 +1,13 @@
 import MainScene from './scenes/MainScene.js';
 import HudScene from './scenes/HudScene.js';
+import NetworkManager from './network/NetworkManager.js';
 
-// Tamaño del mundo (más grande que la ventana visible)
+// World dimensions (larger than the visible window)
 export const WORLD_WIDTH = 2400;
 export const WORLD_HEIGHT = 1800;
 
-// --- WebSocket connection ---
-const socket = new WebSocket('ws://localhost:8080/ws');
-
-socket.onopen = () => {
-    console.log('Connected to server');
-    socket.send('hello from client');
-};
-
-socket.onmessage = (event) => {
-    console.log('Server says:', event.data);
-};
-
-socket.onclose = () => {
-    console.log('Disconnected from server');
-};
-
-socket.onerror = (err) => {
-    console.error('WebSocket error:', err);
-};
-
-export { socket };
-// ----------------------------
+// Shared network instance — scenes import this
+export const network = new NetworkManager('wss://camilla-traplike-scribbly.ngrok-free.dev/ws');
 
 const config = {
     type: Phaser.AUTO,

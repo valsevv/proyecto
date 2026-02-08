@@ -1,23 +1,33 @@
 export default class Drone {
-    constructor(scene, x, y) {
+    /**
+     * @param {Phaser.Scene} scene
+     * @param {number} x
+     * @param {number} y
+     * @param {number} color      – fill colour (e.g. 0x00ff00)
+     * @param {boolean} interactive – only true for the local player's drones
+     */
+    constructor(scene, x, y, color = 0x00ff00, interactive = true) {
         this.scene = scene;
+        this.color = color;
 
         // Placeholder graphic
-        this.sprite = scene.add.circle(x, y, 14, 0x00ff00);
+        this.sprite = scene.add.circle(x, y, 14, color);
         this.sprite.setStrokeStyle(2, 0xffffff);
-        this.sprite.setInteractive({ useHandCursor: true });
 
-        // Selection ring
+        // Selection ring (only relevant for your own drones)
         this.ring = scene.add.circle(x, y, 20);
         this.ring.setStrokeStyle(2, 0xffff00);
         this.ring.setFillStyle();
         this.ring.setVisible(false);
 
-        // Click to select
-        this.sprite.on('pointerdown', (pointer) => {
-            pointer.event.stopPropagation();
-            scene.selectDrone(this);
-        });
+        // Only local drones are clickable
+        if (interactive) {
+            this.sprite.setInteractive({ useHandCursor: true });
+            this.sprite.on('pointerdown', (pointer) => {
+                pointer.event.stopPropagation();
+                scene.selectDrone(this);
+            });
+        }
     }
 
     select() {

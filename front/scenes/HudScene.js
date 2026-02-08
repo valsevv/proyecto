@@ -1,8 +1,10 @@
 import Minimap from '../ui/Minimap.js';
 
+const TEAM_COLORS = [0x00ff00, 0xff4444];
+
 /**
- * HudScene - Escena superpuesta para elementos de interfaz.
- * Se ejecuta en paralelo con MainScene y no se ve afectada por el scroll de la cámara.
+ * HudScene — overlay for UI elements (minimap, etc.).
+ * Runs in parallel with MainScene; not affected by camera scroll.
  */
 export default class HudScene extends Phaser.Scene {
     constructor() {
@@ -10,7 +12,6 @@ export default class HudScene extends Phaser.Scene {
     }
 
     create() {
-        // Minimap estilo radar en la esquina inferior derecha
         const radius = 80;
         const margin = 20;
         this.minimap = new Minimap(
@@ -23,13 +24,17 @@ export default class HudScene extends Phaser.Scene {
 
     update() {
         const mainScene = this.scene.get('MainScene');
-        if (!mainScene || !mainScene.drones.length) return;
+        if (!mainScene) return;
 
-        // Rastrear todos los drones en el minimap
-        const tracked = mainScene.drones.map(drone => ({
+        const allDrones = mainScene.getAllDrones();
+        if (!allDrones.length) return;
+
+        const tracked = allDrones.map(({ drone, playerIndex }) => ({
             x: drone.sprite.x,
             y: drone.sprite.y,
-            color: mainScene.selectedDrone === drone ? 0xffff00 : 0x00ff00
+            color: mainScene.selectedDrone === drone
+                ? 0xffff00
+                : TEAM_COLORS[playerIndex]
         }));
 
         this.minimap.update(mainScene.cameras.main, tracked);
