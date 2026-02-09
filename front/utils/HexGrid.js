@@ -96,4 +96,41 @@ export default class HexGrid {
         }
         return closest;
     }
+
+    /**
+     * Calculate approximate hex distance between two pixel positions.
+     * Uses pixel distance divided by hex width as approximation.
+     */
+    getHexDistance(x1, y1, x2, y2) {
+        const pixelDist = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+        const hexWidth = Math.sqrt(3) * this.size;
+        return Math.round(pixelDist / hexWidth);
+    }
+
+    /**
+     * Draw a filled hexagon at the given center with specified color and alpha.
+     * @param {Phaser.GameObjects.Graphics} graphics - The graphics object to draw on
+     * @param {number} cx - Center X coordinate
+     * @param {number} cy - Center Y coordinate
+     * @param {number} color - Fill color (e.g., 0x00ff00)
+     * @param {number} alpha - Fill alpha (0-1)
+     */
+    drawFilledHex(graphics, cx, cy, color, alpha) {
+        const points = [];
+        for (let i = 0; i < 6; i++) {
+            const angle = Phaser.Math.DegToRad(60 * i - 30);
+            points.push({
+                x: cx + this.size * Math.cos(angle),
+                y: cy + this.size * Math.sin(angle)
+            });
+        }
+        graphics.fillStyle(color, alpha);
+        graphics.beginPath();
+        graphics.moveTo(points[0].x, points[0].y);
+        for (let i = 1; i < 6; i++) {
+            graphics.lineTo(points[i].x, points[i].y);
+        }
+        graphics.closePath();
+        graphics.fillPath();
+    }
 }

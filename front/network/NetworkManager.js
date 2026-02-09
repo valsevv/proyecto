@@ -1,15 +1,6 @@
 /**
  * NetworkManager — thin wrapper around WebSocket.
- *
- * Usage:
- *   const net = new NetworkManager('ws://localhost:8080/ws');
- *   net.on('welcome',   msg => { ... });
- *   net.on('gameStart', msg => { ... });
- *   net.on('moveDrone', msg => { ... });
- *   await net.connect();
- *   net.join();
- *   net.requestMove(droneIndex, x, y);
- */
+*/
 export default class NetworkManager {
     constructor(url) {
         this.url = url;
@@ -20,6 +11,10 @@ export default class NetworkManager {
         this.playerId = null;
         /** 0 or 1 — which player slot we occupy */
         this.playerIndex = -1;
+        /** Track whose turn it is */
+        this.currentTurn = -1;
+        /** Actions remaining in current turn */
+        this.actionsRemaining = 0;
     }
 
     connect() {
@@ -42,8 +37,10 @@ export default class NetworkManager {
     }
 
     send(msg) {
+        console.log('[net] →', msg.type, msg);
         this.ws.send(JSON.stringify(msg));
     }
+
 
     join() {
         this.send({ type: 'join' });
@@ -53,6 +50,18 @@ export default class NetworkManager {
         this.send({ type: 'move', droneIndex, x, y });
     }
 
+    requestAttack(attackerIndex, targetPlayer, targetDrone) {
+        this.send({ type: 'attack', attackerIndex, targetPlayer, targetDrone });
+    }
+
+    endTurn() {
+        this.send({ type: 'endTurn' });
+    }
+
+
+    isMyTurn() {
+        return this.currentTurn === this.playerIndex;
+    }
 
     on(type, callback) {
         this.handlers[type] = callback;
@@ -66,6 +75,16 @@ export default class NetworkManager {
         if (msg.type === 'welcome') {
             this.playerId = msg.playerId;
             this.playerIndex = msg.playerIndex;
+        }
+
+        if (msg.type === 'turnStart') {
+            this.currentTurn = msg.activePlayer;
+            this.actionsRemaining = msg.actionsRemaining;
+        }
+
+        if (msg.type === 'gameStart' && msg.state) {
+            this.currentTurn = msg.state.currentTurn;
+            this.actionsRemaining = msg.state.actionsRemaining;
         }
 
         this._fire(msg.type, msg);
