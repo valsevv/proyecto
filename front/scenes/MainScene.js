@@ -1,6 +1,7 @@
 import HexGrid from '../utils/HexGrid.js';
 import Drone from '../gameobjects/Drone.js';
-import { WORLD_WIDTH, WORLD_HEIGHT, network } from '../game.js';
+import Network from '../Network/NetworkManager.js'
+import { WORLD_WIDTH, WORLD_HEIGHT } from '../shared/constants.js';
 
 const TEAM_COLORS = [0x00ff00, 0xff4444]; // green = player 0, red = player 1
 const MAX_MOVE_DISTANCE = 6; // hexes per turn
@@ -94,11 +95,11 @@ export default class MainScene extends Phaser.Scene {
 
             const droneIndex = this.myDrones.indexOf(this.selectedDrone);
             if (droneIndex >= 0) {
-                network.requestMove(droneIndex, nearest.x, nearest.y);
+                Network.requestMove(droneIndex, nearest.x, nearest.y);
             }
         });
 
-        // Wire up network events
+        // Wire up Network events
         this.setupNetwork();
 
         // Launch the HUD scene in parallel
@@ -106,17 +107,17 @@ export default class MainScene extends Phaser.Scene {
     }
 
     setupNetwork() {
-        network.on('welcome', () => {
+        Network.on('welcome', () => {
             this.events.emit('statusChanged', 'Esperando al oponente...');
         });
 
-        network.on('gameStart', (msg) => {
+        Network.on('gameStart', (msg) => {
             this.createDronesFromState(msg.state);
             this.events.emit('gameStarted');
         });
 
-        network.on('turnStart', (msg) => {
-            this.isMyTurn = (msg.activePlayer === network.playerIndex);
+        Network.on('turnStart', (msg) => {
+            this.isMyTurn = (msg.activePlayer === Network.playerIndex);
             this.actionMode = MODE_MOVE;
             this.clearTargetHighlights();
 
@@ -134,26 +135,26 @@ export default class MainScene extends Phaser.Scene {
             });
         });
 
-        network.on('moveDrone', (msg) => {
+        Network.on('moveDrone', (msg) => {
             const drone = this.drones[msg.playerIndex]?.[msg.droneIndex];
             if (drone) {
                 drone.moveTo(msg.x, msg.y);
                 // Mark drone as moved if it's ours
-                if (msg.playerIndex === network.playerIndex) {
+                if (msg.playerIndex === Network.playerIndex) {
                     drone.hasMoved = true;
                     this.hexHighlight.clear();
                 }
             }
         });
 
-        network.on('attackResult', (msg) => {
+        Network.on('attackResult', (msg) => {
             const targetDrone = this.drones[msg.targetPlayer]?.[msg.targetDrone];
             if (targetDrone) {
                 targetDrone.takeDamage(msg.damage, msg.remainingHealth);
             }
             // Mark attacker as having attacked
             const attackerDrone = this.drones[msg.attackerPlayer]?.[msg.attackerDrone];
-            if (attackerDrone && msg.attackerPlayer === network.playerIndex) {
+            if (attackerDrone && msg.attackerPlayer === Network.playerIndex) {
                 attackerDrone.hasAttacked = true;
             }
             this.clearTargetHighlights();
@@ -161,23 +162,23 @@ export default class MainScene extends Phaser.Scene {
             this.events.emit('attackModeEnded');
         });
 
-        network.on('playerLeft', () => {
+        Network.on('playerLeft', () => {
             this.add.text(400, 300, 'Oponente desconectado\nActualiza para jugar de nuevo', {
                 fontSize: '22px', fill: '#ff4444', align: 'center'
             }).setOrigin(0.5).setScrollFactor(0).setDepth(1000);
         });
 
-        network.on('error', (msg) => {
+        Network.on('error', (msg) => {
             console.warn('[game] server error:', msg.message);
         });
 
         // Connect → join
-        network.connect().then(() => network.join());
+        Network.connect().then(() => Network.join());
     }
 
     createDronesFromState(state) {
         for (const player of state.players) {
-            const isLocal = (player.playerIndex === network.playerIndex);
+            const isLocal = (player.playerIndex === Network.playerIndex);
             const color = TEAM_COLORS[player.playerIndex];
             this.drones[player.playerIndex] = [];
 
@@ -255,7 +256,7 @@ export default class MainScene extends Phaser.Scene {
     }
 
     highlightEnemyTargets() {
-        const enemyIndex = network.playerIndex === 0 ? 1 : 0;
+        const enemyIndex = Network.playerIndex === 0 ? 1 : 0;
         const enemies = this.drones[enemyIndex] || [];
         for (const drone of enemies) {
             if (drone.isAlive()) {
@@ -279,13 +280,13 @@ export default class MainScene extends Phaser.Scene {
         const attackerIndex = this.myDrones.indexOf(this.selectedDrone);
         if (attackerIndex < 0) return;
 
-        network.requestAttack(attackerIndex, targetDrone.playerIndex, targetDrone.droneIndex);
+        Network.requestAttack(attackerIndex, targetDrone.playerIndex, targetDrone.droneIndex);
     }
 
     /** End turn early - called from HUD */
     endTurn() {
         if (!this.isMyTurn) return;
-        network.endTurn();
+        Network.endTurn();
     }
 
     /** Returns a flat list of { drone, playerIndex } for the minimap. */

@@ -1,7 +1,7 @@
 /**
  * NetworkManager — thin wrapper around WebSocket.
 */
-export default class NetworkManager {
+class NetworkManager {
     constructor(url) {
         this.url = url;
         this.ws = null;
@@ -95,3 +95,5 @@ export default class NetworkManager {
         if (handler) handler(msg);
     }
 }
+
+export default new NetworkManager('ws://camilla-traplike-scribbly.ngrok-free.dev/ws');
