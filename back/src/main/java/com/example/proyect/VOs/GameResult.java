@@ -3,8 +3,7 @@ package com.example.proyect.VOs;
 import com.example.proyect.websocket.packet.Packet;
 
 /**
- * Value Object: Result wrapper for game operations.
- * Contains the response packet and metadata about what happened.
+ * Result wrapper for game operations.
  */
 public class GameResult {
     private final boolean success;

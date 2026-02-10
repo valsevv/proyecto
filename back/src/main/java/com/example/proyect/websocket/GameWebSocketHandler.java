@@ -17,8 +17,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * WebSocket handler - thin routing layer only.
- * Delegates all game logic to GameController.
+ * WebSocket handler.
  *
  * Protocol:
  *   Client → Server:
@@ -172,8 +171,6 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         // Broadcast turn change
         broadcast(result.getPacket());
     }
-
-    // ========== Send Utilities ==========
 
     private void send(WebSocketSession session, Packet packet) throws IOException {
         session.sendMessage(new TextMessage(PacketSerializer.serialize(packet)));

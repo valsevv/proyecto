@@ -175,11 +175,11 @@ export default class HudScene extends Phaser.Scene {
         this.isMyTurn = isMyTurn;
 
         if (isMyTurn) {
-            this.turnText.setText('🟢 Tu turno');
+            this.turnText.setText('Tu turno');
             this.turnText.setStyle({ fill: '#00ff00' });
             this.setButtonsVisible(true);
         } else {
-            this.turnText.setText('🔴 Turno del oponente');
+            this.turnText.setText('Turno del oponente');
             this.turnText.setStyle({ fill: '#ff4444' });
             this.droneInfoText.setText('');
             this.setButtonsVisible(false);

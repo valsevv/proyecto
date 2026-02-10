@@ -2,7 +2,6 @@ package com.example.proyect.game;
 
 /**
  * Server-side state for a single drone.
- * Includes position and combat stats.
  */
 public class DroneState {
 

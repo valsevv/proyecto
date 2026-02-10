@@ -5,7 +5,6 @@ import java.util.Map;
 
 /**
  * Simple packet wrapper for WebSocket messages.
- * Contains a type and flexible payload data.
  */
 public class Packet {
     private final PacketType type;
