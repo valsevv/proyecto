@@ -1,4 +1,4 @@
-import { WORLD_WIDTH, WORLD_HEIGHT } from '../game.js';
+import { WORLD_WIDTH, WORLD_HEIGHT } from '../shared/constants.js';
 
 /**
  * Minimap - Radar circular estilo barco/avión

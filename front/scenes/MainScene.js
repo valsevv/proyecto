@@ -1,6 +1,6 @@
 import HexGrid from '../utils/HexGrid.js';
 import Drone from '../gameobjects/Drone.js';
-import Network from '../Network/NetworkManager.js'
+import Network from '../network/NetworkManager.js'
 import { WORLD_WIDTH, WORLD_HEIGHT } from '../shared/constants.js';
 
 const TEAM_COLORS = [0x00ff00, 0xff4444]; // green = player 0, red = player 1

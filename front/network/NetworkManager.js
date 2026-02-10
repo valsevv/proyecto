@@ -1,3 +1,5 @@
+import { WS_URL } from "../shared/constants.js";
+
 /**
  * NetworkManager — thin wrapper around WebSocket.
 */
@@ -96,4 +98,4 @@ class NetworkManager {
     }
 }
 
-export default new NetworkManager('ws://camilla-traplike-scribbly.ngrok-free.dev/ws');
+export default new NetworkManager(WS_URL);
