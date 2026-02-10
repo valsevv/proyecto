@@ -1,10 +1,11 @@
 import MainScene from './scenes/MainScene.js';
 import HudScene from './scenes/HudScene.js';
+import { VIEW_WIDTH, VIEW_HEIGHT } from './shared/constants.js';
 
 const config = {
     type: Phaser.AUTO,
-    width: 1200,
-    height: 600,
+    width: VIEW_WIDTH,
+    height: VIEW_HEIGHT,
     scene: [MainScene, HudScene]
 };
 
