@@ -25,9 +25,21 @@ export default class MainScene extends Phaser.Scene {
         this.actionMode = MODE_MOVE;
     }
 
+
     preload() {
-        this.load.image('mar', 'assets/mar.png');
+    this.load.image('mar', 'assets/mar.png');
+
+    this.load.spritesheet('dron_misil', 'assets/dron_misil.png', {
+        frameWidth: 64,
+        frameHeight: 64,
+        // opcionales:
+        // startFrame: 0,
+        // endFrame: 7,
+        // margin: 0,
+        // spacing: 0
+    });
     }
+
 
     create() {
         // Tile the background to cover the whole world
