@@ -1,8 +1,9 @@
-CREATE TABLE [IF NOT EXISTS] usuario (
-    id_usuario SERIAL PRIMARY KEY,
-    nombre_usuario VARCHAR(50) UNIQUE NOT NULL,
-    contrasenia_hash TEXT NOT NULL,
+CREATE TABLE user (
+    userID SERIAL PRIMARY KEY,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    hash_password TEXT NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
-    fecha_creacion TIMESTAMP  NOT NULL DEFAULT now(),
-    ultima_conexion TIMESTAMP NOT NULL DEFAULT now()
-);
+    creation_date TIMESTAMP  NOT NULL DEFAULT now(),
+    last_connection TIMESTAMP NOT NULL DEFAULT now()
+); 
+ 
