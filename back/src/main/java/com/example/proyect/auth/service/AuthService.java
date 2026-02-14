@@ -1,9 +1,10 @@
 package com.example.proyect.auth.service;
 
-import com.example.proyect.auth.security.PasswordHasher;
-import com.example.proyect.persistencia.player.User;
-import com.example.proyect.persistencia.player.UserRepository;
 import org.springframework.stereotype.Service;
+
+import com.example.proyect.auth.security.PasswordHasher;
+import com.example.proyect.persistence.classes.User;
+import com.example.proyect.persistence.repos.UserRepository;
 
 @Service
 public class AuthService {

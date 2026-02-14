@@ -1,14 +1,15 @@
 package com.example.proyect.auth.api;
 
-//expone http, recibe request del Phaserm, llama al playerservice y devuelve JSON
-//Phaser → AuthController → PlayerService → PlayerRepository → DB
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import com.example.proyect.auth.AuthResponse;
 import com.example.proyect.auth.LoginRequest;
 import com.example.proyect.auth.RegisterRequest;
-import com.example.proyect.persistencia.player.User;
-import com.example.proyect.persistencia.player.UserService;
-import org.springframework.web.bind.annotation.*;
+import com.example.proyect.auth.service.UserService;
+import com.example.proyect.persistence.classes.User;
 
 @RestController
 @RequestMapping("/api/auth")

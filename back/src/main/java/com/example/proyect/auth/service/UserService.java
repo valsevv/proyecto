@@ -1,7 +1,10 @@
-package com.example.proyect.persistencia.player;
+package com.example.proyect.auth.service;
+
+import org.springframework.stereotype.Service;
 
 import com.example.proyect.auth.security.PasswordHasher;
-import org.springframework.stereotype.Service;
+import com.example.proyect.persistence.classes.User;
+import com.example.proyect.persistence.repos.UserRepository;
 
 
 //logica de negocio de player (registro, loginn, raking, etc)

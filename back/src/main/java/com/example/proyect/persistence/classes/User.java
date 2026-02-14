@@ -1,14 +1,20 @@
-package com.example.proyect.persistencia.player;
+package com.example.proyect.persistence.classes;
 
-import jakarta.persistence.*;
-import org.w3c.dom.Text;
 
-import java.time.Instant;
+import java.time.Instant;//no se usa
 import java.time.OffsetDateTime;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 
 @Entity
 @Table(
-        name = "user",
+        name = "users",
         uniqueConstraints = {
                 @UniqueConstraint(name = "uk_player_username", columnNames = "username")
         }

@@ -1,7 +1,10 @@
-package com.example.proyect.persistencia.player;
+package com.example.proyect.persistence.repos;
+
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
-import java.util.Optional;
+
+import com.example.proyect.persistence.classes.User;
 
 public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByUsername(String username);
