@@ -1,4 +1,4 @@
-package com.example.proyect.game;
+package com.example.proyect.game.units.weapons;
 
 public class BombWeapon extends Weapon {
 

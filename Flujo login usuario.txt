@@ -1,0 +1,14 @@
+1:Frontend envia http: POST /api/auth/register
+body  {"username"; "...", "password": "..."}
+
+2: AuthController (API)
+recibe json y llama a authService.register(username,password)
+
+3: AuthService (capa negocio)
+valida username y password
+verifica que no exista
+hashea password
+crea player
+persiste
+
+4: AuthController crea response AuthResponse {Playerid, username}

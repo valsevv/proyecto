@@ -1,4 +1,4 @@
-package com.example.proyect.game;
+package com.example.proyect.game.units;
 
 /**
  * Clase abstracta base para cualquier entidad del tablero

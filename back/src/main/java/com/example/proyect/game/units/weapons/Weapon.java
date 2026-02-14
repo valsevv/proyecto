@@ -1,4 +1,4 @@
-package com.example.proyect.game;
+package com.example.proyect.game.units.weapons;
 
 /**
  * Weapon (arma) para juego por turnos.

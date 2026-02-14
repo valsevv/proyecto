@@ -1,4 +1,6 @@
-package com.example.proyect.game;
+package com.example.proyect.game.units.carrier;
+
+import com.example.proyect.game.units.Unit;
 
 public abstract class Carrier extends Unit {
 

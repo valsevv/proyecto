@@ -1,4 +1,6 @@
-package com.example.proyect.game;
+package com.example.proyect.game.units.drone;
+
+import com.example.proyect.game.units.weapons.BombWeapon;
 
 public class NavalDrone extends Drone {
 

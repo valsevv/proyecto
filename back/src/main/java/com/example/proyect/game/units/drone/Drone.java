@@ -1,4 +1,7 @@
-package com.example.proyect.game;
+package com.example.proyect.game.units.drone;
+
+import com.example.proyect.game.units.weapons.Weapon;
+import com.example.proyect.game.units.Unit;
 
 public abstract class Drone extends Unit {
 

@@ -1,0 +1,123 @@
+@startuml
+
+' =========================
+' Unit (Base abstracta)
+' =========================
+abstract class Unit {
+  - id : String
+  - ownerPlayerId : long
+  - maxHp : int
+  - currentHp : int
+  - movementRange : int
+  - position : HexCoord
+  - status : UnitStatus
+
+  + Unit()
+  + getId() : String
+  + getOwnerPlayerId() : long
+  + getMaxHp() : int
+  + getCurrentHp() : int
+  + getMovementRange() : int
+  + getPosition() : HexCoord
+  + getStatus() : UnitStatus
+  + setMovementRange(range:int) : void
+  + receiveDamage(amount:int) : void
+  + heal(amount:int) : void
+}
+
+enum UnitStatus {
+  ALIVE
+  DESTROYED
+}
+
+class HexCoord {
+  - q : int
+  - r : int
+  + HexCoord(q:int, r:int)
+  + getQ() : int
+  + getR() : int
+}
+
+Unit --> HexCoord : position
+Unit --> UnitStatus : status
+
+' =========================
+' Carrier
+' =========================
+abstract class Carrier {
+  + Carrier()
+  # setCarrierSpeed(speed:int) : void
+}
+
+class NavalCarrier {
+  + NavalCarrier()
+}
+
+class AerialCarrier {
+  + AerialCarrier()
+}
+
+Unit <|-- Carrier
+Carrier <|-- NavalCarrier
+Carrier <|-- AerialCarrier
+
+' =========================
+' Drone
+' =========================
+abstract class Drone {
+  - visionRange : int
+  - weapon : Weapon
+
+  + Drone()
+  + getVisionRange() : int
+  + setVisionRange(v:int) : void
+  + getWeapon() : Weapon
+  # setWeapon(w:Weapon) : void
+}
+
+class AerialDrone {
+  + AerialDrone()
+}
+
+class NavalDrone {
+  + NavalDrone()
+}
+
+Unit <|-- Drone
+Drone <|-- AerialDrone
+Drone <|-- NavalDrone
+
+' =========================
+' Weapon
+' =========================
+class Weapon {
+  - ammo : int
+  - damage : int
+  - shotsPerTurn : int
+  - accuracy : double
+  - range : int
+
+  + Weapon()
+  + Weapon(ammo:int, damage:int, shotsPerTurn:int, accuracy:double, range:int)
+  + getAmmo() : int
+  + getDamage() : int
+  + getShotsPerTurn() : int
+  + getAccuracy() : double
+  + getRange() : int
+  + consumeAmmo(amount:int) : void
+}
+
+class MissileWeapon {
+  + MissileWeapon(ammo:int, damage:int, shotsPerTurn:int, accuracy:double, range:int)
+}
+
+class BombWeapon {
+  + BombWeapon(ammo:int, damage:int, shotsPerTurn:int, accuracy:double, range:int)
+}
+
+Weapon <|-- MissileWeapon
+Weapon <|-- BombWeapon
+
+Drone --> Weapon : weapon
+
+@enduml
