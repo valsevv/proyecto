@@ -9,7 +9,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.example.proyect.persistence.classes.Ranking;
-import com.example.proyect.persistence.classes.User;
 import com.example.proyect.persistence.repos.RankingRepository;
 import com.example.proyect.persistence.repos.UserRepository;
 
@@ -35,11 +34,8 @@ public class RankingService {
         if (rankingRepository.existsByUser_Id(userId)) {
             throw new IllegalStateException("Ya existe un ranking para user_id=" + userId);
         }
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new EntityNotFoundException("No existe User con id=" + userId));
-
         Ranking r = new Ranking();
-        r.setUser(user);
+        r.setUserId(userId);
         r.setPoints(initialPoints);
         r.setReachedAt(OffsetDateTime.now());
 
@@ -67,15 +63,7 @@ public class RankingService {
         Ranking ranking = rankingRepository.findByUser_Id(userId).orElse(null);
 
         if (ranking == null) {
-            if (!createIfMissing) {
-                throw new IllegalStateException("No existe ranking para user_id=" + userId);
-            }
-            User user = userRepository.findById(userId)
-                    .orElseThrow(() -> new EntityNotFoundException("No existe User con id=" + userId));
-            ranking = new Ranking();
-            ranking.setUser(user);
-            ranking.setPoints(0);
-            ranking.setReachedAt(OffsetDateTime.now());
+            createForUser(userId, 0);
         }
 
         int newPoints = (ranking.getPoints() == null ? 0 : ranking.getPoints()) + points;
@@ -85,9 +73,6 @@ public class RankingService {
         return rankingRepository.save(ranking);
     }
 
-    /**
-     * Setea puntos exactos (debe existir).
-     */
     @Transactional
     public Ranking setPoints(Long userId, int points) {
         Ranking r = rankingRepository.findByUser_Id(userId)
@@ -98,16 +83,16 @@ public class RankingService {
     }
 
     /**
-     * Top N por puntos (desempata por reachedAt asc, luego id).
+     * Top N por puntos (desempata por el primero en lograr ese puntaje, luego id).
      */
     @Transactional(readOnly = true)
     public List<Ranking> getTop(int limit) {
-        if (limit <= 0) limit = 10;
+        if (limit <= 0) limit = 10; //Por defecto TOP 10
         return rankingRepository.findTopOrderDefault(PageRequest.of(0, limit));
     }
 
     /**
-     * Elimina el ranking de un usuario si existe.
+     * Elimina el usuario del ranking
      */
     @Transactional
     public boolean deleteByUserId(Long userId) {

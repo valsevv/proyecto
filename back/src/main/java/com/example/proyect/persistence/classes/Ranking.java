@@ -34,9 +34,9 @@ public class Ranking {
         name = "user_id",
         nullable = false,
         unique = true,
-        foreignKey = @ForeignKey(name = "fk_ranking_user")
+        foreignKey = @ForeignKey(name = "fk_ranking_userId")
     )
-    private User user;
+    private Long userId = null; //Tiene el Id del jugador (usuario)
 
     @Column(name = "points", nullable = false)
     private Integer points = 0;
@@ -61,8 +61,8 @@ public class Ranking {
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
-    public User getUser() { return user; }
-    public void setUser(User user) { this.user = user; }
+    public Long getUserId() { return this.userId; }
+    public void setUserId(Long userId) { this.userId = userId; }
 
     public Integer getPoints() { return this.points; }
     public void setPoints(Integer points) { this.points = points; }
