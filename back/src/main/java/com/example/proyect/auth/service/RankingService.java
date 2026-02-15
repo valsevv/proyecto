@@ -31,7 +31,7 @@ public class RankingService {
      */
     @Transactional
     public Ranking createForUser(Long userId, int initialPoints) {
-        if (rankingRepository.existsByUser_Id(userId)) {
+        if (rankingRepository.existsByuserId(userId)) {
             throw new IllegalStateException("Ya existe un ranking para user_id=" + userId);
         }
         Ranking r = new Ranking();
@@ -52,7 +52,7 @@ public class RankingService {
      */
     @Transactional(readOnly = true)
     public Ranking getByUserId(Long userId) {
-        return rankingRepository.findByUser_Id(userId).orElse(null);
+        return rankingRepository.findByuserId(userId).orElse(null);
     }
 
     /**
@@ -60,7 +60,7 @@ public class RankingService {
      */
     @Transactional
     public Ranking addPoints(Long userId, int points, boolean createIfMissing) {
-        Ranking ranking = rankingRepository.findByUser_Id(userId).orElse(null);
+        Ranking ranking = rankingRepository.findByuserId(userId).orElse(null);
 
         if (ranking == null) {
             createForUser(userId, 0);
@@ -75,7 +75,7 @@ public class RankingService {
 
     @Transactional
     public Ranking setPoints(Long userId, int points) {
-        Ranking r = rankingRepository.findByUser_Id(userId)
+        Ranking r = rankingRepository.findByuserId(userId)
                 .orElseThrow(() -> new EntityNotFoundException("No existe ranking para user_id=" + userId));
         r.setPoints(points);
         r.setReachedAt(OffsetDateTime.now());
@@ -96,7 +96,7 @@ public class RankingService {
      */
     @Transactional
     public boolean deleteByUserId(Long userId) {
-        return rankingRepository.findByUser_Id(userId)
+        return rankingRepository.findByuserId(userId)
                 .map(r -> {
                     rankingRepository.delete(r);
                     return true;

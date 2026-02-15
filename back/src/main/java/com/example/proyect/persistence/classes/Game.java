@@ -7,13 +7,10 @@ import com.example.proyect.game.GameStateJsonConverter;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
-import jakarta.persistence.ForeignKey;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -27,10 +24,11 @@ import jakarta.persistence.UniqueConstraint;
         @Index(name = "idx_game_player2_id", columnList = "player2_id")
     },
     uniqueConstraints = {
-        @UniqueConstraint(name = "uq_players", columnNames = { "player1_id", "player2_id" })
+        @UniqueConstraint(name = "uq_players", columnNames = {"player1_id", "player2_id"})
     }
 )
 public class Game {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "game_id")
@@ -38,28 +36,12 @@ public class Game {
 
     @Column(name = "state", nullable = false, columnDefinition = "jsonb")
     @Convert(converter = GameStateJsonConverter.class)
-    private GameState state = defaultState(); // inicialización segura
+    private GameState state = defaultState();
 
-    private static GameState defaultState() {
-        GameState state = new GameState();
-        state.setStatus("IN_PROGRESS");
-        state.setTurn(1);
-        return state;
-    }
-    @ManyToOne(optional = false)
-    @JoinColumn(
-        name = "player1_id",
-        nullable = false,
-        foreignKey = @ForeignKey(name = "fk_game_player1")
-    )
+    @Column(name = "player1_id", nullable = false)
     private Long player1Id;
 
-    @ManyToOne(optional = false)
-    @JoinColumn(
-        name = "player2_id",
-        nullable = false,
-        foreignKey = @ForeignKey(name = "fk_game_player2")
-    )
+    @Column(name = "player2_id", nullable = false)
     private Long player2Id;
 
     // DEFAULT now() en DB; fallback en @PrePersist
@@ -70,6 +52,13 @@ public class Game {
     private OffsetDateTime endedAt;
 
     public Game() {}
+
+    private static GameState defaultState() {
+        GameState state = new GameState();
+        state.setStatus("IN_PROGRESS");
+        state.setTurn(1);
+        return state;
+    }
 
     @PrePersist
     public void prePersist() {
@@ -86,7 +75,7 @@ public class Game {
 
     private void validatePlayersDistinct() {
         if (player1Id != null && player2Id != null) {
-            if (player1Id == player2Id) {
+            if (player1Id.equals(player2Id)) {
                 throw new IllegalStateException("player1 y player2 no pueden ser el mismo usuario");
             }
         }
@@ -103,7 +92,7 @@ public class Game {
     public void setPlayer1Id(Long player1Id) { this.player1Id = player1Id; }
 
     public Long getPlayer2Id() { return player2Id; }
-    public void setPlayer2Id(Long player2) { this.player2Id = player2Id; }
+    public void setPlayer2Id(Long player2Id) { this.player2Id = player2Id; } // <-- corregido
 
     public OffsetDateTime getStartedAt() { return startedAt; }
     public void setStartedAt(OffsetDateTime startedAt) { this.startedAt = startedAt; }

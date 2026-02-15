@@ -24,7 +24,7 @@ public class GameService {
     public List<Game> getAllGamesOfUser(Long userId) {
         Objects.requireNonNull(userId, "user no puede ser null");
         return gameRepository
-                .findByPlayer1OrPlayer2(userId, userId, Pageable.unpaged())
+                .findByPlayer1IdOrPlayer2Id(userId, userId, Pageable.unpaged())
                 .toList();
     }
 }

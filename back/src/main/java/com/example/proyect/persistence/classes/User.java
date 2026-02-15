@@ -1,8 +1,7 @@
 package com.example.proyect.persistence.classes;
 
 
-import java.time.Instant;//no se usa
-import java.time.OffsetDateTime;
+import java.time.OffsetDateTime;//no se usa
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -54,7 +53,7 @@ public class User {
     public User(String username, String passwordHash) {
         setUsername(username);
         setPasswordHash(passwordHash);
-        this.createdAt = OffsetDateTime.from(Instant.now());
+        this.createdAt = OffsetDateTime.now();
     }
 
     // =========================
@@ -92,7 +91,7 @@ public class User {
     }
 
     public void markLoginNow() {
-        this.lastLoginAt = OffsetDateTime.from(Instant.now());
+        this.lastLoginAt = OffsetDateTime.now();
     }
 
     // =========================
