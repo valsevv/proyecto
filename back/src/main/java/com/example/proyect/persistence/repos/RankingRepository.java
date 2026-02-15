@@ -10,9 +10,9 @@ import com.example.proyect.persistence.classes.Ranking;
 
 public interface RankingRepository extends JpaRepository<Ranking, Long> {
 
-    Optional<Ranking> findByUser_Id(Long userId);
+    Optional<Ranking> findByuserId(Long userId);
 
-    boolean existsByUser_Id(Long userId);
+    boolean existsByuserId(Long userId);
 
     @Query("""
            SELECT rank

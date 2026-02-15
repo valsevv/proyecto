@@ -62,13 +62,6 @@
 			<groupId>org.springframework.security</groupId>
 			<artifactId>spring-security-crypto</artifactId>
 		</dependency>
-
-	
-   <dependency>
-     <groupId>org.apache.hadoop</groupId>
-     <artifactId>hadoop-common</artifactId>
-     <version>3.2.0</version>
-   </dependency>
  </dependencies>
 
 	<build>
