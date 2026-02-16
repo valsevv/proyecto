@@ -22,7 +22,7 @@ public class Ranking {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY) 
-    @Column(name = "rank_id")
+    @Column(name = "ranking_id")
     private Long id;
 
     @Column(name = "user_id", nullable = false)

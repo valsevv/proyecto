@@ -24,7 +24,7 @@ public class AuthController {
     @PostMapping("/register")
     public AuthResponse register(@RequestBody RegisterRequest request) {
 
-        User user = userService.register(request.username, request.password);
+        User user = userService.register(request.username, request.email, request.password);
 
         return new AuthResponse(user.getId(), user.getUsername());
     }
@@ -34,6 +34,6 @@ public class AuthController {
 
         User user = userService.login(request.username, request.password);
 
-        return new AuthResponse(user.getId(), user.getUsername());
+         return new AuthResponse(user.getId(), user.getUsername());
     }
 }
