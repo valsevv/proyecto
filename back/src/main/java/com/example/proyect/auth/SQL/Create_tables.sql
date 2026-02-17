@@ -1,7 +1,33 @@
+-- Database: proyect
+-- Primero creamos las tablas que estan aca, y luego segun como la modifica postgre tomamos el sql que el crea 
+-- y lo ponemos en los sql individuales
+-- DROP DATABASE IF EXISTS proyect;
 
-CREATE SCHEMA IF NOT EXISTS public;
-SET search_path TO public;
+CREATE DATABASE proyect
+    WITH
+    OWNER = postgres
+    ENCODING = 'UTF8'
+    LC_COLLATE = 'Spanish_Mexico.1252'
+    LC_CTYPE = 'Spanish_Mexico.1252'
+    LOCALE_PROVIDER = 'libc'
+    TABLESPACE = pg_default
+    CONNECTION LIMIT = -1
+    IS_TEMPLATE = False;
+-- SCHEMA: public
 
+-- DROP SCHEMA IF EXISTS public ;
+
+CREATE SCHEMA IF NOT EXISTS public
+    AUTHORIZATION pg_database_owner;
+
+COMMENT ON SCHEMA public
+    IS 'standard public schema';
+
+GRANT USAGE ON SCHEMA public TO PUBLIC;
+
+GRANT ALL ON SCHEMA public TO pg_database_owner;
+
+-------------
 -- USERS
 CREATE TABLE IF NOT EXISTS users (
     id               BIGSERIAL PRIMARY KEY,

@@ -6,8 +6,6 @@ import com.example.proyect.auth.security.PasswordHasher;
 import com.example.proyect.persistence.classes.User;
 import com.example.proyect.persistence.repos.UserRepository;
 
-
-//logica de negocio de player (registro, loginn, raking, etc)
 @Service
 public class UserService {
 
@@ -17,15 +15,30 @@ public class UserService {
         this.userRepository = userRepository;
     }
 
-    public User register(String username, String rawPassword) {
+    public User register(String username, String email, String rawPassword) {
 
         if (userRepository.existsByUsername(username)) {
             throw new IllegalStateException("Username ya existe");
         }
 
-        String hash = PasswordHasher.hash(rawPassword);
+        if (userRepository.existsByEmail(email.toLowerCase())) {
+            throw new IllegalStateException("Email ya existe");
+        }
+        if (username == null || username.isBlank()) {
+            throw new IllegalArgumentException("Username requerido");
+        }
 
-        User user = new User(username, hash);
+        if (rawPassword == null || rawPassword.length() < 4) {
+            throw new IllegalArgumentException("Password demasiado corto");
+        }
+
+        if (email == null || email.length() < 8) {
+            throw new IllegalArgumentException("Email demasiado corto");
+        }
+
+        String hashedPassword = PasswordHasher.hash(rawPassword);
+ 
+        User user = new User(username, email, hashedPassword);
         return userRepository.save(user);
     }
 
@@ -43,3 +56,4 @@ public class UserService {
         return userRepository.save(user);
     }
 }
+
