@@ -1,5 +1,5 @@
 package com.example.proyect.persistence.classes;
-
+//Con jakarte persistence podemos definir entidades que luego JPA sabe manejar en el repositorio
 import java.time.OffsetDateTime;
 
 import jakarta.persistence.Column;

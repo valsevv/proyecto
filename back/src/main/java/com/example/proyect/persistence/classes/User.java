@@ -1,7 +1,7 @@
 package com.example.proyect.persistence.classes;
 
-
-import java.time.OffsetDateTime;//no se usa
+//Con jakarte persistence podemos definir entidades que luego JPA sabe manejar en el repositorio
+import java.time.OffsetDateTime;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -23,7 +23,8 @@ public class User {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @Column(name = "user_id")
+    private Long userid;
 
     @Column(nullable = false, length = 50)
     private String username;
@@ -60,7 +61,7 @@ public class User {
 
     // Getters
 
-    public Long getId() { return id; }
+    public Long getUserId() { return userid; }
     public String getUsername() { return username; }
     public String getEmail() { return email; }
     public String getPasswordHash() { return passwordHash; }

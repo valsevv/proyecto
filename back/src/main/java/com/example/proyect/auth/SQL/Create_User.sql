@@ -4,7 +4,7 @@
 
 CREATE TABLE IF NOT EXISTS public.users
 (
-    id bigint NOT NULL DEFAULT nextval('users_id_seq'::regclass),
+    user_id bigint NOT NULL DEFAULT nextval('users_id_seq'::regclass),
     username character varying(50) COLLATE pg_catalog."default" NOT NULL,
     password_hash text COLLATE pg_catalog."default" NOT NULL,
     email character varying(255) COLLATE pg_catalog."default" NOT NULL,

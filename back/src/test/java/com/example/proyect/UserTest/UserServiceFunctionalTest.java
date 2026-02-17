@@ -1,4 +1,6 @@
-package com.example.proyect;
+//Test Funcional del servicio UserService. Prueba el servicio y tambien el repositorio
+
+package com.example.proyect.UserTest;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -24,11 +26,12 @@ class UserServiceFunctionalTest {
     private UserRepository userRepository;
 
     @Test
+    //Se prueba crear un usuario 
     void shouldRegisterUserSuccessfully() {
 
         User user = userService.register("alexis", "alexis@mail.com", "123456");
 
-        assertNotNull(user.getId());
+        assertNotNull(user.getUserId());
         assertEquals("alexis", user.getUsername());
         assertEquals("alexis@mail.com", user.getEmail());
         assertNotNull(user.getPasswordHash());
@@ -38,25 +41,36 @@ class UserServiceFunctionalTest {
 
         assertTrue(userRepository.existsByUsername("alexis"));
         assertTrue(userRepository.existsByEmail("alexis@mail.com"));
+    
+        //Si quisieramos usar el Repositorio para traer ese usuario creado
+        // Optional<User> optionalUser = userRepository.findByUsername("alexis");
+
+        // if (optionalUser.isPresent()) {
+        //     User user2 = optionalUser.get();
+        //     System.out.println("[DEBUG]-> El usuario existe : " + user2.getUsername() );
+        //     System.out.println("[DEBUG]--> Su Email es : " + user2.getEmail() );
+        //     System.out.println("[DEBUG]---> Su puntaje es : " + user2.getScore() );
+        //     System.out.println("[DEBUG]----> Password hasheado es : " + user2.getPasswordHash() );
+        // }
     }
 
     @Test
     void shouldNotAllowDuplicateUsername() {
 
-        userService.register("duplicate", "dup@mail.com", "123");
+        userService.register("duplicate", "dup@mail.com", "123456789");
 
         assertThrows(IllegalStateException.class, () ->
-                userService.register("duplicate", "other@mail.com", "456")
+                userService.register("duplicate", "other@mail.com", "456456456")
         );
     }
 
     @Test
     void shouldNotAllowDuplicateEmail() {
 
-        userService.register("user1", "same@mail.com", "123");
+        userService.register("user1", "same@mail.com", "123456789");
 
         assertThrows(IllegalStateException.class, () ->
-                userService.register("user2", "same@mail.com", "456")
+                userService.register("user2", "same@mail.com", "456456456")
         );
     }
 
@@ -66,7 +80,12 @@ class UserServiceFunctionalTest {
         userService.register("loginUser", "login@mail.com", "mypassword");
 
         User logged = userService.login("loginUser", "mypassword");
-
+    
+        // Si quisiera debugear y ver en el Debug Console mas info del usuario
+        // System.out.println("[DEBUG]-> Usuario logeado : " + logged.getUsername() );
+        // System.out.println("[DEBUG]--> Email  : " + logged.getEmail() );
+        // System.out.println("[DEBUG]---> ultima conexion : " + logged.getLastConnection() );
+        
         assertNotNull(logged.getLastConnection());
     }
 
@@ -87,4 +106,5 @@ class UserServiceFunctionalTest {
                 userService.login("ghost", "123")
         );
     }
+
 }

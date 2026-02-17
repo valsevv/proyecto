@@ -1,5 +1,5 @@
 package com.example.proyect.persistence.classes;
-
+//Con jakarte persistence podemos definir entidades que luego JPA sabe manejar en el repositorio
 import java.time.OffsetDateTime;
 
 import com.example.proyect.game.GameStateJsonConverter;
@@ -55,7 +55,7 @@ public class Game {
 
     private static GameState defaultState() {
         GameState state = new GameState();
-        state.setStatus("IN_PROGRESS");
+        state.setStatus(GameStatus.IN_PROGRESS);
         state.setTurn(1);
         return state;
     }
