@@ -1,18 +1,5 @@
-<<<<<<<< HEAD:back/src/test/java/com/example/proyect/auth/service/UserServiceTest.java
 package com.example.proyect.auth.service;
 
-import com.example.proyect.auth.security.PasswordHasher;
-import com.example.proyect.auth.service.UserService;
-import com.example.proyect.persistence.classes.User;
-import com.example.proyect.persistence.repos.UserRepository;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;                          // <— usa el import normal
-import org.mockito.MockedStatic;
-import org.mockito.junit.jupiter.MockitoExtension;
-========
-package com.example.proyect;
->>>>>>>> eafe0bd4ad3efe9e4f1d59c60a64bdee48fa202f:back/src/test/java/com/example/proyect/UserServiceTest.java
 
 import java.util.Optional;
 
@@ -30,7 +17,6 @@ import static org.mockito.Mockito.when;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.example.proyect.auth.security.PasswordHasher;
-import com.example.proyect.auth.service.UserService;
 import com.example.proyect.persistence.classes.User;
 import com.example.proyect.persistence.repos.UserRepository;
 
