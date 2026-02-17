@@ -15,7 +15,8 @@ import jakarta.persistence.UniqueConstraint;
 @Table(
         name = "users",
         uniqueConstraints = {
-                @UniqueConstraint(name = "uk_player_username", columnNames = "username")
+                @UniqueConstraint(name = "uk_player_username", columnNames = "username"),
+                @UniqueConstraint(name = "uk_player_email", columnNames = "email")
         }
 )
 public class User {
@@ -27,7 +28,9 @@ public class User {
     @Column(nullable = false, length = 50)
     private String username;
 
-    // Nunca guardar password plano
+    @Column(nullable = false, length = 255)
+    private String email;
+
     @Column(name = "password_hash", nullable = false, length = 255, columnDefinition = "TEXT")
     private String passwordHash;
 
@@ -43,60 +46,62 @@ public class User {
     @Column(name = "created_at", nullable = false, updatable = false, columnDefinition = "TIMESTAMPTZ DEFAULT now()")
     private OffsetDateTime createdAt;
 
-    @Column(name = "last_login_at", columnDefinition = "TIMESTAMPTZ DEFAULT now()")
-    private OffsetDateTime lastLoginAt;
+    @Column(name = "last_connection", columnDefinition = "TIMESTAMPTZ DEFAULT now()")
+    private OffsetDateTime lastConnection;
 
-    protected User() {
-        // Constructor vacío requerido por JPA
-    }
+    protected User() {}
 
-    public User(String username, String passwordHash) {
+    public User(String username, String email, String passwordHash) {
         setUsername(username);
+        setEmail(email);
         setPasswordHash(passwordHash);
         this.createdAt = OffsetDateTime.now();
     }
 
-    // =========================
     // Getters
-    // =========================
 
     public Long getId() { return id; }
     public String getUsername() { return username; }
+    public String getEmail() { return email; }
     public String getPasswordHash() { return passwordHash; }
     public int getWins() { return wins; }
     public int getLosses() { return losses; }
     public int getScore() { return score; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
-    public OffsetDateTime getLastLoginAt() { return lastLoginAt; }
+    public OffsetDateTime getLastConnection() { return lastConnection; }
 
-    // =========================
     // Setters controlados
-    // =========================
 
     public void setUsername(String username) {
-        if (username == null || username.isBlank()) {
+        if (username == null || username.isBlank())
             throw new IllegalArgumentException("Username requerido");
-        }
-        if (username.length() > 50) {
+
+        if (username.length() > 50)
             throw new IllegalArgumentException("Username demasiado largo");
-        }
+
         this.username = username.trim();
     }
 
+    public void setEmail(String email) {
+        if (email == null || email.isBlank())
+            throw new IllegalArgumentException("Email requerido");
+
+        if (!email.contains("@"))
+            throw new IllegalArgumentException("Email inválido");
+
+        this.email = email.trim().toLowerCase();
+    }
+
     public void setPasswordHash(String passwordHash) {
-        if (passwordHash == null || passwordHash.isBlank()) {
+        if (passwordHash == null || passwordHash.isBlank())
             throw new IllegalArgumentException("Password hash requerido");
-        }
+
         this.passwordHash = passwordHash;
     }
 
     public void markLoginNow() {
-        this.lastLoginAt = OffsetDateTime.now();
+        this.lastConnection = OffsetDateTime.now();
     }
-
-    // =========================
-    // Dominio (ranking)
-    // =========================
 
     public void registerWin(int points) {
         this.wins++;

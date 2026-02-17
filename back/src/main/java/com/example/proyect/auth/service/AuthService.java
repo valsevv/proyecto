@@ -1,3 +1,5 @@
+//este ya no se usa, ahora se usa UserService
+
 package com.example.proyect.auth.service;
 
 import org.springframework.stereotype.Service;
@@ -18,7 +20,7 @@ public class AuthService {
     // =========================
     // REGISTER
     // =========================
-    public User register(String username, String rawPassword) {
+    public User register(String username, String email, String rawPassword) {
 
         if (username == null || username.isBlank()) {
             throw new IllegalArgumentException("Username requerido");
@@ -28,13 +30,17 @@ public class AuthService {
             throw new IllegalArgumentException("Password demasiado corto");
         }
 
+        if (email == null || email.length() < 8) {
+            throw new IllegalArgumentException("Email demasiado corto");
+        }
+
         if (userRepository.existsByUsername(username)) {
             throw new IllegalStateException("Username ya existe");
         }
 
         String hashedPassword = PasswordHasher.hash(rawPassword);
 
-        User user = new User(username, hashedPassword);
+        User user = new User(username, email, hashedPassword);
         return userRepository.save(user);
     }
 
