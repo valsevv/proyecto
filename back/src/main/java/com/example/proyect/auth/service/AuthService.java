@@ -1,3 +1,5 @@
+//este ya no se usa, ahora se usa UserService
+
 package com.example.proyect.auth.service;
 
 import org.springframework.stereotype.Service;
