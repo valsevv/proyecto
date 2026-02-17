@@ -14,6 +14,8 @@ export default class HudScene extends Phaser.Scene {
     }
 
     create() {
+        console.log('[HudScene] === CREATE CALLED ===');
+        
         const radius = 80;
         const margin = 20;
         this.minimap = new Minimap(
@@ -42,11 +44,17 @@ export default class HudScene extends Phaser.Scene {
         this.createActionButtons();
 
         // Listen for events from MainScene
+        console.log('[HudScene] === SETTING UP EVENT LISTENERS ===');
         const mainScene = this.scene.get('MainScene');
+        console.log('[HudScene] MainScene exists?:', !!mainScene);        
+        
         mainScene.events.on('statusChanged', this.onStatusChanged, this);
         mainScene.events.on('gameStarted', this.onGameStarted, this);
         mainScene.events.on('turnChanged', this.onTurnChanged, this);
         mainScene.events.on('attackModeEnded', this.deselectAttackButton, this);
+        
+        console.log('[HudScene] === EVENT LISTENERS REGISTERED ===');
+        console.log('[HudScene] === CREATE COMPLETE ===');
     }
 
     createActionButtons() {
@@ -164,14 +172,20 @@ export default class HudScene extends Phaser.Scene {
     }
 
     onStatusChanged(status) {
+        console.log('[HudScene] === ON STATUS CHANGED ===');
+        console.log('[HudScene] New status:', status);
         this.turnText.setText(status);
     }
 
     onGameStarted() {
+        console.log('[HudScene] === ON GAME STARTED ===');
         this.gameStarted = true;
     }
 
     onTurnChanged({ isMyTurn }) {
+        console.log('[HudScene] === ON TURN CHANGED ===');
+        console.log('[HudScene] isMyTurn:', isMyTurn);
+        
         this.isMyTurn = isMyTurn;
 
         if (isMyTurn) {

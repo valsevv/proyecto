@@ -39,12 +39,15 @@ class NetworkManager {
     }
 
     send(msg) {
-        console.log('[net] →', msg.type, msg);
+        console.log('='.repeat(80));
+        console.log('[net] → SENDING MESSAGE:', msg.type);
+        console.log('[net] Full message:', msg);
+        console.log('='.repeat(80));
         this.ws.send(JSON.stringify(msg));
     }
 
-
     join() {
+        console.log('[net] === SENDING JOIN MESSAGE ===');
         this.send({ type: 'join' });
     }
 
@@ -59,42 +62,72 @@ class NetworkManager {
     endTurn() {
         this.send({ type: 'endTurn' });
     }
-
+    
+    selectSide(side) {
+        console.log('[net] === SENDING SELECT_SIDE MESSAGE ===');
+        console.log('[net] Side:', side);
+        this.send({ type: 'selectSide', side });
+    }
 
     isMyTurn() {
         return this.currentTurn === this.playerIndex;
     }
 
     on(type, callback) {
+        const isOverwriting = !!this.handlers[type];
+        if (isOverwriting) {
+            console.warn('[net] ⚠️  OVERWRITING EXISTING HANDLER for:', type);
+            console.trace('[net] Stack trace for handler overwrite:');
+        } else {
+            console.log('[net] ✓ Registering new handler for:', type);
+        }
         this.handlers[type] = callback;
     }
 
     _onMessage(event) {
         const msg = JSON.parse(event.data);
-        console.log('[net] ←', msg.type, msg);
+        console.log('='.repeat(80));
+        console.log('[net] ← RECEIVED MESSAGE:', msg.type);
+        console.log('[net] Full message:', msg);
+        console.log('='.repeat(80));
 
         // Internal bookkeeping
         if (msg.type === 'welcome') {
             this.playerId = msg.playerId;
             this.playerIndex = msg.playerIndex;
+            console.log('[net] Updated playerId:', this.playerId);
+            console.log('[net] Updated playerIndex:', this.playerIndex);
         }
 
         if (msg.type === 'turnStart') {
             this.currentTurn = msg.activePlayer;
             this.actionsRemaining = msg.actionsRemaining;
+            console.log('[net] Updated currentTurn:', this.currentTurn);
+            console.log('[net] Updated actionsRemaining:', this.actionsRemaining);
         }
 
         if (msg.type === 'gameStart' && msg.state) {
             this.currentTurn = msg.state.currentTurn;
             this.actionsRemaining = msg.state.actionsRemaining;
+            console.log('[net] Updated from gameStart - currentTurn:', this.currentTurn);
+            console.log('[net] Updated from gameStart - actionsRemaining:', this.actionsRemaining);
         }
 
+        console.log('[net] Firing handler for:', msg.type);
         this._fire(msg.type, msg);
+        console.log('[net] Handler fired');
     }
 
     _fire(type, msg) {
         const handler = this.handlers[type];
-        if (handler) handler(msg);
+        if (handler) {
+            console.log('[net] ✓ Handler exists for', type, '- executing...');
+            handler(msg);
+            console.log('[net] ✓ Handler executed for', type);
+        } else {
+            console.warn('[net] ⚠️  NO HANDLER REGISTERED for:', type);
+            console.log('[net] Current registered handlers:', Object.keys(this.handlers));
+        }
     }
 }
 

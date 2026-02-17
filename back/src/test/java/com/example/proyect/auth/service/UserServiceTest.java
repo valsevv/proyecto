@@ -1,6 +1,7 @@
-package com.example.proyect.auth.tests;
+package com.example.proyect.auth.service;
 
 import com.example.proyect.auth.security.PasswordHasher;
+import com.example.proyect.auth.service.UserService;
 import com.example.proyect.persistence.classes.User;
 import com.example.proyect.persistence.repos.UserRepository;
 import org.junit.jupiter.api.Test;

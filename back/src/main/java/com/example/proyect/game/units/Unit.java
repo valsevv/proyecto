@@ -9,17 +9,15 @@ public abstract class Unit {
     private String id;
     private long ownerPlayerId;
     private int maxHp;
-    private int actualHp;
+    private int currentHp;
     private HexCoord position;
     private UnitStatus status;
 
-
-
     private int movementRange;
-
 
     public Unit() {
         this.maxHp = 100;
+        this.currentHp = 100;
         this.status = UnitStatus.ALIVE;
     } //SE DEBERIA PONER TAMBIEN EL OWNERPLAYEID NO?
 
@@ -80,12 +78,18 @@ public abstract class Unit {
     public void receiveDamage(int amount) {
         if (amount <= 0 || isDestroyed()) return;
 
-        maxHp -= amount;
+        currentHp -= amount;
 
-        if (maxHp <= 0) {
-            maxHp = 0;
+        if (currentHp <= 0) {
+            currentHp = 0;
             status = UnitStatus.DESTROYED;
         }
+    }
+
+    public void heal(int amount) {
+        if (amount <= 0 || isDestroyed()) return;
+
+        currentHp = Math.min(currentHp + amount, maxHp);
     }
 
     // =========================
@@ -99,25 +103,25 @@ public abstract class Unit {
 
     public static final class HexCoord {
 
-        private final int q;
-        private final int r;
+        private final double x;
+        private final double y;
 
-        public HexCoord(int q, int r) {
-            this.q = q;
-            this.r = r;
+        public HexCoord(double x, double y) {
+            this.x = x;
+            this.y = y;
         }
 
-        public int getQ() {
-            return q;
+        public double getX() {
+            return x;
         }
 
-        public int getR() {
-            return r;
+        public double getY() {
+            return y;
         }
 
         @Override
         public String toString() {
-            return "(" + q + "," + r + ")";
+            return "(" + x + "," + y + ")";
         }
 
         @Override
@@ -125,21 +129,23 @@ public abstract class Unit {
             if (this == obj) return true;
             if (!(obj instanceof HexCoord)) return false;
             HexCoord other = (HexCoord) obj;
-            return q == other.q && r == other.r;
+            return Double.compare(x, other.x) == 0 && Double.compare(y, other.y) == 0;
         }
 
         @Override
         public int hashCode() {
-            return 31 * q + r;
+            long xBits = Double.doubleToLongBits(x);
+            long yBits = Double.doubleToLongBits(y);
+            return (int) (xBits ^ (xBits >>> 32) ^ yBits ^ (yBits >>> 32));
         }
     }
 
-    public int getActualHp() {
-        return actualHp;
+    public int getCurrentHp() {
+        return currentHp;
     }
 
-    public void setActualHp(int actualHp) {
-        this.actualHp = actualHp;
+    public void setCurrentHp(int currentHp) {
+        this.currentHp = currentHp;
     }
 
     public int getMovementRange() {
@@ -155,6 +161,6 @@ public abstract class Unit {
             throw new IllegalArgumentException("maxHp debe ser mayor a 0");
 
         this.maxHp = maxHp;
-        this.actualHp = maxHp;
+        this.currentHp = maxHp;
     }
 }

@@ -6,12 +6,15 @@ package com.example.proyect.websocket.packet;
 public enum PacketType {
     // Client -> Server (Inbound)
     JOIN("join"),
+    SELECT_SIDE("selectSide"),
     MOVE("move"),
     ATTACK("attack"),
     END_TURN("endTurn"),
 
     // Server -> Client (Outbound)
     WELCOME("welcome"),
+    SIDE_CHOSEN("sideChosen"),
+    BOTH_READY("bothReady"),
     GAME_START("gameStart"),
     TURN_START("turnStart"),
     MOVE_DRONE("moveDrone"),

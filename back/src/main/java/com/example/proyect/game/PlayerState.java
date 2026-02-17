@@ -1,5 +1,6 @@
 package com.example.proyect.game;
 
+import com.example.proyect.game.units.drone.Drone;
 import java.util.List;
 
 /**
@@ -9,9 +10,10 @@ public class PlayerState {
 
     private final String sessionId;
     private final int playerIndex;
-    private final List<DroneState> drones;
+    private final List<Drone> drones;
+    private String side; // "Naval" or "Aereo"
 
-    public PlayerState(String sessionId, int playerIndex, List<DroneState> drones) {
+    public PlayerState(String sessionId, int playerIndex, List<Drone> drones) {
         this.sessionId = sessionId;
         this.playerIndex = playerIndex;
         this.drones = drones;
@@ -19,5 +21,7 @@ public class PlayerState {
 
     public String getSessionId() { return sessionId; }
     public int getPlayerIndex() { return playerIndex; }
-    public List<DroneState> getDrones() { return drones; }
+    public List<Drone> getDrones() { return drones; }
+    public String getSide() { return side; }
+    public void setSide(String side) { this.side = side; }
 }

@@ -131,4 +131,15 @@ public class Packet {
     public static Packet error(String message) {
         return Packet.of(PacketType.ERROR, "message", message);
     }
+
+    public static Packet sideChosen(int playerIndex, String side) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("playerIndex", playerIndex);
+        payload.put("side", side);
+        return new Packet(PacketType.SIDE_CHOSEN, payload);
+    }
+
+    public static Packet bothReady() {
+        return new Packet(PacketType.BOTH_READY, new HashMap<>());
+    }
 }

@@ -1,6 +1,9 @@
 package com.example.proyect.game;
 
-import org.springframework.stereotype.Component;
+import com.example.proyect.game.units.Unit.HexCoord;
+import com.example.proyect.game.units.drone.AerialDrone;
+import com.example.proyect.game.units.drone.NavalDrone;
+import com.example.proyect.game.units.drone.Drone;
 import java.util.*;
 
 /**
@@ -8,8 +11,17 @@ import java.util.*;
  * Manages turn-based gameplay with actions per turn.
  * All public methods are synchronized for thread safety.
  */
-@Component
 public class GameRoom {
+
+    private final String roomId;
+
+    public GameRoom(String roomId) {
+        this.roomId = roomId;
+    }
+
+    public String getRoomId() {
+        return roomId;
+    }
 
     public static final int MAX_PLAYERS = 2;
     public static final int DRONES_PER_PLAYER = 3;
@@ -20,6 +32,9 @@ public class GameRoom {
     private static final double[][] STARTS_P1 = { {2100, 600}, {2100, 900}, {2100, 1200} };
 
     private final List<PlayerState> players = new ArrayList<>();
+    
+    // Side selection state (Naval or Aereo)
+    private final Map<Integer, String> playerSides = new HashMap<>();
 
     // Turn state
     private boolean gameStarted = false;
@@ -35,14 +50,48 @@ public class GameRoom {
         int index = players.size();
         double[][] starts = (index == 0) ? STARTS_P0 : STARTS_P1;
 
-        List<DroneState> drones = new ArrayList<>();
-        for (double[] pos : starts) {
-            drones.add(new DroneState(pos[0], pos[1]));
+        List<Drone> drones = new ArrayList<>();
+        // Note: Drones will be created as placeholders initially
+        // They will be recreated with proper type after side selection
+        for (int i = 0; i < starts.length; i++) {
+            double[] pos = starts[i];
+            // Default to AerialDrone, will be replaced after side selection
+            AerialDrone drone = new AerialDrone();
+            drone.setId(UUID.randomUUID().toString());
+            drone.setOwnerPlayerId(index);
+            drone.setPosition(new HexCoord(pos[0], pos[1]));
+            drones.add(drone);
         }
 
         PlayerState player = new PlayerState(sessionId, index, drones);
         players.add(player);
         return player;
+    }
+    
+    /**
+     * Recreate player's drones based on selected side.
+     * Called after side selection.
+     */
+    public synchronized void createDronesForSide(int playerIndex, String side) {
+        PlayerState player = getPlayerByIndex(playerIndex);
+        if (player == null) return;
+        
+        double[][] starts = (playerIndex == 0) ? STARTS_P0 : STARTS_P1;
+        List<Drone> drones = new ArrayList<>();
+        
+        for (int i = 0; i < starts.length; i++) {
+            double[] pos = starts[i];
+            Drone drone = "Naval".equals(side) ? new NavalDrone() : new AerialDrone();
+            drone.setId(UUID.randomUUID().toString());
+            drone.setOwnerPlayerId(playerIndex);
+            drone.setPosition(new HexCoord(pos[0], pos[1]));
+            drones.add(drone);
+        }
+        
+        // Replace drones in player state
+        player.getDrones().clear();
+        player.getDrones().addAll(drones);
+        player.setSide(side);
     }
 
     /**
@@ -68,9 +117,8 @@ public class GameRoom {
         if (player == null) return false;
         if (droneIndex < 0 || droneIndex >= player.getDrones().size()) return false;
 
-        DroneState drone = player.getDrones().get(droneIndex);
-        drone.setX(x);
-        drone.setY(y);
+        Drone drone = player.getDrones().get(droneIndex);
+        drone.setPosition(new HexCoord(x, y));
         return true;
     }
 
@@ -84,12 +132,34 @@ public class GameRoom {
     public synchronized boolean isFull() {
         return players.size() >= MAX_PLAYERS;
     }
+    
+    /**
+     * Get the side chosen by a player.
+     */
+    public synchronized String getPlayerSide(int playerIndex) {
+        return playerSides.get(playerIndex);
+    }
+    
+    /**
+     * Set the side for a player.
+     */
+    public synchronized void setPlayerSide(int playerIndex, String side) {
+        playerSides.put(playerIndex, side);
+    }
+    
+    /**
+     * Check if both players have selected their sides.
+     */
+    public synchronized boolean bothSidesSelected() {
+        return playerSides.size() == MAX_PLAYERS;
+    }
 
     /**
      * Reset the room so new players can join.
      */
     public synchronized void reset() {
         players.clear();
+        playerSides.clear();
         gameStarted = false;
         currentTurn = 0;
         actionsRemaining = ACTIONS_PER_TURN;
@@ -152,10 +222,10 @@ public class GameRoom {
         return null;
     }
 
-    public synchronized DroneState getDrone(int playerIndex, int droneIndex) {
+    public synchronized Drone getDrone(int playerIndex, int droneIndex) {
         PlayerState player = getPlayerByIndex(playerIndex);
         if (player == null) return null;
-        List<DroneState> drones = player.getDrones();
+        List<Drone> drones = player.getDrones();
         if (droneIndex < 0 || droneIndex >= drones.size()) return null;
         return drones.get(droneIndex);
     }
@@ -172,17 +242,20 @@ public class GameRoom {
         for (PlayerState p : players) {
             Map<String, Object> pm = new LinkedHashMap<>();
             pm.put("playerIndex", p.getPlayerIndex());
+            pm.put("side", p.getSide());
 
             List<Map<String, Object>> droneMaps = new ArrayList<>();
-            for (DroneState d : p.getDrones()) {
+            for (Drone d : p.getDrones()) {
                 Map<String, Object> dm = new LinkedHashMap<>();
-                dm.put("x", d.getX());
-                dm.put("y", d.getY());
-                dm.put("health", d.getHealth());
-                dm.put("maxHealth", d.getMaxHealth());
-                dm.put("attackDamage", d.getAttackDamage());
-                dm.put("attackRange", d.getAttackRange());
+                dm.put("x", d.getPosition().getX());
+                dm.put("y", d.getPosition().getY());
+                dm.put("health", d.getCurrentHp());
+                dm.put("maxHealth", d.getMaxHp());
+                dm.put("attackDamage", d.getWeapon().getDamage());
+                dm.put("attackRange", d.getWeapon().getRange());
                 dm.put("alive", d.isAlive());
+                // Add drone type for frontend rendering
+                dm.put("droneType", d instanceof NavalDrone ? "Naval" : "Aereo");
                 droneMaps.add(dm);
             }
             pm.put("drones", droneMaps);

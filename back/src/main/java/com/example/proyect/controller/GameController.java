@@ -1,7 +1,7 @@
 package com.example.proyect.controller;
 
 import com.example.proyect.VOs.GameResult;
-import com.example.proyect.game.DroneState;
+import com.example.proyect.game.units.drone.Drone;
 import com.example.proyect.game.GameRoom;
 import com.example.proyect.game.PlayerState;
 import com.example.proyect.websocket.packet.Packet;
@@ -10,65 +10,174 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Game service layer that handles all game logic orchestration.
- * Separates business logic from WebSocket handling.
+ * Manages multiple GameRoom instances for concurrent 1v1 matches.
  */
 @Service
 public class GameController {
 
     private static final Logger log = LoggerFactory.getLogger(GameController.class);
 
-    private final GameRoom room;
+    // All game rooms by room ID
+    private final Map<String, GameRoom> rooms = new ConcurrentHashMap<>();
+    
+    // Track which room each session is in
+    private final Map<String, String> sessionToRoom = new ConcurrentHashMap<>();
+    
+    // Sequential room ID counter
+    private final AtomicInteger roomCounter = new AtomicInteger(1);
 
-    public GameController(GameRoom room) {
-        this.room = room;
+    /**
+     * Find an available room (not full) or create a new one.
+     */
+    private synchronized GameRoom findOrCreateRoom() {
+        // Try to find an existing room with space
+        for (GameRoom room : rooms.values()) {
+            if (!room.isFull() && !room.isGameStarted()) {
+                return room;
+            }
+        }
+        
+        // No available room found, create a new one
+        String roomId = "room-" + roomCounter.getAndIncrement();
+        GameRoom newRoom = new GameRoom(roomId);
+        rooms.put(roomId, newRoom);
+        log.info("Created new game room: {}", roomId);
+        return newRoom;
     }
 
     /**
-     * Join a player to the game room.
+     * Get the room for a given session, or null if not in any room.
+     */
+    private GameRoom getRoomForSession(String sessionId) {
+        String roomId = sessionToRoom.get(sessionId);
+        if (roomId == null) return null;
+        return rooms.get(roomId);
+    }
+
+    /**
+     * Remove empty rooms to free resources.
+     */
+    private void cleanupEmptyRooms() {
+        rooms.entrySet().removeIf(entry -> {
+            GameRoom room = entry.getValue();
+            if (room.getPlayers().isEmpty()) {
+                log.info("Removing empty room: {}", entry.getKey());
+                return true;
+            }
+            return false;
+        });
+    }
+
+    /**
+     * Join a player to an available game room (auto-matchmaking).
      */
     public GameResult joinGame(String sessionId) {
+        // Check if already in a room
+        if (sessionToRoom.containsKey(sessionId)) {
+            return GameResult.error("Already in a game");
+        }
+
+        GameRoom room = findOrCreateRoom();
         PlayerState player = room.addPlayer(sessionId);
         
         if (player == null) {
-            log.warn("Player {} tried to join but game is full", sessionId);
+            log.warn("Player {} tried to join but room {} is full", sessionId, room.getRoomId());
             return GameResult.error("Game is full");
         }
 
-        log.info("Player {} joined as index {}", sessionId, player.getPlayerIndex());
+        // Track which room this session is in
+        sessionToRoom.put(sessionId, room.getRoomId());
+
+        log.info("Player {} joined room {} as index {}", sessionId, room.getRoomId(), player.getPlayerIndex());
         
         Packet welcome = Packet.welcome(sessionId, player.getPlayerIndex());
         
-        // Check if game should start
-        if (room.isFull()) {
-            room.startGame();
-            log.info("Game started! Player 0's turn");
-            return GameResult.gameReady(welcome);
-        }
+        // Don't auto-start game anymore - wait for side selection
+        // Second player will be notified to wait or select
         
         return GameResult.ok(welcome);
     }
+    
+    /**
+     * Handle player side selection.
+     */
+    public GameResult selectSide(String sessionId, String side) {
+        // Validate side
+        if (!"Naval".equals(side) && !"Aereo".equals(side)) {
+            return GameResult.error("Invalid side. Must be 'Naval' or 'Aereo'");
+        }
+        
+        GameRoom room = getRoomForSession(sessionId);
+        if (room == null) {
+            return GameResult.error("You are not in a game room");
+        }
+        
+        PlayerState player = room.getPlayerBySession(sessionId);
+        if (player == null) {
+            return GameResult.error("You are not in the game");
+        }
+        
+        int playerIndex = player.getPlayerIndex();
+        
+        // Check if this player already selected a side
+        if (room.getPlayerSide(playerIndex) != null) {
+            return GameResult.error("You already selected a side");
+        }
+        
+        // For first player, allow any side
+        // For second player, assign opposite side automatically in the handler
+        room.setPlayerSide(playerIndex, side);
+        room.createDronesForSide(playerIndex, side);
+        
+        log.info("Player {} selected side {} in room {}", playerIndex, side, room.getRoomId());
+        
+        // Check if both players have selected
+        if (room.bothSidesSelected() && room.isFull()) {
+            room.startGame();
+            log.info("Both sides selected! Game started in room {}. Player 0's turn", room.getRoomId());
+            return GameResult.gameReady(Packet.sideChosen(playerIndex, side));
+        }
+        
+        return GameResult.ok(Packet.sideChosen(playerIndex, side));
+    }
 
     /**
-     * Remove a player from the game.
+     * Remove a player from their game room.
      */
     public int removePlayer(String sessionId) {
+        GameRoom room = getRoomForSession(sessionId);
+        if (room == null) {
+            return -1;
+        }
+
         PlayerState removed = room.removePlayer(sessionId);
         if (removed != null) {
-            log.info("Player {} (index {}) left", sessionId, removed.getPlayerIndex());
+            log.info("Player {} (index {}) left room {}", sessionId, removed.getPlayerIndex(), room.getRoomId());
+            sessionToRoom.remove(sessionId);
             room.reset();
+            
+            // Cleanup empty rooms
+            cleanupEmptyRooms();
+            
             return removed.getPlayerIndex();
         }
         return -1;
     }
 
-
     /**
      * Process a move action.
      */
     public GameResult processMove(String sessionId, int droneIndex, double x, double y) {
+        GameRoom room = getRoomForSession(sessionId);
+        if (room == null) {
+            return GameResult.error("You are not in a game room");
+        }
+
         PlayerState player = room.getPlayerBySession(sessionId);
         
         if (player == null) {
@@ -79,7 +188,7 @@ public class GameController {
             return GameResult.error("Not your turn");
         }
 
-        DroneState drone = room.getDrone(player.getPlayerIndex(), droneIndex);
+        Drone drone = room.getDrone(player.getPlayerIndex(), droneIndex);
         if (drone == null) {
             return GameResult.error("Invalid drone index");
         }
@@ -96,8 +205,8 @@ public class GameController {
         // Consume action
         room.useAction();
         
-        log.debug("Player {} moved drone {} to ({}, {})", 
-            player.getPlayerIndex(), droneIndex, x, y);
+        log.debug("Player {} moved drone {} to ({}, {}) in room {}", 
+            player.getPlayerIndex(), droneIndex, x, y, room.getRoomId());
 
         Packet movePacket = Packet.moveDrone(player.getPlayerIndex(), droneIndex, x, y);
         
@@ -115,6 +224,11 @@ public class GameController {
      */
     public GameResult processAttack(String sessionId, int attackerIndex, 
                                      int targetPlayerIndex, int targetDroneIndex) {
+        GameRoom room = getRoomForSession(sessionId);
+        if (room == null) {
+            return GameResult.error("You are not in a game room");
+        }
+
         PlayerState attacker = room.getPlayerBySession(sessionId);
         
         if (attacker == null) {
@@ -130,8 +244,8 @@ public class GameController {
             return GameResult.error("Cannot attack your own drones");
         }
 
-        DroneState attackerDrone = room.getDrone(attacker.getPlayerIndex(), attackerIndex);
-        DroneState targetDrone = room.getDrone(targetPlayerIndex, targetDroneIndex);
+        Drone attackerDrone = room.getDrone(attacker.getPlayerIndex(), attackerIndex);
+        Drone targetDrone = room.getDrone(targetPlayerIndex, targetDroneIndex);
 
         if (attackerDrone == null) {
             return GameResult.error("Invalid attacker drone index");
@@ -151,26 +265,26 @@ public class GameController {
         // For now, all attacks are valid if drones exist
 
         // Apply damage
-        int damage = attackerDrone.getAttackDamage();
-        targetDrone.takeDamage(damage);
+        int damage = attackerDrone.getWeapon().getDamage();
+        targetDrone.receiveDamage(damage);
 
         // Consume action
         room.useAction();
 
-        log.info("Player {} drone {} attacked player {} drone {} for {} damage (remaining HP: {})",
+        log.info("Player {} drone {} attacked player {} drone {} for {} damage (remaining HP: {}) in room {}",
             attacker.getPlayerIndex(), attackerIndex, 
             targetPlayerIndex, targetDroneIndex,
-            damage, targetDrone.getHealth());
+            damage, targetDrone.getCurrentHp(), room.getRoomId());
 
         Packet attackPacket = Packet.attackResult(
             attacker.getPlayerIndex(), attackerIndex,
             targetPlayerIndex, targetDroneIndex,
-            damage, targetDrone.getHealth()
+            damage, targetDrone.getCurrentHp()
         );
 
         // Check for game over
-        if (isPlayerDefeated(targetPlayerIndex)) {
-            log.info("Player {} has been defeated!", targetPlayerIndex);
+        if (isPlayerDefeated(room, targetPlayerIndex)) {
+            log.info("Player {} has been defeated in room {}!", targetPlayerIndex, room.getRoomId());
             // Could return a game over result here
         }
 
@@ -188,41 +302,81 @@ public class GameController {
      * @return Result with turnStart info or error
      */
     public GameResult endTurn(String sessionId) {
+        GameRoom room = getRoomForSession(sessionId);
+        if (room == null) {
+            return GameResult.error("You are not in a game room");
+        }
+
         if (!room.isPlayerTurn(sessionId)) {
             return GameResult.error("Not your turn");
         }
 
         room.endTurn();
         
-        log.info("Turn ended. Now player {}'s turn with {} actions",
-            room.getCurrentTurn(), room.getActionsRemaining());
+        log.info("Turn ended in room {}. Now player {}'s turn with {} actions",
+            room.getRoomId(), room.getCurrentTurn(), room.getActionsRemaining());
 
         return GameResult.turnStarted(room.getCurrentTurn(), room.getActionsRemaining());
     }
 
-    public Map<String, Object> getGameState() {
+    public Map<String, Object> getGameState(String sessionId) {
+        GameRoom room = getRoomForSession(sessionId);
+        if (room == null) return Map.of();
         return room.toStateMap();
     }
 
-    public int getCurrentTurn() {
+    public int getCurrentTurn(String sessionId) {
+        GameRoom room = getRoomForSession(sessionId);
+        if (room == null) return 0;
         return room.getCurrentTurn();
     }
 
-    public int getActionsRemaining() {
+    public int getActionsRemaining(String sessionId) {
+        GameRoom room = getRoomForSession(sessionId);
+        if (room == null) return 0;
         return room.getActionsRemaining();
     }
 
-    public boolean isGameStarted() {
+    public boolean isGameStarted(String sessionId) {
+        GameRoom room = getRoomForSession(sessionId);
+        if (room == null) return false;
         return room.isGameStarted();
     }
 
-    private boolean isPlayerDefeated(int playerIndex) {
+    private boolean isPlayerDefeated(GameRoom room, int playerIndex) {
         PlayerState player = room.getPlayerByIndex(playerIndex);
         if (player == null) return false;
         
-        for (DroneState drone : player.getDrones()) {
+        for (Drone drone : player.getDrones()) {
             if (drone.isAlive()) return false;
         }
         return true;
+    }
+
+    /**
+     * Get the room ID for a session (useful for debugging/admin).
+     */
+    public String getRoomId(String sessionId) {
+        return sessionToRoom.get(sessionId);
+    }
+
+    /**
+     * Get all session IDs in the same room as the given session.
+     */
+    public java.util.List<String> getSessionsInSameRoom(String sessionId) {
+        String roomId = sessionToRoom.get(sessionId);
+        if (roomId == null) return java.util.List.of();
+        
+        return sessionToRoom.entrySet().stream()
+            .filter(entry -> roomId.equals(entry.getValue()))
+            .map(Map.Entry::getKey)
+            .collect(java.util.stream.Collectors.toList());
+    }
+
+    /**
+     * Get total number of active rooms.
+     */
+    public int getActiveRoomCount() {
+        return rooms.size();
     }
 }

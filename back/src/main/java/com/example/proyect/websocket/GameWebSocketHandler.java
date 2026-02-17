@@ -58,6 +58,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         sessions.remove(session.getId());
         int removedIndex = gameController.removePlayer(session.getId());
         if (removedIndex >= 0) {
+            // Broadcast player left to remaining players
             broadcastSafe(Packet.playerLeft(removedIndex));
         }
     }
@@ -78,11 +79,12 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         log.info("[WS] Parsed packet type: {}", packet.getType());
 
         switch (packet.getType()) {
-            case JOIN     -> handleJoin(session);
-            case MOVE     -> handleMove(session, packet);
-            case ATTACK   -> handleAttack(session, packet);
-            case END_TURN -> handleEndTurn(session);
-            default       -> sendError(session, "Unknown message type");
+            case JOIN        -> handleJoin(session);
+            case SELECT_SIDE -> handleSelectSide(session, packet);
+            case MOVE        -> handleMove(session, packet);
+            case ATTACK      -> handleAttack(session, packet);
+            case END_TURN    -> handleEndTurn(session);
+            default          -> sendError(session, "Unknown message type");
         }
     }
 
@@ -96,17 +98,42 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
 
         // Send welcome to joining player
         send(session, result.getPacket());
-
-        // If game is ready, broadcast game start and first turn
+        
+        // Note: Game will not auto-start anymore
+        // Players must select sides first
+    }
+    
+    private void handleSelectSide(WebSocketSession session, Packet packet) throws IOException {
+        String side = packet.getString("side");
+        
+        if (side == null) {
+            sendError(session, "Side not specified");
+            return;
+        }
+        
+        GameResult result = gameController.selectSide(session.getId(), side);
+        
+        if (!result.isSuccess()) {
+            send(session, result.getPacket());
+            return;
+        }
+        
+        // Broadcast side selection to both players in room
+        broadcastToRoom(session.getId(), result.getPacket());
+        
+        // If game is ready (both sides selected), broadcast game start
         if (result.isGameReady()) {
-            Packet gameStart = Packet.gameStart(gameController.getGameState());
-            broadcast(gameStart);
+            Packet bothReady = Packet.bothReady();
+            broadcastToRoom(session.getId(), bothReady);
+            
+            Packet gameStart = Packet.gameStart(gameController.getGameState(session.getId()));
+            broadcastToRoom(session.getId(), gameStart);
             
             Packet turnStart = Packet.turnStart(
-                gameController.getCurrentTurn(), 
-                gameController.getActionsRemaining()
+                gameController.getCurrentTurn(session.getId()), 
+                gameController.getActionsRemaining(session.getId())
             );
-            broadcast(turnStart);
+            broadcastToRoom(session.getId(), turnStart);
         }
     }
 
@@ -126,13 +153,13 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             return;
         }
 
-        // Broadcast the move
-        broadcast(result.getPacket());
+        // Broadcast the move to room
+        broadcastToRoom(session.getId(), result.getPacket());
 
-        // If turn ended, broadcast new turn
+        // If turn ended, broadcast new turn to room
         if (result.isTurnEnded()) {
             Packet turnStart = Packet.turnStart(result.getNextPlayer(), result.getActionsRemaining());
-            broadcast(turnStart);
+            broadcastToRoom(session.getId(), turnStart);
         }
     }
 
@@ -150,13 +177,13 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             return;
         }
 
-        // Broadcast the attack result
-        broadcast(result.getPacket());
+        // Broadcast the attack result to room
+        broadcastToRoom(session.getId(), result.getPacket());
 
-        // If turn ended, broadcast new turn
+        // If turn ended, broadcast new turn to room
         if (result.isTurnEnded()) {
             Packet turnStart = Packet.turnStart(result.getNextPlayer(), result.getActionsRemaining());
-            broadcast(turnStart);
+            broadcastToRoom(session.getId(), turnStart);
         }
     }
 
@@ -168,8 +195,8 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             return;
         }
 
-        // Broadcast turn change
-        broadcast(result.getPacket());
+        // Broadcast turn change to room
+        broadcastToRoom(session.getId(), result.getPacket());
     }
 
     private void send(WebSocketSession session, Packet packet) throws IOException {
@@ -184,6 +211,27 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         String json = PacketSerializer.serialize(packet);
         for (WebSocketSession s : sessions.values()) {
             if (s.isOpen()) {
+                s.sendMessage(new TextMessage(json));
+            }
+        }
+    }
+
+    /**
+     * Broadcast a packet only to players in the same room as the given session.
+     */
+    private void broadcastToRoom(String sessionId, Packet packet) throws IOException {
+        java.util.List<String> roomSessions = gameController.getSessionsInSameRoom(sessionId);
+        if (roomSessions.isEmpty()) {
+            log.warn("No room found for session {}", sessionId);
+            return;
+        }
+        
+        String json = PacketSerializer.serialize(packet);
+        log.debug("Broadcasting to room ({} sessions): {}", roomSessions.size(), packet.getType());
+        
+        for (String sid : roomSessions) {
+            WebSocketSession s = sessions.get(sid);
+            if (s != null && s.isOpen()) {
                 s.sendMessage(new TextMessage(json));
             }
         }

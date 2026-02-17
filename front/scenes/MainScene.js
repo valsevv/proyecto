@@ -27,21 +27,17 @@ export default class MainScene extends Phaser.Scene {
 
 
     preload() {
-    this.load.image('mar', 'assets/mar.png');
-
-    this.load.spritesheet('dron_misil', 'assets/dron_misil.png', {
-        frameWidth: 64,
-        frameHeight: 64,
-        // opcionales:
-        // startFrame: 0,
-        // endFrame: 7,
-        // margin: 0,
-        // spacing: 0
-    });
+        this.load.image('mar', 'assets/mar.png');
+        this.load.image('dron_misil', 'assets/dron_misil.png');
+        this.load.image('dron_bomba', 'assets/dron_bomba.png');
     }
 
 
-    create() {
+    create(data) {
+        console.log('[MainScene] === CREATE CALLED ===');
+        console.log('[MainScene] Scene data received:', data);
+        console.log('[MainScene] Has gameState?:', !!data?.gameState);
+        
         // Tile the background to cover the whole world
         const bg = this.add.tileSprite(0, 0, WORLD_WIDTH, WORLD_HEIGHT, 'mar');
         bg.setOrigin(0, 0);
@@ -113,21 +109,79 @@ export default class MainScene extends Phaser.Scene {
 
         // Wire up Network events
         this.setupNetwork();
-
-        // Launch the HUD scene in parallel
+        
+        // Launch the HUD scene FIRST so it can receive events
+        console.log('[MainScene] === LAUNCHING HUD SCENE ===');
         this.scene.launch('HudScene');
+        console.log('[MainScene] === HUD SCENE LAUNCHED (booting...) ===');
+        
+        // Small delay to ensure HudScene finishes its create() method
+        // and sets up event listeners before we emit events
+        this.time.delayedCall(50, () => {
+            this.initializeGameState(data);
+        });
+    }
+    
+    initializeGameState(data) {
+        console.log('[MainScene] === INITIALIZING GAME STATE ===');
+    }
+    
+    initializeGameState(data) {
+        console.log('[MainScene] === INITIALIZING GAME STATE ===');
+        
+        // If we have initial game state from LobbyScene, create drones immediately
+        console.log('[MainScene] === CHECKING FOR INITIAL GAME STATE ===');
+        console.log('[MainScene] data:', data);
+        console.log('[MainScene] data.gameState:', data?.gameState);
+        
+        if (data && data.gameState) {
+            console.log('[MainScene] === CREATING DRONES FROM INITIAL STATE ===');
+            console.log('[MainScene] Game state:', data.gameState);
+            this.createDronesFromState(data.gameState);
+            
+            console.log('[MainScene] === EMITTING gameStarted EVENT ===');
+            this.events.emit('gameStarted');
+            console.log('[MainScene] === DRONES CREATED AND gameStarted EMITTED ===');
+            
+            // CRITICAL: Manually trigger turnStart since the server's turnStart message
+            // arrives BEFORE this scene is ready to receive it
+            console.log('[MainScene] === MANUALLY TRIGGERING INITIAL TURN ===');
+            const initialTurn = data.gameState.currentTurn;
+            const initialActions = data.gameState.actionsRemaining;
+            console.log('[MainScene] Initial turn player:', initialTurn);
+            console.log('[MainScene] Initial actions:', initialActions);
+            
+            this.isMyTurn = (initialTurn === Network.playerIndex);
+            this.actionMode = MODE_MOVE;
+            this.clearTargetHighlights();
+            
+            // Reset per-drone action state for new turn
+            if (this.isMyTurn) {
+                for (const drone of this.myDrones) {
+                    drone.hasMoved = false;
+                    drone.hasAttacked = false;
+                }
+            }
+            
+            // Notify HUD
+            console.log('[MainScene] === EMITTING turnChanged EVENT ===');
+            this.events.emit('turnChanged', {
+                isMyTurn: this.isMyTurn
+            });
+            console.log('[MainScene] === INITIAL TURN STATE SET - isMyTurn:', this.isMyTurn, '===');
+        } else {
+            console.error('[MainScene] === NO INITIAL GAME STATE PROVIDED! ===');
+            console.error('[MainScene] This is a bug - game should not start without state');
+        }
+
+        console.log('[MainScene] === MAINSCENE CREATE COMPLETE ===');
     }
 
     setupNetwork() {
-        Network.on('welcome', () => {
-            this.events.emit('statusChanged', 'Esperando al oponente...');
-        });
-
-        Network.on('gameStart', (msg) => {
-            this.createDronesFromState(msg.state);
-            this.events.emit('gameStarted');
-        });
-
+        // Remove auto-connect logic - that's handled by LobbyScene
+        // Note: Don't register 'gameStart' handler here as it conflicts with LobbyScene's handler
+        // The initial game state is received via scene data from LobbyScene
+        
         Network.on('turnStart', (msg) => {
             this.isMyTurn = (msg.activePlayer === Network.playerIndex);
             this.actionMode = MODE_MOVE;
@@ -183,24 +237,37 @@ export default class MainScene extends Phaser.Scene {
         Network.on('error', (msg) => {
             console.warn('[game] server error:', msg.message);
         });
-
-        // Connect → join
-        Network.connect().then(() => Network.join());
+        
+        // Note: Connection and join are handled by LobbyScene
     }
 
     createDronesFromState(state) {
+        console.log('[MainScene] === createDronesFromState CALLED ===');
+        console.log('[MainScene] State:', state);
+        console.log('[MainScene] Players in state:', state?.players);
+        console.log('[MainScene] Current turn:', state?.currentTurn);
+        console.log('[MainScene] My player index:', Network.playerIndex);
+        
         for (const player of state.players) {
+            console.log('[MainScene] Processing player', player.playerIndex);
+            console.log('[MainScene] Player side:', player.side);
+            console.log('[MainScene] Player drones:', player.drones?.length);
+            
             const isLocal = (player.playerIndex === Network.playerIndex);
             const color = TEAM_COLORS[player.playerIndex];
             this.drones[player.playerIndex] = [];
 
             for (const d of player.drones) {
                 const hex = this.hexGrid.getNearestCenter(d.x, d.y);
+                const droneType = d.droneType || 'Aereo'; // Default to Aereo if not specified
+                console.log('[MainScene] Creating drone at', hex.x, hex.y, 'type:', droneType);
+                
                 const drone = new Drone(this, hex.x, hex.y, color, isLocal, {
                     health: d.health,
                     maxHealth: d.maxHealth,
                     attackDamage: d.attackDamage,
-                    attackRange: d.attackRange
+                    attackRange: d.attackRange,
+                    droneType: droneType
                 });
                 drone.playerIndex = player.playerIndex;
                 drone.droneIndex = this.drones[player.playerIndex].length;
@@ -208,11 +275,17 @@ export default class MainScene extends Phaser.Scene {
             }
 
             if (isLocal) {
+                console.log('[MainScene] These are MY drones');
                 this.myDrones = this.drones[player.playerIndex];
                 const first = this.myDrones[0];
                 this.cameras.main.centerOn(first.sprite.x, first.sprite.y);
+                console.log('[MainScene] Camera centered on my first drone');
             }
         }
+        
+        console.log('[MainScene] === DRONE CREATION COMPLETE ===');
+        console.log('[MainScene] Total players:', Object.keys(this.drones).length);
+        console.log('[MainScene] My drones:', this.myDrones?.length);
     }
 
     /** Called when any drone is clicked */

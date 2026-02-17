@@ -3,9 +3,9 @@ export default class Drone {
      * @param {Phaser.Scene} scene
      * @param {number} x
      * @param {number} y
-     * @param {number} color      – fill colour (e.g. 0x00ff00)
+     * @param {number} color      – fill colour (e.g. 0x00ff00) - used for health bar and fallback
      * @param {boolean} interactive – only true for the local player's drones
-     * @param {object} stats      – { health, maxHealth, attackDamage, attackRange }
+     * @param {object} stats      – { health, maxHealth, attackDamage, attackRange, droneType }
      */
     constructor(scene, x, y, color = 0x00ff00, interactive = true, stats = {}) {
         this.scene = scene;
@@ -17,33 +17,40 @@ export default class Drone {
         this.maxHealth = stats.maxHealth ?? 100;
         this.attackDamage = stats.attackDamage ?? 25;
         this.attackRange = stats.attackRange ?? 3;
+        this.droneType = stats.droneType ?? 'Aereo';
 
         // Turn action tracking (reset each turn)
         this.hasMoved = false;
         this.hasAttacked = false;
 
-        // Placeholder graphic
-        this.sprite = scene.add.circle(x, y, 14, color);
-        this.sprite.setStrokeStyle(2, 0xffffff);
+        // Determine sprite key based on drone type
+        const spriteKey = this.droneType === 'Naval' ? 'dron_bomba' : 'dron_misil';
 
-        // Health bar background
-        this.healthBarBg = scene.add.rectangle(x, y - 22, 30, 6, 0x333333);
+        // Create sprite instead of circle - use image instead of sprite since they're not animated
+        this.sprite = scene.add.image(x, y, spriteKey);
+        this.sprite.setScale(0.125); // Scale down the 64x64 image to 8x8
+        this.sprite.setOrigin(0.5);
+
+        // Don't tint - keep original drone colors
+
+        // Health bar background (positioned above the smaller sprite)
+        this.healthBarBg = scene.add.rectangle(x, y - 10, 20, 3, 0x333333);
         this.healthBarBg.setOrigin(0.5);
 
         // Health bar fill
-        this.healthBar = scene.add.rectangle(x - 15, y - 22, 30, 4, 0x00ff00);
+        this.healthBar = scene.add.rectangle(x - 10, y - 10, 20, 2, 0x00ff00);
         this.healthBar.setOrigin(0, 0.5);
         this.updateHealthBar();
 
         // Selection ring (only relevant for your own drones)
-        this.ring = scene.add.circle(x, y, 20);
+        this.ring = scene.add.circle(x, y, 10);
         this.ring.setStrokeStyle(2, 0xffff00);
         this.ring.setFillStyle();
         this.ring.setVisible(false);
 
         // Target ring (shown when this drone is targetable for attack)
-        this.targetRing = scene.add.circle(x, y, 22);
-        this.targetRing.setStrokeStyle(3, 0xff0000);
+        this.targetRing = scene.add.circle(x, y, 12);
+        this.targetRing.setStrokeStyle(2, 0xff0000);
         this.targetRing.setFillStyle();
         this.targetRing.setVisible(false);
 
@@ -82,15 +89,15 @@ export default class Drone {
         this.scene.tweens.add({
             targets: this.healthBarBg,
             x: x,
-            y: y - 22,
+            y: y - 16,
             duration: 600,
             ease: 'Power2'
         });
         // Health bar fill (different origin)
         this.scene.tweens.add({
             targets: this.healthBar,
-            x: x - 15,
-            y: y - 22,
+            x: x - 12,
+            y: y - 16,
             duration: 600,
             ease: 'Power2'
         });
@@ -100,12 +107,12 @@ export default class Drone {
         this.health = remainingHealth;
         this.updateHealthBar();
 
-        // Flash red
-        this.scene.tweens.add({
-            targets: this.sprite,
-            fillColor: { from: 0xff0000, to: this.color },
-            duration: 300,
-            ease: 'Power2'
+        // Flash effect using alpha instead of tint
+        this.sprite.setAlpha(0.3);
+        this.scene.time.delayedCall(150, () => {
+            if (this.sprite && this.sprite.active) {
+                this.sprite.setAlpha(1);
+            }
         });
 
         if (this.health <= 0) {
@@ -115,7 +122,7 @@ export default class Drone {
 
     updateHealthBar() {
         const ratio = Math.max(0, this.health / this.maxHealth);
-        this.healthBar.width = 30 * ratio;
+        this.healthBar.width = 24 * ratio;
 
         if (ratio > 0.6) {
             this.healthBar.setFillStyle(0x00ff00);
