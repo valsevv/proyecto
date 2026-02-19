@@ -1,5 +1,9 @@
 package com.example.proyect.auth.api;
+import java.util.Map;
+
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -48,7 +52,8 @@ public class AuthController {
     }       
 
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@RequestBody LoginRequest request) {
+    public ResponseEntity<AuthResponse> login(@RequestBody @Valid LoginRequest request) {
+        
         User user = userService.login(
                 request.username(),
                 request.password()
@@ -64,4 +69,21 @@ public class AuthController {
                 )
             );
     }
+        @GetMapping("/ping")
+        public ResponseEntity<Map<String, String>> ping() {
+        return ResponseEntity.ok(Map.of("status", "ok"));
+        }
+        
+    @RestController
+        @RequestMapping("/api/users")
+        public class UserMeController {
+
+        @GetMapping("/me")
+        public ResponseEntity<Map<String, Object>> me(Authentication auth) {
+                // auth.getName() ← el username que pusiste en el SecurityContext
+                return ResponseEntity.ok(Map.of(
+                "username", auth.getName()
+                ));
+        }
+        }
 }
