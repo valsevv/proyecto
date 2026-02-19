@@ -19,24 +19,40 @@ class NetworkManager {
         this.actionsRemaining = 0;
     }
 
+    setToken(token) {
+        this.token = token;
+    }
     connect() {
         return new Promise((resolve, reject) => {
-            this.ws = new WebSocket(this.url);
+
+            if (this.token) {
+                reject("No JWT token found");
+                return;
+            }
+
+            const urlWithToken = `${this.url}?token=${token}`;
+
+            this.ws = new WebSocket(urlWithToken);
+
             this.ws.onopen = () => {
                 console.log('[net] connected');
                 resolve();
             };
+
             this.ws.onerror = (err) => {
                 console.error('[net] error:', err);
                 reject(err);
             };
+
             this.ws.onmessage = (event) => this._onMessage(event);
+
             this.ws.onclose = () => {
                 console.log('[net] disconnected');
                 this._fire('disconnect', {});
             };
         });
     }
+
 
     send(msg) {
         console.log('='.repeat(80));

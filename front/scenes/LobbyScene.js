@@ -58,6 +58,17 @@ export default class LobbyScene extends Phaser.Scene {
 
         // Connect and join
         console.log('[LobbyScene] === CONNECTING TO SERVER ===');
+        
+        const token = localStorage.getItem("token");
+
+        if (!token) {
+            console.error("No token found, redirecting to login");
+            this.scene.start('LoginScene');
+            return;
+        }
+
+        Network.setToken(token);
+
         Network.connect().then(() => {
             console.log('[LobbyScene] === CONNECTION ESTABLISHED ===');
             Network.join();

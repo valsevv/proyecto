@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS ranking (
       ON DELETE CASCADE,
 
     CONSTRAINT fk_ranking_user_user
-      FOREIGN KEY (user_id) REFERENCES users(id)
+      FOREIGN KEY (user_id) REFERENCES users(user_id)
       ON DELETE CASCADE
 );
 

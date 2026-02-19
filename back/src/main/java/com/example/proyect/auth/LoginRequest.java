@@ -1,6 +1,13 @@
 package com.example.proyect.auth;
 
-public class LoginRequest {
-    public String username;
-    public String password;
-}
+import jakarta.validation.constraints.NotBlank;
+
+public record LoginRequest(
+
+        @NotBlank(message = "Nombre de usuario requerido")
+        String username,
+
+        @NotBlank(message = "Password es requerida")
+        String password
+) {}
+

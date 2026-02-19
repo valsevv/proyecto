@@ -2,6 +2,8 @@ package com.example.proyect.auth.service;
 
 import org.springframework.stereotype.Service;
 
+import com.example.proyect.auth.Exceptions.InvalidCredentialsException;
+import com.example.proyect.auth.Exceptions.UserAlreadyExistsException;
 import com.example.proyect.auth.security.PasswordHasher;
 import com.example.proyect.persistence.classes.User;
 import com.example.proyect.persistence.repos.UserRepository;
@@ -18,7 +20,7 @@ public class UserService {
     public User register(String username, String email, String rawPassword) {
 
         if (userRepository.existsByUsername(username)) {
-            throw new IllegalStateException("Username ya existe");
+            throw new UserAlreadyExistsException("Username ya existe");
         }
 
         if (userRepository.existsByEmail(email.toLowerCase())) {
@@ -46,10 +48,10 @@ public class UserService {
 
         User user = userRepository
                 .findByUsername(username)
-                .orElseThrow(() -> new IllegalArgumentException("Credenciales inválidas"));
+                .orElseThrow(() -> new InvalidCredentialsException("Credenciales inválidas"));
 
         if (!PasswordHasher.matches(rawPassword, user.getPasswordHash())) {
-            throw new IllegalArgumentException("Credenciales inválidas");
+            throw new InvalidCredentialsException("Credenciales inválidas");
         }
 
         user.markLoginNow();

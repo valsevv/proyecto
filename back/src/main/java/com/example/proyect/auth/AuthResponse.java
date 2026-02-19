@@ -1,11 +1,14 @@
 package com.example.proyect.auth;
 
 public class AuthResponse {
-    public Long playerId;
-    public String username;
 
-    public AuthResponse(Long playerId, String username) {
-        this.playerId = playerId;
+    public Long userId;
+    public String username;
+    public String token;
+
+    public AuthResponse(Long userId, String username, String token) {
+        this.userId = userId;
         this.username = username;
+        this.token = token;
     }
 }
