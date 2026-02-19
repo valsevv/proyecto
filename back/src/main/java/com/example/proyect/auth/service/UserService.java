@@ -2,6 +2,7 @@ package com.example.proyect.auth.service;
 
 import org.springframework.stereotype.Service;
 
+import com.example.proyect.auth.Exceptions.EmailAlreadyExistsException;
 import com.example.proyect.auth.Exceptions.InvalidCredentialsException;
 import com.example.proyect.auth.Exceptions.UserAlreadyExistsException;
 import com.example.proyect.auth.security.PasswordHasher;
@@ -20,22 +21,22 @@ public class UserService {
     public User register(String username, String email, String rawPassword) {
 
         if (userRepository.existsByUsername(username)) {
-            throw new UserAlreadyExistsException("Username ya existe");
+            throw new UserAlreadyExistsException("El usuario ya existe");
         }
 
         if (userRepository.existsByEmail(email.toLowerCase())) {
-            throw new IllegalStateException("Email ya existe");
+            throw new EmailAlreadyExistsException("Email ya existe");
         }
         if (username == null || username.isBlank()) {
-            throw new IllegalArgumentException("Username requerido");
+            throw new InvalidCredentialsException("Username requerido");
         }
 
         if (rawPassword == null || rawPassword.length() < 4) {
-            throw new IllegalArgumentException("Password demasiado corto");
+            throw new InvalidCredentialsException("Password demasiado corto");
         }
 
         if (email == null || email.length() < 8) {
-            throw new IllegalArgumentException("Email demasiado corto");
+            throw new InvalidCredentialsException("Email demasiado corto");
         }
 
         String hashedPassword = PasswordHasher.hash(rawPassword);
