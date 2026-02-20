@@ -28,6 +28,7 @@ public class Packet {
         return (T) payload.get(key);
     }
 
+    @SuppressWarnings("unchecked")
     public <T> T get(String key, T defaultValue) {
         Object value = payload.get(key);
         if (value == null) {
