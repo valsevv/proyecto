@@ -1,5 +1,7 @@
 -PostgreSQL 18.1
+
 -Java 17
+
 -Maven 3.3.4
 
 # Juego local
