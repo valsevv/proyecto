@@ -30,6 +30,7 @@
         document.body.addEventListener("click", () => {
             const music = document.getElementById("bgMusic");
             music.volume = 0.4;
+            music.loop = true;
             music.play();
         }, { once: true });
         </script>
