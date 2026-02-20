@@ -11,9 +11,9 @@ export default class LobbyScene extends Phaser.Scene {
 
     preload() {
         // Load side preview images (use same keys as MainScene will use)
-        this.load.image('dron_bomba', 'assets/dron_bomba.png');
-        this.load.image('dron_misil', 'assets/dron_misil.png');
-        this.load.image('mar', 'assets/mar.png');
+        this.load.image('dron_bomba', '/front/assets/dron_bomba.png');
+        this.load.image('dron_misil', '/front/assets/dron_misil.png');
+        this.load.image('mar', '/front/assets/mar.png');
     }
 
     create() {
@@ -58,8 +58,8 @@ export default class LobbyScene extends Phaser.Scene {
 
         // Connect and join
         console.log('[LobbyScene] === CONNECTING TO SERVER ===');
-        
-        const token = localStorage.getItem("token");
+         
+        const token = sessionStorage.getItem("token");
 
         if (!token) {
             console.error("No token found, redirecting to login");

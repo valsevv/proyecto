@@ -1,29 +1,3 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<title>Batalla Naval - Acceso</title>
-<link rel="stylesheet" href="styles.css">
-</head>
-<body>
-
-<div class="panel">
-    <h1> Batalla de drones</h1>
-
-    <input type="text" id="username" placeholder="USUARIO">
-    <input type="email" id="email" placeholder="EMAIL" hidden>
-    <input type="password" id="password" placeholder="CLAVE">
-
-    <button id="actionBtn">LOGEARSE</button>
-
-    <div class="toggle" id="toggleMode">
-        ¿No tenés cuenta? Registrarse
-    </div>
-
-    <div class="status" id="status"></div>
-</div>
-
-<script>
 const actionBtn = document.getElementById("actionBtn");
 const toggleMode = document.getElementById("toggleMode");
 const statusText = document.getElementById("status");
@@ -96,20 +70,16 @@ actionBtn.onclick = async () => {
     const data = await response.json();
 
     if (data.token) {
-      localStorage.setItem("token", data.token);
+      sessionStorage.setItem("token", data.token);
     }
 
     statusText.textContent = isLogin ? "Login exitoso" : "Registro exitoso";
 
     setTimeout(() => {
-      window.location.href = "/front/index.html";
+      window.location.href = "/front/screen/menu.html";
     }, 800);
 
   } catch (err) {
     statusText.textContent = err.message || "Error de autenticación";
   }
 };
-</script>
-
-</body>
-</html>

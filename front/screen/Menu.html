@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Drone Carrier Command</title>
+    <link rel="stylesheet" href="styles/menu.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="ocean"></div>
+    <div class="radar"></div>
+    <img src="/front/assets/porta_drones_volador.png" class="drone volador" title="nave voladora">
+
+    <img src="/front/assets/porta_drones_mar.png" class="drone naval" title="porta drones naval">
+
+    <!-- Menú -->
+    <div class="menu-container">
+        <h1>Batalla de Drones</h1>
+
+        <button class="menu-btn" onclick="location.href='/front/screen/index.html'">Crear Nueva Partida </button>
+        <button class="menu-btn">Cargar Partidas Guardadas</button>
+        <button class="menu-btn">Ranking de Jugadores</button>
+        <button class="menu-btn">Créditos</button>
+    </div>
+        <audio id="bgMusic" loop>
+            <source src="/front/assets/Menu_loop.mp3" type="audio/mpeg">
+        </audio>
+
+        <script>
+        document.body.addEventListener("click", () => {
+            const music = document.getElementById("bgMusic");
+            music.volume = 0.4;
+            music.play();
+        }, { once: true });
+        </script>
+</body>
+</html>

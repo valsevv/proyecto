@@ -1,0 +1,124 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Orbitron', sans-serif;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: white;
+}
+
+/* 🌊 Fondo mar real */
+.ocean {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: url('/front/assets/mar.png');
+    background-size: cover;
+    animation: waveMove 20s linear infinite;
+    filter: brightness(0.5);
+    z-index: 0;
+}
+
+@keyframes waveMove {
+    from { background-position: 0 0; }
+    to { background-position: 1000px 0; }
+}
+
+/* 🟢 Radar */
+.radar {
+    position: absolute;
+    width: 900px;
+    height: 900px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(0,255,100,0.15) 0%, rgba(0,255,100,0.05) 60%, transparent 70%);
+    border: 2px solid rgba(0,255,100,0.2);
+    animation: radarSpin 6s linear infinite;
+    z-index: 1;
+}
+
+@keyframes radarSpin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+
+.drone {
+    position: absolute;
+    width: 250px;
+    z-index: 2;
+    animation: float 4s ease-in-out infinite;
+}
+
+.volador{
+    top: 10%;
+    left: 1%;
+}
+
+.naval {
+    bottom: 15%;
+    right: 1%;
+    animation-delay: 2s;
+}
+
+@keyframes float {
+    0% { transform: translateY(0px); }
+    50% { transform: translateY(-20px); }
+    100% { transform: translateY(0px); }
+}
+
+/* 🎮 Menú */
+.menu-container {
+    position: relative;
+    z-index: 3;
+    background: rgba(0, 0, 0, 0.75);
+    padding: 60px 80px;
+    border-radius: 20px;
+    border: 1px solid rgba(9, 108, 214, 0.4);
+    text-align: center;
+    backdrop-filter: blur(10px);
+}
+
+h1 {
+    font-size: 34px;
+    margin-bottom: 40px;
+    letter-spacing: 3px;
+    color: #00ffcc;
+    /* color: #00d9ff; */
+    text-shadow: 0 0 15px rgba(0, 200, 255, 0.8);
+}
+
+.menu-btn {
+    display: block;
+    width: 320px;
+    margin: 18px auto;
+    padding: 18px;
+    font-size: 15px;
+    background: transparent;
+    /* border: 2px solid #00d9ff;
+    color: #00d9ff; */
+    border: 2px solid #00ffcc;
+    color: #00ffcc;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    letter-spacing: 1px;
+    border-radius: 8px;
+}
+
+.menu-btn:hover {
+    /* background: #00d9ff; */
+    background: #00ffcc;
+    color: #001018;
+    box-shadow: 0 0 20px rgba(0, 200, 255, 0.8);
+    transform: scale(1.05);
+}
+
+.menu-btn:active {
+    transform: scale(0.98);
+}

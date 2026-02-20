@@ -7,6 +7,7 @@ class NetworkManager {
     constructor(url) {
         this.url = url;
         this.ws = null;
+        //cada tipo tiene un ARRAY de handlers
         this.handlers = {};
 
         /** Set after the server sends "welcome" */
@@ -25,12 +26,12 @@ class NetworkManager {
     connect() {
         return new Promise((resolve, reject) => {
 
-            if (this.token) {
+            if (!this.token) {
                 reject("No JWT token found");
                 return;
             }
 
-            const urlWithToken = `${this.url}?token=${token}`;
+            const urlWithToken = `${this.url}?token=${this.token}`;
 
             this.ws = new WebSocket(urlWithToken);
 
@@ -59,6 +60,11 @@ class NetworkManager {
         console.log('[net] → SENDING MESSAGE:', msg.type);
         console.log('[net] Full message:', msg);
         console.log('='.repeat(80));
+
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+            console.warn('[net] Cannot send, socket not open');
+            return;
+        }
         this.ws.send(JSON.stringify(msg));
     }
 
@@ -90,16 +96,21 @@ class NetworkManager {
     }
 
     on(type, callback) {
-        const isOverwriting = !!this.handlers[type];
-        if (isOverwriting) {
-            console.warn('[net] ⚠️  OVERWRITING EXISTING HANDLER for:', type);
-            console.trace('[net] Stack trace for handler overwrite:');
-        } else {
-            console.log('[net] ✓ Registering new handler for:', type);
+        if (!this.handlers[type]) {
+            this.handlers[type] = [];
         }
-        this.handlers[type] = callback;
+
+        this.handlers[type].push(callback);
+        console.log(`[net] ✓ Handler added for: ${type} (total: ${this.handlers[type].length})`);
     }
 
+    off(type, callback) {
+        if (!this.handlers[type]) return;
+
+        this.handlers[type] = this.handlers[type].filter(cb => cb !== callback);
+        console.log(`[net] Handler removed for: ${type}`);
+    }
+    
     _onMessage(event) {
         const msg = JSON.parse(event.data);
         console.log('='.repeat(80));
@@ -135,14 +146,21 @@ class NetworkManager {
     }
 
     _fire(type, msg) {
-        const handler = this.handlers[type];
-        if (handler) {
-            console.log('[net] ✓ Handler exists for', type, '- executing...');
-            handler(msg);
-            console.log('[net] ✓ Handler executed for', type);
-        } else {
-            console.warn('[net] ⚠️  NO HANDLER REGISTERED for:', type);
-            console.log('[net] Current registered handlers:', Object.keys(this.handlers));
+        const handlers = this.handlers[type];
+
+        if (!handlers || handlers.length === 0) {
+            console.warn('[net] No handlers for:', type);
+            return;
+        }
+
+        console.log(`[net] Firing ${handlers.length} handler(s) for: ${type}`);
+
+        for (const handler of handlers) {
+            try {
+                handler(msg);
+            } catch (err) {
+                console.error('[net] Handler error:', err);
+            }
         }
     }
 }

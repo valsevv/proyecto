@@ -50,9 +50,24 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
+
+        String username = (String) session.getAttributes().get("username");
+
+        if (username == null) {
+            log.warn("Connection without authenticated user. Closing.");
+            try {
+                session.close();
+            } catch (IOException e) {
+                log.error("Error closing session", e);
+            }
+            return;
+        }
+
         sessions.put(session.getId(), session);
-        log.info("Client connected: {}", session.getId());
+
+        log.info("Client connected: {} ({})", username, session.getId());
     }
+
 
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
