@@ -122,3 +122,34 @@ h1 {
 .menu-btn:active {
     transform: scale(0.98);
 }
+
+.music-toggle-floating {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 5;
+    width: 52px;
+    height: 52px;
+    margin: 0;
+    border-radius: 50%;
+    border: 2px solid #00ffcc;
+    background: rgba(0, 0, 0, 0.65);
+    color: #00ffcc;
+    font-size: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 0 12px rgba(0, 255, 204, 0.35);
+    transition: all 0.2s ease;
+}
+
+.music-toggle-floating:hover {
+    background: #00ffcc;
+    color: #001018;
+    transform: scale(1.06);
+}
+
+.music-toggle-floating:active {
+    transform: scale(0.96);
+}

@@ -21,6 +21,7 @@
         <button class="menu-btn">Cargar Partidas Guardadas</button>
         <button class="menu-btn">Ranking de Jugadores</button>
         <button class="menu-btn">Créditos</button>
+        <button class="menu-btn" id="musicToggleBtn">🔊 Música: ON</button>
         <button class="menu-btn" id="logoutBtn" style="background-color: #8B0000;">Logout</button>
     </div>
         <audio id="bgMusic" loop>
@@ -30,12 +31,45 @@
         <script>
         const API_BASE = 'http://localhost:8080/api';
         
-        document.body.addEventListener("click", () => {
-            const music = document.getElementById("bgMusic");
+      const music = document.getElementById('bgMusic');
+        const musicToggleBtn = document.getElementById('musicToggleBtn');
+        let musicEnabled = true;
+
+        function updateMusicButton() {
+            musicToggleBtn.textContent = musicEnabled ? '🔊' : '🔇';
+            const label = musicEnabled ? 'Desactivar música' : 'Activar música';
+            musicToggleBtn.title = label;
+            musicToggleBtn.setAttribute('aria-label', label);
+        }
+
+        document.body.addEventListener('click', () => {
             music.volume = 0.4;
             music.loop = true;
-            music.play();
-        }, { once: true });
+ if (musicEnabled) {
+                music.play().catch(() => {
+                    musicEnabled = false;
+                    updateMusicButton();
+                });
+            }
+                }, { once: true });
+
+ musicToggleBtn.addEventListener('click', async () => {
+            musicEnabled = !musicEnabled;
+
+            if (musicEnabled) {
+                try {
+                    await music.play();
+                } catch (error) {
+                    console.warn('No se pudo reproducir la música:', error);
+                    musicEnabled = false;
+                }
+            } else {
+                music.pause();
+            }
+
+            updateMusicButton();
+        });
+
 
         // Logout functionality
         document.getElementById('logoutBtn').addEventListener('click', async () => {
