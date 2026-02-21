@@ -24,12 +24,19 @@ public class GameRoom {
     }
 
     public static final int MAX_PLAYERS = 2;
-    public static final int DRONES_PER_PLAYER = 3;
+    public static final int AERIAL_DRONES_PER_PLAYER = 3;
+    public static final int NAVAL_DRONES_PER_PLAYER = 6;
     public static final int ACTIONS_PER_TURN = 99; // Unlimited - frontend tracks per-drone limits
 
     // Starting positions per player (left side vs right side of the map)
-    private static final double[][] STARTS_P0 = { {300, 600}, {300, 900}, {300, 1200} };
-    private static final double[][] STARTS_P1 = { {2100, 600}, {2100, 900}, {2100, 1200} };
+    private static final double[][] STARTS_P0_AERIAL = { {300, 600}, {300, 900}, {300, 1200} };
+    private static final double[][] STARTS_P1_AERIAL = { {2100, 600}, {2100, 900}, {2100, 1200} };
+    private static final double[][] STARTS_P0_NAVAL = {
+            {300, 450}, {300, 630}, {300, 810}, {300, 990}, {300, 1170}, {300, 1350}
+    };
+    private static final double[][] STARTS_P1_NAVAL = {
+            {2100, 450}, {2100, 630}, {2100, 810}, {2100, 990}, {2100, 1170}, {2100, 1350}
+    };
 
     private final List<PlayerState> players = new ArrayList<>();
     
@@ -48,7 +55,7 @@ public class GameRoom {
         if (players.size() >= MAX_PLAYERS) return null;
 
         int index = players.size();
-        double[][] starts = (index == 0) ? STARTS_P0 : STARTS_P1;
+        double[][] starts = (index == 0) ? STARTS_P0_AERIAL : STARTS_P1_AERIAL;
 
         List<Drone> drones = new ArrayList<>();
         // Note: Drones will be created as placeholders initially
@@ -75,13 +82,16 @@ public class GameRoom {
     public synchronized void createDronesForSide(int playerIndex, String side) {
         PlayerState player = getPlayerByIndex(playerIndex);
         if (player == null) return;
-        
-        double[][] starts = (playerIndex == 0) ? STARTS_P0 : STARTS_P1;
+
+        boolean isNaval = "Naval".equals(side);
+        double[][] starts = isNaval
+                ? ((playerIndex == 0) ? STARTS_P0_NAVAL : STARTS_P1_NAVAL)
+                : ((playerIndex == 0) ? STARTS_P0_AERIAL : STARTS_P1_AERIAL);
         List<Drone> drones = new ArrayList<>();
         
         for (int i = 0; i < starts.length; i++) {
             double[] pos = starts[i];
-            Drone drone = "Naval".equals(side) ? new NavalDrone() : new AerialDrone();
+            Drone drone = isNaval ? new NavalDrone() : new AerialDrone();
             drone.setId(UUID.randomUUID().toString());
             drone.setOwnerPlayerId(playerIndex);
             drone.setPosition(new HexCoord(pos[0], pos[1]));

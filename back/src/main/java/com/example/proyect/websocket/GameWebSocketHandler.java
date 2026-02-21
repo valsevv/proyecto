@@ -101,6 +101,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             case MOVE        -> handleMove(session, packet);
             case ATTACK      -> handleAttack(session, packet);
             case END_TURN    -> handleEndTurn(session);
+            case SAVE_AND_EXIT -> handleSaveAndExit(session);
             default          -> sendError(session, "Unknown message type");
         }
     }
@@ -214,6 +215,26 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         if (result.isTurnEnded()) {
             Packet turnStart = Packet.turnStart(result.getNextPlayer(), result.getActionsRemaining());
             broadcastToRoom(session.getId(), turnStart);
+        }
+    }
+
+    private void handleSaveAndExit(WebSocketSession session) throws IOException {
+        java.util.List<String> roomSessions = gameController.getSessionsInSameRoom(session.getId());
+
+        GameResult result = gameController.saveAndExit(session.getId());
+
+        if (!result.isSuccess()) {
+            send(session, result.getPacket());
+            return;
+        }
+
+        // Notify all players that this game was saved and closed
+        String json = PacketSerializer.serialize(result.getPacket());
+        for (String sid : roomSessions) {
+            WebSocketSession s = sessions.get(sid);
+            if (s != null && s.isOpen()) {
+                s.sendMessage(new TextMessage(json));
+            }
         }
     }
 

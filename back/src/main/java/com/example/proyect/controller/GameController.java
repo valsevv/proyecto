@@ -5,6 +5,11 @@ import com.example.proyect.game.units.drone.Drone;
 import com.example.proyect.game.GameRoom;
 import com.example.proyect.game.PlayerState;
 import com.example.proyect.lobby.Lobby;
+import java.time.OffsetDateTime;
+import com.example.proyect.persistence.classes.Game;
+import com.example.proyect.persistence.classes.GameStatus;
+import com.example.proyect.persistence.repos.GameRepository;
+import java.util.LinkedHashMap;
 import com.example.proyect.lobby.service.LobbyService;
 import com.example.proyect.websocket.packet.Packet;
 import org.slf4j.Logger;
@@ -26,6 +31,7 @@ public class GameController {
 
     private final LobbyService lobbyService;
 
+    private final GameRepository gameRepository;
     // All game rooms by room ID
     private final Map<String, GameRoom> rooms = new ConcurrentHashMap<>();
     
@@ -38,8 +44,9 @@ public class GameController {
     // Sequential room ID counter
     private final AtomicInteger roomCounter = new AtomicInteger(1);
 
-    public GameController(LobbyService lobbyService) {
+    public GameController(LobbyService lobbyService, GameRepository gameRepository) {
         this.lobbyService = lobbyService;
+        this.gameRepository = gameRepository;
     }
 
     /**
@@ -215,6 +222,66 @@ public class GameController {
             return removed.getPlayerIndex();
         }
         return -1;
+    }
+
+    /**
+     * Save current room state to DB and close the game room for all participants.
+     */
+    public GameResult saveAndExit(String sessionId) {
+        GameRoom room = getRoomForSession(sessionId);
+        if (room == null) {
+            return GameResult.error("You are not in a game room");
+        }
+
+        PlayerState actor = room.getPlayerBySession(sessionId);
+        if (actor == null) {
+            return GameResult.error("You are not in the game");
+        }
+
+        PlayerState p0 = room.getPlayerByIndex(0);
+        PlayerState p1 = room.getPlayerByIndex(1);
+        if (p0 == null || p1 == null) {
+            return GameResult.error("Cannot save an incomplete game");
+        }
+
+        Long player1Id = sessionToUserId.get(p0.getSessionId());
+        Long player2Id = sessionToUserId.get(p1.getSessionId());
+        if (player1Id == null || player2Id == null) {
+            return GameResult.error("Cannot resolve players for persistence");
+        }
+
+        Game game = new Game();
+        game.setPlayer1Id(player1Id);
+        game.setPlayer2Id(player2Id);
+        game.setEndedAt(OffsetDateTime.now());
+
+        com.example.proyect.persistence.classes.GameState persistedState =
+                new com.example.proyect.persistence.classes.GameState();
+        persistedState.setStatus(GameStatus.FINISHED);
+        persistedState.setTurn(room.getCurrentTurn());
+
+        Map<String, Object> meta = new LinkedHashMap<>();
+        meta.put("roomId", room.getRoomId());
+        meta.put("savedByPlayerIndex", actor.getPlayerIndex());
+        meta.put("savedByUserId", sessionToUserId.get(sessionId));
+        meta.put("snapshot", room.toStateMap());
+        persistedState.setMeta(meta);
+
+        game.setState(persistedState);
+        Game saved = gameRepository.save(game);
+
+        String roomId = room.getRoomId();
+        java.util.List<String> sessionsInRoom = getSessionsInSameRoom(sessionId);
+        sessionToRoom.entrySet().removeIf(entry -> roomId.equals(entry.getValue()));
+        for (String sid : sessionsInRoom) {
+            sessionToUserId.remove(sid);
+        }
+        room.reset();
+        cleanupEmptyRooms();
+
+        log.info("Game room {} saved and closed by player {}. Persisted gameId={}", roomId, actor.getPlayerIndex(), saved.getId());
+
+        return GameResult.ok(Packet.gameSaved(saved.getId(), actor.getPlayerIndex()));
     }
 
     /**

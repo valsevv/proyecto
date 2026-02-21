@@ -37,6 +37,13 @@ public class Packet {
         return (T) value;
     }
 
+    public static Packet gameSaved(Long gameId, int savedByPlayerIndex) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("gameId", gameId);
+        payload.put("savedByPlayerIndex", savedByPlayerIndex);
+        return new Packet(PacketType.GAME_SAVED, payload);
+    }
+
     public int getInt(String key) {
         Object value = payload.get(key);
         if (value instanceof Number) {
