@@ -2,7 +2,6 @@ package com.example.proyect.websocket;
 
 import java.util.Map;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.server.ServerHttpRequest;
 import org.springframework.http.server.ServerHttpResponse;
 import org.springframework.http.server.ServletServerHttpRequest;
@@ -15,8 +14,11 @@ import com.example.proyect.auth.security.JwtService;
 @Component
 public class JwtHandshakeInterceptor implements HandshakeInterceptor {
 
-    @Autowired
-    private JwtService jwtService; // tu clase que  el token valida
+    private final JwtService jwtService;
+
+    public JwtHandshakeInterceptor(JwtService jwtService) {
+        this.jwtService = jwtService;
+    }
     @Override
     public boolean beforeHandshake(
             ServerHttpRequest request,
@@ -24,21 +26,39 @@ public class JwtHandshakeInterceptor implements HandshakeInterceptor {
             WebSocketHandler wsHandler,
             Map<String, Object> attributes) {
 
-        if (request instanceof ServletServerHttpRequest servletRequest) {
-
-            String token = servletRequest.getServletRequest()
-                    .getParameter("token");
-
-            if (token == null || !jwtService.isTokenValid(token)) {
-                return false; // rechaza conexión
-            }
-
-            String username = jwtService.extractUsername(token);
-
-            attributes.put("username", username);
+        // Extract JWT from Cookie header (browsers automatically send cookies with WS handshake)
+        String token = extractTokenFromCookies(request);
+        
+        // Fallback: check query parameter for backward compatibility during migration
+        if (token == null && request instanceof ServletServerHttpRequest servletRequest) {
+            token = servletRequest.getServletRequest().getParameter("token");
         }
 
+        if (token == null || !jwtService.isTokenValid(token)) {
+            return false; // reject connection - no valid auth
+        }
+
+        String username = jwtService.extractUsername(token);
+        Long userId = jwtService.extractUserId(token);
+
+        attributes.put("username", username);
+        attributes.put("userId", userId);
+
         return true;
+    }
+
+    private String extractTokenFromCookies(ServerHttpRequest request) {
+        String cookieHeader = request.getHeaders().getFirst("Cookie");
+        if (cookieHeader != null) {
+            String[] cookies = cookieHeader.split(";");
+            for (String cookie : cookies) {
+                String[] parts = cookie.trim().split("=", 2);
+                if (parts.length == 2 && "authToken".equals(parts[0])) {
+                    return parts[1];
+                }
+            }
+        }
+        return null;
     }
 
     @Override

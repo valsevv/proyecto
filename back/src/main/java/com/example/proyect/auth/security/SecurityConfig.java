@@ -36,20 +36,61 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 // Preflight siempre permitido
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                // Endpoints públicos
+                
+                // Public endpoints
+                .requestMatchers("/api/auth/**").permitAll()
+                
+                // Public page routes
+                .requestMatchers("/", "/login").permitAll()
+                
+                // Block direct access to HTML files in static directory
+                .requestMatchers(request -> {
+                    String path = request.getRequestURI();
+                    return path.startsWith("/screen/") && path.endsWith(".html");
+                }).denyAll()
+                
+                // Public static assets (CSS, JS, images, libraries)
+                // Allow everything else under /screen/ and other static resources
                 .requestMatchers(
-                    "/api/auth/**",
-                    "/index.html", "/favicon.ico"
+                    "/assets/**",
+                    "/styles/**", 
+                    "/screen/**",
+                    "/lib/**",
+                    "/gameobjects/**",
+                    "/scenes/**",
+                    "/network/**",
+                    "/shared/**",
+                    "/ui/**",
+                    "/utils/**",
+                    "/favicon.ico",
+                    "/game.js"
                 ).permitAll()
-                // Todo lo demás requiere estar autenticado (JWT válido)
+                
+                // Protected page routes - require authentication
+                .requestMatchers(
+                    "/menu",
+                    "/lobby-browser", 
+                    "/lobby-waiting",
+                    "/game"
+                ).authenticated()
+                
+                // All API endpoints require authentication (except /api/auth/**)
                 .anyRequest().authenticated()
             )
-            // Manejo centralizado de 401/403 (opcional pero útil)
+            // Manejo centralizado de 401/403
             .exceptionHandling(ex -> ex
                 .authenticationEntryPoint((req, res, e) -> {
-                    res.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                    res.setContentType("application/json");
-                    res.getWriter().write("{\"error\":\"Unauthorized\"}");
+                    // Check if it's an HTML request
+                    String accept = req.getHeader("Accept");
+                    if (accept != null && accept.contains("text/html")) {
+                        // Redirect HTML requests to login page
+                        res.sendRedirect("/login");
+                    } else {
+                        // Return JSON for API requests
+                        res.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                        res.setContentType("application/json");
+                        res.getWriter().write("{\"error\":\"Unauthorized\"}");
+                    }
                 })
                 .accessDeniedHandler((req, res, e) -> {
                     res.setStatus(HttpServletResponse.SC_FORBIDDEN);

@@ -1,6 +1,8 @@
 package com.example.proyect.auth.api;
 import java.util.Map;
 
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -42,13 +44,22 @@ public class AuthController {
 
         String token = jwtService.generateToken(user.getUserId(), user.getUsername());
 
-        return ResponseEntity.ok(
-                new AuthResponse(
+        // Create HttpOnly cookie for JWT
+        ResponseCookie cookie = ResponseCookie.from("authToken", token)
+                .httpOnly(true)
+                .secure(false) // Set to true in production with HTTPS
+                .path("/")
+                .maxAge(3600) // 1 hour (matches JWT expiration)
+                .sameSite("Strict")
+                .build();
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                .body(new AuthResponse(
                         user.getUserId(),
                         user.getUsername(),
-                        token
-                )
-        );
+                        null // No token in response body
+                ));
     }       
 
     @PostMapping("/login")
@@ -61,18 +72,43 @@ public class AuthController {
 
         String token = jwtService.generateToken(user.getUserId(), user.getUsername());
         
-        return ResponseEntity.ok(
-                new AuthResponse(
+        // Create HttpOnly cookie for JWT
+        ResponseCookie cookie = ResponseCookie.from("authToken", token)
+                .httpOnly(true)
+                .secure(false) // Set to true in production with HTTPS
+                .path("/")
+                .maxAge(3600) // 1 hour (matches JWT expiration)
+                .sameSite("Strict")
+                .build();
+        
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                .body(new AuthResponse(
                         user.getUserId(),
                         user.getUsername(),
-                        token
-                )
-            );
+                        null // No token in response body
+                ));
     }
         @GetMapping("/ping")
         public ResponseEntity<Map<String, String>> ping() {
         return ResponseEntity.ok(Map.of("status", "ok"));
         }
+
+    @PostMapping("/logout")
+    public ResponseEntity<Map<String, String>> logout() {
+        // Clear the authentication cookie
+        ResponseCookie cookie = ResponseCookie.from("authToken", "")
+                .httpOnly(true)
+                .secure(false)
+                .path("/")
+                .maxAge(0) // Expire immediately
+                .sameSite("Strict")
+                .build();
+        
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                .body(Map.of("message", "Logged out successfully"));
+    }
         
     @RestController
         @RequestMapping("/api/users")

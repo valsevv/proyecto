@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.util.Date;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import io.jsonwebtoken.Claims;
@@ -13,10 +14,11 @@ import io.jsonwebtoken.security.Keys;
 @Service
 public class JwtService {
 
-    private final String SECRET = "d8aF92ksLmPq78XzRtUvW1yB6nHjK3sQ";
-    //Una buena practica seria guardarle en un application.properties y levantarla de ahi
+    @Value("${jwt.secret}")
+    private String SECRET;
 
-    private final long EXPIRATION = 1000 * 60 * 60; // 1 hora
+    @Value("${jwt.expiration}")
+    private long EXPIRATION;
 
     private Key getSigningKey() {
         return Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));

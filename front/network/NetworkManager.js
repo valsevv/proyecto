@@ -21,19 +21,15 @@ class NetworkManager {
     }
 
     setToken(token) {
-        this.token = token;
+        // Token no longer needed - cookies are sent automatically
+        // Keep method for backward compatibility but it's a no-op
+        console.log('[net] setToken() called but cookies are used instead');
     }
+    
     connect() {
         return new Promise((resolve, reject) => {
-
-            if (!this.token) {
-                reject("No JWT token found");
-                return;
-            }
-
-            const urlWithToken = `${this.url}?token=${this.token}`;
-
-            this.ws = new WebSocket(urlWithToken);
+            // Connect to WebSocket - browser automatically sends cookies
+            this.ws = new WebSocket(this.url);
 
             this.ws.onopen = () => {
                 console.log('[net] connected');
@@ -68,9 +64,10 @@ class NetworkManager {
         this.ws.send(JSON.stringify(msg));
     }
 
-    join() {
+    join(lobbyId) {
         console.log('[net] === SENDING JOIN MESSAGE ===');
-        this.send({ type: 'join' });
+        console.log('[net] Lobby ID:', lobbyId);
+        this.send({ type: 'join', lobbyId });
     }
 
     requestMove(droneIndex, x, y) {

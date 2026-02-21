@@ -47,8 +47,8 @@ actionBtn.onclick = async () => {
       headers: {
         "Content-Type": "application/json"
       },
-      body: JSON.stringify(body)
-      // credentials: "include" // solo si usas cookies/sesiones; para JWT via header no hace falta
+      body: JSON.stringify(body),
+      credentials: "include" // Enable cookie support
     });
 
     if (!response.ok) {
@@ -69,14 +69,13 @@ actionBtn.onclick = async () => {
 
     const data = await response.json();
 
-    if (data.token) {
-      sessionStorage.setItem("token", data.token);
-    }
+    // Cookie is set automatically by browser from Set-Cookie header
+    // No need to manually store token in sessionStorage
 
     statusText.textContent = isLogin ? "Login exitoso" : "Registro exitoso";
 
     setTimeout(() => {
-      window.location.href = "/front/screen/menu.html";
+      window.location.href = "/menu";
     }, 800);
 
   } catch (err) {

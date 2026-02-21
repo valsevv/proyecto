@@ -35,42 +35,50 @@ protected void doFilterInternal(HttpServletRequest request,
         return;
     }
 
-    String path = request.getRequestURI();
-    if (path.startsWith("/api/auth")) {
-        filterChain.doFilter(request, response);
-        return;
-    }
-    
+    // Si ya existe autenticación, continuar
     Authentication existing = SecurityContextHolder.getContext().getAuthentication();
     if (existing != null && existing.isAuthenticated()) {
         filterChain.doFilter(request, response);
         return;
     }
 
-        
-    String authHeader = request.getHeader("Authorization");
-    if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-        return;
+    // Extract JWT from cookie
+    String token = extractTokenFromCookie(request);
+    
+    // Fallback: also check Authorization header for backward compatibility during migration
+    if (token == null) {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            token = authHeader.substring(7);
+        }
     }
+    
+    if (token != null && jwtService.isTokenValid(token)) {
+        String username = jwtService.extractUsername(token);
 
-    String token = authHeader.substring(7);
-    if (!jwtService.isTokenValid(token)) {
-        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-        return;
+        UsernamePasswordAuthenticationToken authentication =
+            new UsernamePasswordAuthenticationToken(
+                username,
+                null,
+                java.util.Collections.emptyList() // sin roles
+            );
+
+        SecurityContextHolder.getContext().setAuthentication(authentication);
     }
-
-    String username = jwtService.extractUsername(token);
-
-    UsernamePasswordAuthenticationToken authentication =
-        new UsernamePasswordAuthenticationToken(
-            username,
-            null,
-            java.util.Collections.emptyList() // sin roles
-        );
-
-    SecurityContextHolder.getContext().setAuthentication(authentication);
+    
+    // Siempre continuar con la cadena - SecurityConfig decidirá si se requiere auth
     filterChain.doFilter(request, response);
+    }
+
+    private String extractTokenFromCookie(HttpServletRequest request) {
+        if (request.getCookies() != null) {
+            for (jakarta.servlet.http.Cookie cookie : request.getCookies()) {
+                if ("authToken".equals(cookie.getName())) {
+                    return cookie.getValue();
+                }
+            }
+        }
+        return null;
     }
 }
 

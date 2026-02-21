@@ -1,5 +1,6 @@
 package com.example.proyect.lobby;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -7,16 +8,26 @@ import java.util.List;
 public class Lobby {
 
     private final String lobbyId;
+    private final String creatorUsername;
+    private final LocalDateTime createdAt;
     private final List<Long> playerIds = new ArrayList<>(2);
     private LobbyStatus status = LobbyStatus.WAITING; //comienza pendiente
 
-    public Lobby(String lobbyId) {
+    public Lobby(String lobbyId, String creatorUsername) {
         this.lobbyId = lobbyId;
+        this.creatorUsername = creatorUsername;
+        this.createdAt = LocalDateTime.now();
     }
 
     public String getLobbyId() { return lobbyId; }
+    public String getCreatorUsername() { return creatorUsername; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
     public LobbyStatus getStatus() { return status; }
     public List<Long> getPlayerIds() { return Collections.unmodifiableList(playerIds); }
+
+    public boolean isFull() {
+        return playerIds.size() >= 2;
+    }
 
     public void addPlayer(long playerId) {
         if (playerIds.contains(playerId)) return;

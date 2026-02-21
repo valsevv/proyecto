@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Lobby Browser - Drone Carrier Command</title>
+    <link rel="stylesheet" href="/screen/styles/lobby.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="ocean"></div>
+    <div class="radar"></div>
+
+    <div class="lobby-container">
+        <h1>Available Lobbies</h1>
+        
+        <div class="lobby-controls">
+            <button class="btn-primary" id="createLobbyBtn">Create New Lobby</button>
+            <button class="btn-secondary" id="refreshBtn">Refresh</button>
+            <button class="btn-secondary" id="backBtn">Back to Menu</button>
+        </div>
+
+        <div class="lobby-list" id="lobbyList">
+            <p class="loading">Loading lobbies...</p>
+        </div>
+
+        <div class="lobby-info">
+            <p>Click on a lobby to join or create your own!</p>
+        </div>
+    </div>
+
+    <script src="/screen/LobbyBrowser.js"></script>
+</body>
+</html>

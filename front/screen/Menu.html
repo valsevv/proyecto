@@ -3,36 +3,61 @@
 <head>
     <meta charset="UTF-8">
     <title>Drone Carrier Command</title>
-    <link rel="stylesheet" href="styles/menu.css">
+    <link rel="stylesheet" href="/screen/styles/menu.css">
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <div class="ocean"></div>
     <div class="radar"></div>
-    <img src="/front/assets/porta_drones_volador.png" class="drone volador" title="nave voladora">
+    <img src="/assets/porta_drones_volador.png" class="drone volador" title="nave voladora">
 
-    <img src="/front/assets/porta_drones_mar.png" class="drone naval" title="porta drones naval">
+    <img src="/assets/porta_drones_mar.png" class="drone naval" title="porta drones naval">
 
     <!-- Menú -->
     <div class="menu-container">
         <h1>Batalla de Drones</h1>
 
-        <button class="menu-btn" onclick="location.href='/front/screen/index.html'">Crear Nueva Partida </button>
+        <button class="menu-btn" onclick="location.href='/lobby-browser'">Browse Lobbies</button>
         <button class="menu-btn">Cargar Partidas Guardadas</button>
         <button class="menu-btn">Ranking de Jugadores</button>
         <button class="menu-btn">Créditos</button>
+        <button class="menu-btn" id="logoutBtn" style="background-color: #8B0000;">Logout</button>
     </div>
         <audio id="bgMusic" loop>
-            <source src="/front/assets/Menu_loop.mp3" type="audio/mpeg">
+            <source src="/assets/Menu_loop.mp3" type="audio/mpeg">
         </audio>
 
         <script>
+        const API_BASE = 'http://localhost:8080/api';
+        
         document.body.addEventListener("click", () => {
             const music = document.getElementById("bgMusic");
             music.volume = 0.4;
             music.loop = true;
             music.play();
         }, { once: true });
+
+        // Logout functionality
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            try {
+                const response = await fetch(`${API_BASE}/auth/logout`, {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+                
+                if (response.ok) {
+                    // Clear any remaining session data
+                    sessionStorage.clear();
+                    // Redirect to login
+                    window.location.href = '/login';
+                } else {
+                    alert('Logout failed. Please try again.');
+                }
+            } catch (error) {
+                console.error('Logout error:', error);
+                alert('Error during logout.');
+            }
+        });
         </script>
 </body>
 </html>

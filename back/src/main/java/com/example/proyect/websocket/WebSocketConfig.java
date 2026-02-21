@@ -10,14 +10,18 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
 public class WebSocketConfig implements WebSocketConfigurer {
 
     private final GameWebSocketHandler gameHandler;
+    private final JwtHandshakeInterceptor jwtHandshakeInterceptor;
 
-    public WebSocketConfig(GameWebSocketHandler gameHandler) {
+    public WebSocketConfig(GameWebSocketHandler gameHandler, 
+                          JwtHandshakeInterceptor jwtHandshakeInterceptor) {
         this.gameHandler = gameHandler;
+        this.jwtHandshakeInterceptor = jwtHandshakeInterceptor;
     }
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
         registry.addHandler(gameHandler, "/ws")
+                .addInterceptors(jwtHandshakeInterceptor)  // Enable authentication!
                 .setAllowedOriginPatterns("*");
     }
 }

@@ -11,9 +11,9 @@ export default class LobbyScene extends Phaser.Scene {
 
     preload() {
         // Load side preview images (use same keys as MainScene will use)
-        this.load.image('dron_bomba', '/front/assets/dron_bomba.png');
-        this.load.image('dron_misil', '/front/assets/dron_misil.png');
-        this.load.image('mar', '/front/assets/mar.png');
+        this.load.image('dron_bomba', '/assets/dron_bomba.png');
+        this.load.image('dron_misil', '/assets/dron_misil.png');
+        this.load.image('mar', '/assets/mar.png');
     }
 
     create() {
@@ -59,19 +59,19 @@ export default class LobbyScene extends Phaser.Scene {
         // Connect and join
         console.log('[LobbyScene] === CONNECTING TO SERVER ===');
          
-        const token = sessionStorage.getItem("token");
+        const lobbyId = sessionStorage.getItem("currentLobbyId");
 
-        if (!token) {
-            console.error("No token found, redirecting to login");
-            this.scene.start('LoginScene');
+        if (!lobbyId) {
+            console.error("No lobby ID found, redirecting to lobby browser");
+            window.location.href = '/lobby-browser';
             return;
         }
 
-        Network.setToken(token);
-
+        // No need to check/set token - cookies are sent automatically
         Network.connect().then(() => {
             console.log('[LobbyScene] === CONNECTION ESTABLISHED ===');
-            Network.join();
+            console.log('[LobbyScene] Joining lobby:', lobbyId);
+            Network.join(lobbyId);
             console.log('[LobbyScene] === JOIN MESSAGE SENT ===');
             // Don't set status text here - wait for welcome message
         }).catch(err => {

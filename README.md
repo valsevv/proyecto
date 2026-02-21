@@ -6,6 +6,6 @@
 
 # Juego local
 
-Cambiar la URL del ws en /front/game.js a
+Cambiar la URL del ws en /game.js a
 
 > ws://localhost:8080/ws

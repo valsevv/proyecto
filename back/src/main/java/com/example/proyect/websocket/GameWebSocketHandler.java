@@ -52,8 +52,9 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
     public void afterConnectionEstablished(WebSocketSession session) {
 
         String username = (String) session.getAttributes().get("username");
+        Long userId = (Long) session.getAttributes().get("userId");
 
-        if (username == null) {
+        if (username == null || userId == null) {
             log.warn("Connection without authenticated user. Closing.");
             try {
                 session.close();
@@ -65,7 +66,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
 
         sessions.put(session.getId(), session);
 
-        log.info("Client connected: {} ({})", username, session.getId());
+        log.info("Client connected: {} (userId: {}, username: {})", session.getId(), userId, username);
     }
 
 
@@ -95,7 +96,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         log.info("[WS] Parsed packet type: {}", packet.getType());
 
         switch (packet.getType()) {
-            case JOIN        -> handleJoin(session);
+            case JOIN        -> handleJoin(session, packet);
             case SELECT_SIDE -> handleSelectSide(session, packet);
             case MOVE        -> handleMove(session, packet);
             case ATTACK      -> handleAttack(session, packet);
@@ -104,8 +105,21 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
-    private void handleJoin(WebSocketSession session) throws IOException {
-        GameResult result = gameController.joinGame(session.getId());
+    private void handleJoin(WebSocketSession session, Packet packet) throws IOException {
+        String lobbyId = packet.getString("lobbyId");
+        Long userId = (Long) session.getAttributes().get("userId");
+        
+        if (lobbyId == null) {
+            sendError(session, "No lobby specified");
+            return;
+        }
+        
+        if (userId == null) {
+            sendError(session, "User not authenticated");
+            return;
+        }
+        
+        GameResult result = gameController.joinGame(session.getId(), lobbyId, userId);
         
         if (!result.isSuccess()) {
             send(session, result.getPacket());

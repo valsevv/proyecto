@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import com.example.proyect.auth.ErrorResponse;
 
 
-@RestControllerAdvice
+@RestControllerAdvice(basePackages = {"com.example.proyect.auth.api", "com.example.proyect.controller", "com.example.proyect.lobby.api"})
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(UserAlreadyExistsException.class)

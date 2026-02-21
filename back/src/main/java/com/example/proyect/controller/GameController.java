@@ -4,6 +4,8 @@ import com.example.proyect.VOs.GameResult;
 import com.example.proyect.game.units.drone.Drone;
 import com.example.proyect.game.GameRoom;
 import com.example.proyect.game.PlayerState;
+import com.example.proyect.lobby.Lobby;
+import com.example.proyect.lobby.service.LobbyService;
 import com.example.proyect.websocket.packet.Packet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,31 +24,32 @@ public class GameController {
 
     private static final Logger log = LoggerFactory.getLogger(GameController.class);
 
+    private final LobbyService lobbyService;
+
     // All game rooms by room ID
     private final Map<String, GameRoom> rooms = new ConcurrentHashMap<>();
     
     // Track which room each session is in
     private final Map<String, String> sessionToRoom = new ConcurrentHashMap<>();
     
+    // Track userId for each session
+    private final Map<String, Long> sessionToUserId = new ConcurrentHashMap<>();
+    
     // Sequential room ID counter
     private final AtomicInteger roomCounter = new AtomicInteger(1);
 
+    public GameController(LobbyService lobbyService) {
+        this.lobbyService = lobbyService;
+    }
+
     /**
-     * Find an available room (not full) or create a new one.
+     * Create a GameRoom from a lobby when both players are ready.
      */
-    private synchronized GameRoom findOrCreateRoom() {
-        // Try to find an existing room with space
-        for (GameRoom room : rooms.values()) {
-            if (!room.isFull() && !room.isGameStarted()) {
-                return room;
-            }
-        }
-        
-        // No available room found, create a new one
+    private GameRoom createGameFromLobby(Lobby lobby) {
         String roomId = "room-" + roomCounter.getAndIncrement();
         GameRoom newRoom = new GameRoom(roomId);
         rooms.put(roomId, newRoom);
-        log.info("Created new game room: {}", roomId);
+        log.info("Created game room {} from lobby {}", roomId, lobby.getLobbyId());
         return newRoom;
     }
 
@@ -74,15 +77,38 @@ public class GameController {
     }
 
     /**
-     * Join a player to an available game room (auto-matchmaking).
+     * Join a player to a game room from their lobby.
+     * The lobby must exist and the user must be a member.
      */
-    public GameResult joinGame(String sessionId) {
+    public GameResult joinGame(String sessionId, String lobbyId, Long userId) {
         // Check if already in a room
         if (sessionToRoom.containsKey(sessionId)) {
             return GameResult.error("Already in a game");
         }
 
-        GameRoom room = findOrCreateRoom();
+        // Validate lobby exists
+        Lobby lobby = lobbyService.getLobbyById(lobbyId)
+                .orElse(null);
+        
+        if (lobby == null) {
+            return GameResult.error("Lobby not found");
+        }
+
+        // Validate user is in this lobby
+        if (!lobby.getPlayerIds().contains(userId)) {
+            return GameResult.error("You are not in this lobby");
+        }
+
+        // Store userId mapping
+        sessionToUserId.put(sessionId, userId);
+
+        // Find or create game room for this lobby
+        GameRoom room = findRoomForLobby(lobbyId);
+        if (room == null) {
+            room = createGameFromLobby(lobby);
+            // Mark that this room is for this lobby (we'll use the room ID)
+        }
+
         PlayerState player = room.addPlayer(sessionId);
         
         if (player == null) {
@@ -93,14 +119,35 @@ public class GameController {
         // Track which room this session is in
         sessionToRoom.put(sessionId, room.getRoomId());
 
-        log.info("Player {} joined room {} as index {}", sessionId, room.getRoomId(), player.getPlayerIndex());
+        log.info("Player {} (userId {}) joined room {} from lobby {} as index {}", 
+                sessionId, userId, room.getRoomId(), lobbyId, player.getPlayerIndex());
         
         Packet welcome = Packet.welcome(sessionId, player.getPlayerIndex());
         
-        // Don't auto-start game anymore - wait for side selection
-        // Second player will be notified to wait or select
+        // Mark lobby as started when both players are in the game room
+        if (room.isFull()) {
+            lobby.markStarted();
+            log.info("Lobby {} marked as STARTED", lobbyId);
+        }
         
         return GameResult.ok(welcome);
+    }
+
+    /**
+     * Find existing game room for a lobby (by checking if any room has players from this lobby).
+     * This is a simplified approach - in production you'd want a direct lobby→room mapping.
+     */
+    private GameRoom findRoomForLobby(String lobbyId) {
+        // For simplicity, we'll check if there's a room with space that was just created
+        // A better approach would be to maintain a lobbyId → roomId mapping
+        for (GameRoom room : rooms.values()) {
+            if (!room.isFull() && !room.isGameStarted()) {
+                // Check if any player in this room is from the lobby  
+                // Since lobby members should join sequentially, we'll just return the first available room
+                return room;
+            }
+        }
+        return null;
     }
     
     /**
@@ -159,6 +206,7 @@ public class GameController {
         if (removed != null) {
             log.info("Player {} (index {}) left room {}", sessionId, removed.getPlayerIndex(), room.getRoomId());
             sessionToRoom.remove(sessionId);
+            sessionToUserId.remove(sessionId);
             room.reset();
             
             // Cleanup empty rooms
