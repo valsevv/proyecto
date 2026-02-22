@@ -144,6 +144,17 @@ public class GameRoom {
         return null;
     }
 
+    public synchronized void assignSessionToPlayer(int playerIndex, String sessionId) {
+        PlayerState existing = getPlayerByIndex(playerIndex);
+        if (existing == null) {
+            return;
+        }
+
+        PlayerState reassigned = new PlayerState(sessionId, playerIndex, existing.getDrones());
+        reassigned.setSide(existing.getSide());
+        players.set(playerIndex, reassigned);
+    }
+
     public synchronized boolean isFull() {
         return players.size() >= MAX_PLAYERS;
     }
