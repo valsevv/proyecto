@@ -16,8 +16,13 @@ public interface GameRepository extends JpaRepository<Game, Long> {
     );
 
     // Contar partidas del usuario
-    long countByPlayer1IdOrPlayer2Id(
+    Long countByPlayer1IdOrPlayer2Id(
             Long player1Id,
             Long player2Id
     );
+
+    Boolean existsByPlayer1IdAndPlayer2Id(
+                Long player1Id,
+                Long player2Id
+    );                                                  
 }

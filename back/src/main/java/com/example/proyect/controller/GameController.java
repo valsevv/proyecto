@@ -1,24 +1,25 @@
 package com.example.proyect.controller;
 
-import com.example.proyect.VOs.GameResult;
-import com.example.proyect.game.units.drone.Drone;
-import com.example.proyect.game.GameRoom;
-import com.example.proyect.game.PlayerState;
-import com.example.proyect.lobby.Lobby;
-import java.time.OffsetDateTime;
-import com.example.proyect.persistence.classes.Game;
-import com.example.proyect.persistence.classes.GameStatus;
-import com.example.proyect.persistence.repos.GameRepository;
 import java.util.LinkedHashMap;
-import com.example.proyect.lobby.service.LobbyService;
-import com.example.proyect.websocket.packet.Packet;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
+import com.example.proyect.VOs.GameResult;
+import com.example.proyect.auth.service.GameService;
+import com.example.proyect.game.GameRoom;
+import com.example.proyect.game.PlayerState;
+import com.example.proyect.game.units.drone.Drone;
+import com.example.proyect.lobby.Lobby;
+import com.example.proyect.lobby.service.LobbyService;
+import com.example.proyect.persistence.classes.Game;
+import com.example.proyect.persistence.classes.GameStatus;
+import com.example.proyect.websocket.packet.Packet;
 
 /**
  * Game service layer that handles all game logic orchestration.
@@ -31,7 +32,7 @@ public class GameController {
 
     private final LobbyService lobbyService;
 
-    private final GameRepository gameRepository;
+    private final GameService gameService;
     // All game rooms by room ID
     private final Map<String, GameRoom> rooms = new ConcurrentHashMap<>();
     
@@ -41,23 +42,36 @@ public class GameController {
     // Track userId for each session
     private final Map<String, Long> sessionToUserId = new ConcurrentHashMap<>();
     
+    //GamesId de la session
+    private final Map<Long, Game> games = new ConcurrentHashMap<>();    
+
+    
     // Sequential room ID counter
     private final AtomicInteger roomCounter = new AtomicInteger(1);
 
-    public GameController(LobbyService lobbyService, GameRepository gameRepository) {
+    public GameController(LobbyService lobbyService, GameService gameService) {
         this.lobbyService = lobbyService;
-        this.gameRepository = gameRepository;
+        this.gameService = gameService;
     }
 
     /**
      * Create a GameRoom from a lobby when both players are ready.
      */
-    private GameRoom createGameFromLobby(Lobby lobby) {
+    private GameRoom createRoomFromLobby(Lobby lobby) { //aca no usa el lobby para nada
         String roomId = "room-" + roomCounter.getAndIncrement();
         GameRoom newRoom = new GameRoom(roomId);
         rooms.put(roomId, newRoom);
         log.info("Created game room {} from lobby {}", roomId, lobby.getLobbyId());
         return newRoom;
+    }
+
+    private void  createGameFromLobby(Lobby lobby) {
+        List <Long> playersId = lobby.getPlayerIds();
+
+        Game newGame = gameService.createGame(playersId.get(0), playersId.get(1));
+        Long gameId = newGame.getId();
+        games.put(gameId, newGame);
+        log.info("Created game  {} from lobby {}", gameId, lobby.getLobbyId());
     }
 
     /**
@@ -96,7 +110,8 @@ public class GameController {
         // Validate lobby exists
         Lobby lobby = lobbyService.getLobbyById(lobbyId)
                 .orElse(null);
-        
+       
+
         if (lobby == null) {
             return GameResult.error("Lobby not found");
         }
@@ -112,7 +127,7 @@ public class GameController {
         // Find or create game room for this lobby
         GameRoom room = findRoomForLobby(lobbyId);
         if (room == null) {
-            room = createGameFromLobby(lobby);
+            room = createRoomFromLobby(lobby);
             // Mark that this room is for this lobby (we'll use the room ID)
         }
 
@@ -136,7 +151,13 @@ public class GameController {
             lobby.markStarted();
             log.info("Lobby {} marked as STARTED", lobbyId);
         }
-        
+
+        //Si la partida no existe se crea
+        List <Long> playersId = lobby.getPlayerIds();
+        if (gameService.existsGameBetweenUsers(playersId.get(0), playersId.get(1))){
+            createGameFromLobby(lobby);
+        }
+
         return GameResult.ok(welcome);
     }
 
@@ -244,32 +265,39 @@ public class GameController {
             return GameResult.error("Cannot save an incomplete game");
         }
 
+        
         Long player1Id = sessionToUserId.get(p0.getSessionId());
         Long player2Id = sessionToUserId.get(p1.getSessionId());
         if (player1Id == null || player2Id == null) {
             return GameResult.error("Cannot resolve players for persistence");
         }
-
-        Game game = new Game();
-        game.setPlayer1Id(player1Id);
-        game.setPlayer2Id(player2Id);
-        game.setEndedAt(OffsetDateTime.now());
+         
 
         com.example.proyect.persistence.classes.GameState persistedState =
                 new com.example.proyect.persistence.classes.GameState();
+
         persistedState.setStatus(GameStatus.FINISHED);
         persistedState.setTurn(room.getCurrentTurn());
-
+        
+        //La meta dato en que va a ir guardada en jsonb
         Map<String, Object> meta = new LinkedHashMap<>();
         meta.put("roomId", room.getRoomId());
         meta.put("savedByPlayerIndex", actor.getPlayerIndex());
         meta.put("savedByUserId", sessionToUserId.get(sessionId));
-        meta.put("snapshot", room.toStateMap());
+        meta.put("snapshot", room.toStateMap()); //esta es la partida en si
         persistedState.setMeta(meta);
+        
+       if (!gameService.existsGameBetweenUsers(player1Id, player2Id)){
 
-        game.setState(persistedState);
-        Game saved = gameRepository.save(game);
+            return GameResult.error("The game doesnt exist");
+        }     
+        
+        Game gameToSave = gameService.getById(player2Id);  
+        //Agarro el Game que ya existe y le piso la informacion de la partida que seria el GameRoom en el Meta   snapshot   
+        gameToSave.setState(persistedState);
+        gameToSave = gameService.saveGame(player1Id, player2Id, gameToSave);
 
+            
         String roomId = room.getRoomId();
         java.util.List<String> sessionsInRoom = getSessionsInSameRoom(sessionId);
         sessionToRoom.entrySet().removeIf(entry -> roomId.equals(entry.getValue()));
@@ -279,9 +307,9 @@ public class GameController {
         room.reset();
         cleanupEmptyRooms();
 
-        log.info("Game room {} saved and closed by player {}. Persisted gameId={}", roomId, actor.getPlayerIndex(), saved.getId());
+        log.info("Game room {} saved and closed by player {}. Persisted gameId={}", roomId, actor.getPlayerIndex(), gameToSave.getId());
 
-        return GameResult.ok(Packet.gameSaved(saved.getId(), actor.getPlayerIndex()));
+        return GameResult.ok(Packet.gameSaved(gameToSave.getId(), actor.getPlayerIndex()));
     }
 
     /**

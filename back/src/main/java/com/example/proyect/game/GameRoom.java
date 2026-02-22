@@ -1,15 +1,20 @@
 package com.example.proyect.game;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
 import com.example.proyect.game.units.Unit.HexCoord;
 import com.example.proyect.game.units.drone.AerialDrone;
-import com.example.proyect.game.units.drone.NavalDrone;
 import com.example.proyect.game.units.drone.Drone;
-import java.util.*;
+import com.example.proyect.game.units.drone.NavalDrone;
 
 /**
- * A single game room for 2 players, each with 3 drones.
- * Manages turn-based gameplay with actions per turn.
- * All public methods are synchronized for thread safety.
+me parece que este GameRoom sustituye nuestro Game o como es la movida
  */
 public class GameRoom {
 
@@ -24,7 +29,7 @@ public class GameRoom {
     }
 
     public static final int MAX_PLAYERS = 2;
-    public static final int AERIAL_DRONES_PER_PLAYER = 3;
+    public static final int AERIAL_DRONES_PER_PLAYER = 12;
     public static final int NAVAL_DRONES_PER_PLAYER = 6;
     public static final int ACTIONS_PER_TURN = 99; // Unlimited - frontend tracks per-drone limits
 

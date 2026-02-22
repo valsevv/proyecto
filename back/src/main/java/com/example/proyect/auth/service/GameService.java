@@ -44,7 +44,23 @@ public class GameService {
         return gameRepository.save(game);
     }
 
-    // ---------------- GET BY ID ----------------
+    public Game saveGame(Long player1Id, Long player2Id, Game gameToSave) {
+
+        Objects.requireNonNull(player1Id, "player1 no puede ser null");
+        Objects.requireNonNull(player2Id, "player2 no puede ser null");
+        Objects.requireNonNull(gameToSave, "el juego no puede ser null");
+
+        if (player1Id.equals(player2Id)) {
+            throw new IllegalArgumentException("Un jugador no puede jugar contra sí mismo");
+        }
+
+        gameToSave.setPlayer1Id(player1Id);
+        gameToSave.setPlayer2Id(player2Id);
+        gameToSave.setStartedAt(OffsetDateTime.now());
+
+        return gameRepository.save(gameToSave);
+    }
+    
 
     public Game getById(Long gameId) {
         return gameRepository.findById(gameId)
@@ -52,7 +68,6 @@ public class GameService {
                         new EntityNotFoundException("No existe partida con id=" + gameId));
     }
 
-    // ---------------- GET ALL OF USER ----------------
 
     public List<Game> getAllGamesOfUser(Long userId) {
         Objects.requireNonNull(userId, "user no puede ser null");
@@ -62,7 +77,6 @@ public class GameService {
                 .toList();
     }
 
-    // ---------------- GET PAGINATED ----------------
 
     public List<Game> getGamesOfUser(Long userId, int page, int size) {
 
@@ -75,7 +89,6 @@ public class GameService {
                 .toList();
     }
 
-    // ---------------- COUNT ----------------
 
     public long countGamesOfUser(Long userId) {
         Objects.requireNonNull(userId, "user no puede ser null");
@@ -83,9 +96,8 @@ public class GameService {
         return gameRepository.countByPlayer1IdOrPlayer2Id(userId, userId);
     }
 
-    // ---------------- DELETE ----------------
 
-    @Transactional
+    
     public void deleteGame(Long gameId) {
         if (!gameRepository.existsById(gameId)) {
             throw new EntityNotFoundException("No existe partida con id=" + gameId);
@@ -93,4 +105,22 @@ public class GameService {
 
         gameRepository.deleteById(gameId);
     }
+
+
+
+public boolean existsGameBetweenUsers(Long user1Id, Long user2Id) {
+
+    Objects.requireNonNull(user1Id, "user1 no puede ser null");
+    Objects.requireNonNull(user2Id, "user2 no puede ser null");
+
+    if (user1Id.equals(user2Id)) {
+        throw new IllegalArgumentException("Un jugador no puede jugar contra sí mismo");
+    }
+
+    return gameRepository.existsByPlayer1IdAndPlayer2Id(user1Id, user2Id)
+            || gameRepository.existsByPlayer1IdAndPlayer2Id(user2Id, user1Id);
+    }
+
+
+
 }
