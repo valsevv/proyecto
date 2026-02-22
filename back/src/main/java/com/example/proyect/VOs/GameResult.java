@@ -1,6 +1,10 @@
 package com.example.proyect.VOs;
 
 import com.example.proyect.websocket.packet.Packet;
+import com.example.proyect.websocket.packet.PacketType;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Result wrapper for game operations.
@@ -43,6 +47,19 @@ public class GameResult {
 
     public static GameResult turnEnded(Packet packet, int nextPlayer, int actionsRemaining) {
         return new GameResult(true, packet, null, false, true, nextPlayer, actionsRemaining);
+    }
+
+    public static Packet gameLoaded(Object state) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("state", state);
+        return new Packet(PacketType.GAME_LOADED, payload);
+    }
+
+    public static Packet gameLoadError(String message) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("message", message);
+        payload.put("operation", "loadGame");
+        return new Packet(PacketType.ERROR, payload);
     }
 
     public static GameResult turnStarted(int activePlayer, int actionsRemaining) {

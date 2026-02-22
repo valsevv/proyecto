@@ -8,6 +8,7 @@ import com.example.proyect.auth.Exceptions.UserAlreadyExistsException;
 import com.example.proyect.auth.security.PasswordHasher;
 import com.example.proyect.persistence.classes.User;
 import com.example.proyect.persistence.repos.UserRepository;
+import jakarta.persistence.EntityNotFoundException;
 
 @Service
 public class UserService {
@@ -57,6 +58,18 @@ public class UserService {
 
         user.markLoginNow();
         return userRepository.save(user);
+    }
+
+    public User getByUsername(String username) {
+        return userRepository
+                .findByUsername(username)
+                .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado: " + username));
+    }
+
+    public User getById(Long userId) {
+        return userRepository
+                .findById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado con id=" + userId));
     }
 }
 

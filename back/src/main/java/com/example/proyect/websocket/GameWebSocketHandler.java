@@ -65,7 +65,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         }
 
         sessions.put(session.getId(), session);
-
+        gameController.bindSessionUser(session.getId(), userId);
         log.info("Client connected: {} (userId: {}, username: {})", session.getId(), userId, username);
     }
 
@@ -102,6 +102,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             case ATTACK      -> handleAttack(session, packet);
             case END_TURN    -> handleEndTurn(session);
             case SAVE_AND_EXIT -> handleSaveAndExit(session);
+            case LOAD_GAME -> handleLoadGame(session, packet);
             default          -> sendError(session, "Unknown message type");
         }
     }
@@ -236,6 +237,34 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
                 s.sendMessage(new TextMessage(json));
             }
         }
+    }
+
+    private void handleLoadGame(WebSocketSession session, Packet packet) throws IOException {
+        Number gameIdNumber = packet.get("gameId");
+        if (gameIdNumber == null) {
+            send(session, Packet.gameLoadError("gameId is required"));
+            return;
+        }
+        Long gameId = gameIdNumber.longValue();
+
+        if (gameId <= 0) {
+            send(session, Packet.gameLoadError("invalid gameId"));
+            return;
+        }
+
+        GameResult result = gameController.loadGame(session.getId(), gameId);
+        if (!result.isSuccess()) {
+            send(session, Packet.gameLoadError(result.getErrorMessage()));
+            return;
+        }
+
+        send(session, result.getPacket());
+
+        Packet turnStart = Packet.turnStart(
+                gameController.getCurrentTurn(session.getId()),
+                gameController.getActionsRemaining(session.getId())
+        );
+        send(session, turnStart);
     }
 
     private void handleEndTurn(WebSocketSession session) throws IOException {

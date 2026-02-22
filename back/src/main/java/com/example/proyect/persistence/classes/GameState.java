@@ -3,7 +3,7 @@ package com.example.proyect.persistence.classes;
 import java.util.Map;
 
 public class GameState {
-    private GameStatus status;        // "IN_PROGRESS", "FINISHED"
+    private GameStatus status;        // "IN_PROGRESS", "FINISHED", "SAVED"
     private Integer turn;            // turno actual (1 y 2 indicando el jugador)
     private Map<String, Object> meta;// datos extensibles Toda esta Metadata va a ir formateada en jsonb a la base, en el campo state de Game
 

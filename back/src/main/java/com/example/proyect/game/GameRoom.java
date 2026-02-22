@@ -284,4 +284,78 @@ public class GameRoom {
         state.put("gameStarted", gameStarted);
         return state;
     }
+
+    @SuppressWarnings("unchecked")
+    public static GameRoom fromSnapshot(String roomId, Map<String, Object> snapshot, String sessionId) {
+        GameRoom room = new GameRoom(roomId);
+        if (snapshot == null) {
+            return room;
+        }
+
+        Object started = snapshot.get("gameStarted");
+        room.gameStarted = started instanceof Boolean ? (Boolean) started : false;
+
+        Object turn = snapshot.get("currentTurn");
+        if (turn instanceof Number) {
+            room.currentTurn = ((Number) turn).intValue();
+        }
+
+        Object actions = snapshot.get("actionsRemaining");
+        if (actions instanceof Number) {
+            room.actionsRemaining = ((Number) actions).intValue();
+        }
+
+        Object playersObj = snapshot.get("players");
+        if (!(playersObj instanceof List<?> playersList)) {
+            return room;
+        }
+
+        for (Object playerObj : playersList) {
+            if (!(playerObj instanceof Map<?, ?> rawPlayer)) {
+                continue;
+            }
+
+            Object idxObj = rawPlayer.get("playerIndex");
+            if (!(idxObj instanceof Number)) {
+                continue;
+            }
+            int playerIndex = ((Number) idxObj).intValue();
+
+            String side = rawPlayer.get("side") != null ? rawPlayer.get("side").toString() : null;
+            List<Drone> drones = new ArrayList<>();
+
+            Object dronesObj = rawPlayer.get("drones");
+            if (dronesObj instanceof List<?> dronesList) {
+                for (Object droneObj : dronesList) {
+                    if (!(droneObj instanceof Map<?, ?> rawDrone)) {
+                        continue;
+                    }
+
+                    String droneType = rawDrone.get("droneType") != null ? rawDrone.get("droneType").toString() : "Aereo";
+                    Drone drone = "Naval".equals(droneType) ? new NavalDrone() : new AerialDrone();
+                    drone.setId(UUID.randomUUID().toString());
+                    drone.setOwnerPlayerId(playerIndex);
+
+                    double x = rawDrone.get("x") instanceof Number ? ((Number) rawDrone.get("x")).doubleValue() : 0d;
+                    double y = rawDrone.get("y") instanceof Number ? ((Number) rawDrone.get("y")).doubleValue() : 0d;
+                    drone.setPosition(new HexCoord(x, y));
+
+                    if (rawDrone.get("health") instanceof Number health) {
+                        drone.setCurrentHp(health.intValue());
+                    }
+
+                    drones.add(drone);
+                }
+            }
+
+            PlayerState player = new PlayerState(sessionId, playerIndex, drones);
+            player.setSide(side);
+            room.players.add(player);
+            if (side != null) {
+                room.playerSides.put(playerIndex, side);
+            }
+        }
+
+        return room;
+    }
 }

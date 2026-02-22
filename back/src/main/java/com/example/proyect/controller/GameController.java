@@ -53,7 +53,11 @@ public class GameController {
         this.lobbyService = lobbyService;
         this.gameService = gameService;
     }
-
+    public void bindSessionUser(String sessionId, Long userId) {
+        if (sessionId != null && userId != null) {
+            sessionToUserId.put(sessionId, userId);
+        }
+    }
     /**
      * Create a GameRoom from a lobby when both players are ready.
      */
@@ -277,6 +281,7 @@ public class GameController {
                 new com.example.proyect.persistence.classes.GameState();
 
         persistedState.setStatus(GameStatus.FINISHED);
+        persistedState.setStatus(GameStatus.SAVED);
         persistedState.setTurn(room.getCurrentTurn());
         
         //La meta dato en que va a ir guardada en jsonb
@@ -284,7 +289,9 @@ public class GameController {
         meta.put("roomId", room.getRoomId());
         meta.put("savedByPlayerIndex", actor.getPlayerIndex());
         meta.put("savedByUserId", sessionToUserId.get(sessionId));
+        meta.put("savedAt", java.time.Instant.now().toString());
         meta.put("snapshot", room.toStateMap()); //esta es la partida en si
+        meta.put("schemaVersion", 1);
         persistedState.setMeta(meta);
         
        if (!gameService.existsGameBetweenUsers(player1Id, player2Id)){
@@ -310,6 +317,49 @@ public class GameController {
         log.info("Game room {} saved and closed by player {}. Persisted gameId={}", roomId, actor.getPlayerIndex(), gameToSave.getId());
 
         return GameResult.ok(Packet.gameSaved(gameToSave.getId(), actor.getPlayerIndex()));
+    }
+
+    @SuppressWarnings("unchecked")
+    public GameResult loadGame(String sessionId, Long gameId) {
+        if (sessionToRoom.containsKey(sessionId)) {
+            return GameResult.error("Already in a game");
+        }
+
+        Long userId = sessionToUserId.get(sessionId);
+        if (userId == null) {
+            return GameResult.error("User not authenticated");
+        }
+
+        Game game;
+        try {
+            game = gameService.getById(gameId);
+        } catch (Exception ex) {
+            return GameResult.error("Game not found");
+        }
+
+        boolean isParticipant = userId.equals(game.getPlayer1Id()) || userId.equals(game.getPlayer2Id());
+        if (!isParticipant) {
+            return GameResult.error("You are not part of this game");
+        }
+
+        if (game.getState() == null || game.getState().getStatus() != GameStatus.PAUSED) {
+            return GameResult.error("Game is not paused");
+        }
+
+        Map<String, Object> meta = game.getState().getMeta();
+        if (meta == null || !(meta.get("snapshot") instanceof Map<?, ?>)) {
+            return GameResult.error("Saved game snapshot is missing");
+        }
+
+        Map<String, Object> snapshot = (Map<String, Object>) meta.get("snapshot");
+        String roomId = "loaded-" + game.getId();
+
+        GameRoom room = GameRoom.fromSnapshot(roomId, snapshot, sessionId);
+        rooms.put(roomId, room);
+        sessionToRoom.put(sessionId, roomId);
+        sessionToUserId.put(sessionId, userId);
+
+        return GameResult.ok(Packet.gameLoaded(room.toStateMap()));
     }
 
     /**

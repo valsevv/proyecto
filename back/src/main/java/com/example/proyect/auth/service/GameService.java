@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.example.proyect.persistence.classes.Game;
+import com.example.proyect.persistence.classes.GameStatus;
 import com.example.proyect.persistence.repos.GameRepository;
 
 import jakarta.persistence.EntityNotFoundException;
@@ -66,6 +67,19 @@ public class GameService {
         return gameRepository.findById(gameId)
                 .orElseThrow(() ->
                         new EntityNotFoundException("No existe partida con id=" + gameId));
+    }
+
+    public List<Game> getPausedGamesOfUser(Long userId) {
+        Objects.requireNonNull(userId, "user no puede ser null");
+
+        return gameRepository.findByUserIdAndStateStatus(userId, GameStatus.SAVED.name());
+    }
+
+    public boolean canUserAccessGame(Long userId, Game game) {
+        Objects.requireNonNull(userId, "user no puede ser null");
+        Objects.requireNonNull(game, "game no puede ser null");
+
+        return userId.equals(game.getPlayer1Id()) || userId.equals(game.getPlayer2Id());
     }
 
 

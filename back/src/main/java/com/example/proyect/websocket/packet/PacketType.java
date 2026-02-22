@@ -11,6 +11,7 @@ public enum PacketType {
     ATTACK("attack"),
     END_TURN("endTurn"),
     SAVE_AND_EXIT("saveAndExit"),
+    LOAD_GAME("loadGame"),
 
     // Server -> Client (Outbound)
     WELCOME("welcome"),
@@ -22,6 +23,7 @@ public enum PacketType {
     ATTACK_RESULT("attackResult"),
     PLAYER_LEFT("playerLeft"),
     GAME_SAVED("gameSaved"),
+    GAME_LOADED("gameLoaded"),
     ERROR("error");
 
     private final String value;
