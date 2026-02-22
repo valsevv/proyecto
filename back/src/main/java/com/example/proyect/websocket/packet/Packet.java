@@ -74,6 +74,20 @@ public class Packet {
         return map;
     }
 
+    public static Packet gameLoaded(Object state) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("state", state);
+        return new Packet(PacketType.GAME_LOADED, payload);
+    }
+
+    public static Packet gameLoadError(String message) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("message", message);
+        payload.put("operation", "loadGame");
+        return new Packet(PacketType.ERROR, payload);
+    }
+
+
     // Factory methods for common packets
 
     public static Packet of(PacketType type) {
