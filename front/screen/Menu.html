@@ -7,13 +7,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="ocean"></div>
-    <div class="radar"></div>
-    <img src="/assets/porta_drones_volador.png" class="drone volador" title="nave voladora">
-
-    <img src="/assets/porta_drones_mar.png" class="drone naval" title="porta drones naval">
-
-    <!-- Menú -->
+ 
     <div class="menu-container">
         <h1>Batalla de Drones</h1>
 
@@ -22,76 +16,14 @@
         <button class="menu-btn">Ranking de Jugadores</button>
         <button class="menu-btn">Créditos</button>
         <button class="menu-btn" id="musicToggleBtn">🔊 Música: ON</button>
-        <button class="menu-btn" id="logoutBtn" style="background-color: #8B0000;">Logout</button>
+        <button class="menu-btn" id="logoutBtn">Logout</button>
     </div>
-        <audio id="bgMusic" loop>
-            <source src="/assets/Menu_loop.mp3" type="audio/mpeg">
-        </audio>
 
-        <script>
-        const API_BASE = 'http://localhost:8080/api';
-        
-      const music = document.getElementById('bgMusic');
-        const musicToggleBtn = document.getElementById('musicToggleBtn');
-        let musicEnabled = true;
+    <audio id="bgMusic" loop>
+        <source src="/assets/Menu_loop.mp3" type="audio/mpeg">
+    </audio>
 
-        function updateMusicButton() {
-            musicToggleBtn.textContent = musicEnabled ? '🔊' : '🔇';
-            const label = musicEnabled ? 'Desactivar música' : 'Activar música';
-            musicToggleBtn.title = label;
-            musicToggleBtn.setAttribute('aria-label', label);
-        }
-
-        document.body.addEventListener('click', () => {
-            music.volume = 0.4;
-            music.loop = true;
- if (musicEnabled) {
-                music.play().catch(() => {
-                    musicEnabled = false;
-                    updateMusicButton();
-                });
-            }
-                }, { once: true });
-
- musicToggleBtn.addEventListener('click', async () => {
-            musicEnabled = !musicEnabled;
-
-            if (musicEnabled) {
-                try {
-                    await music.play();
-                } catch (error) {
-                    console.warn('No se pudo reproducir la música:', error);
-                    musicEnabled = false;
-                }
-            } else {
-                music.pause();
-            }
-
-            updateMusicButton();
-        });
-
-
-        // Logout functionality
-        document.getElementById('logoutBtn').addEventListener('click', async () => {
-            try {
-                const response = await fetch(`${API_BASE}/auth/logout`, {
-                    method: 'POST',
-                    credentials: 'include'
-                });
-                
-                if (response.ok) {
-                    // Clear any remaining session data
-                    sessionStorage.clear();
-                    // Redirect to login
-                    window.location.href = '/login';
-                } else {
-                    alert('Logout failed. Please try again.');
-                }
-            } catch (error) {
-                console.error('Logout error:', error);
-                alert('Error during logout.');
-            }
-        });
-        </script>
+    <script src="/screen/Menu.js"></script>
+    <script src="/screen/CheckAuth.js"></script>
 </body>
 </html>

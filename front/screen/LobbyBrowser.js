@@ -3,29 +3,6 @@
 const API_BASE = 'http://localhost:8080/api';
 let refreshInterval = null;
 
-// Check if user is authenticated by calling the API
-async function checkAuth() {
-    try {
-        const response = await fetch(`${API_BASE}/users/me`, {
-            method: 'GET',
-            credentials: 'include'
-        });
-        
-        if (!response.ok) {
-            alert('Please login first');
-            window.location.href = '/login';
-            return false;
-        }
-        
-        return true;
-    } catch (error) {
-        console.error('Auth check failed:', error);
-        alert('Authentication error. Please login.');
-        window.location.href = '/login';
-        return false;
-    }
-}
-
 // Fetch and display lobbies
 async function fetchLobbies() {
     if (!await checkAuth()) return;
@@ -170,8 +147,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initial fetch
     fetchLobbies();
 
-    // Auto-refresh every 3 seconds
-    refreshInterval = setInterval(fetchLobbies, 3000);
+    // Auto-refresh every 15 seconds 
+    refreshInterval = setInterval(fetchLobbies, 15000);
 });
 
 // Cleanup on page unload

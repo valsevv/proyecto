@@ -76,9 +76,42 @@ actionBtn.onclick = async () => {
 
     setTimeout(() => {
       window.location.href = "/menu";
-    }, 800);
+    }, 1200);
 
   } catch (err) {
     statusText.textContent = err.message || "Error de autenticación";
   }
 };
+
+  window.addEventListener("DOMContentLoaded", async () => {
+
+    const statusText = document.getElementById("status");
+
+    try {
+      const response = await fetch("http://localhost:8080/api/auth/me", {
+        method: "GET",
+        credentials: "include"
+      });
+
+      if (response.ok) {
+        statusText.textContent = "Sesión detectada...";
+        statusText.style.color = "#00ff88";
+        statusText.style.opacity = "1";
+
+        setTimeout(() => {
+          document.body.style.transition = "opacity 0.6s";
+          document.body.style.opacity = "0";
+        }, 800);
+
+        setTimeout(() => {
+          window.location.href = "/menu";
+        }, 1200);
+
+        return;
+      }
+
+    } catch (e) {
+      // No autenticado → no hacer nada
+    }
+
+  });

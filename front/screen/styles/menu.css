@@ -1,155 +1,138 @@
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+body::before {
+    content: "";
+    position: fixed;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: url("/assets/mar.png") repeat;
+    background-size: 600px auto;
+
+    animation: oceanMove 40s linear infinite;
+    z-index: -2;
 }
 
-body {
-    font-family: 'Orbitron', sans-serif;
-    height: 100vh;
-    overflow: hidden;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    color: white;
+/* Oscurecido estilo cinematográfico */
+body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(circle at center, rgba(0,0,0,0.2) 40%, rgba(0,0,0,0.85) 100%);
+    z-index: -1;
 }
 
-/* 🌊 Fondo mar real */
-.ocean {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    background: url('/assets/mar.png');
-    background-size: cover;
-    animation: waveMove 20s linear infinite;
-    filter: brightness(0.5);
-    z-index: 0;
+/* Movimiento suave diagonal */
+@keyframes oceanMove {
+    from {
+        transform: translate(0, 0);
+    }
+    to {
+        transform: translate(-600px, -400px);
+    }
 }
+/* ===== MENU FUTURISTA ESTILO HUD ===== */
 
-@keyframes waveMove {
-    from { background-position: 0 0; }
-    to { background-position: 1000px 0; }
-}
-
-/* 🟢 Radar */
-.radar {
-    position: absolute;
-    width: 900px;
-    height: 900px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(0,255,100,0.15) 0%, rgba(0,255,100,0.05) 60%, transparent 70%);
-    border: 2px solid rgba(0,255,100,0.2);
-    animation: radarSpin 6s linear infinite;
-    z-index: 1;
-}
-
-@keyframes radarSpin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-}
-
-
-.drone {
-    position: absolute;
-    width: 250px;
-    z-index: 2;
-    animation: float 4s ease-in-out infinite;
-}
-
-.volador{
-    top: 10%;
-    left: 1%;
-}
-
-.naval {
-    bottom: 15%;
-    right: 1%;
-    animation-delay: 2s;
-}
-
-@keyframes float {
-    0% { transform: translateY(0px); }
-    50% { transform: translateY(-20px); }
-    100% { transform: translateY(0px); }
-}
-
-/* 🎮 Menú */
 .menu-container {
-    position: relative;
-    z-index: 3;
-    background: rgba(0, 0, 0, 0.75);
-    padding: 60px 80px;
-    border-radius: 20px;
-    border: 1px solid rgba(9, 108, 214, 0.4);
-    text-align: center;
-    backdrop-filter: blur(10px);
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 420px;
+
+    padding: 40px 35px;
+    border-radius: 10px;
+
+    background: rgba(5, 20, 40, 0.75);
+    backdrop-filter: blur(8px);
+
+    border: 2px solid rgba(0,255,255,0.7);
+    box-shadow:
+        0 0 15px rgba(0,255,255,0.8),
+        inset 0 0 15px rgba(0,255,255,0.3);
+
+    color: #7ef9ff;
 }
 
-h1 {
-    font-size: 34px;
-    margin-bottom: 40px;
-    letter-spacing: 3px;
-    color: #00ffcc;
-    /* color: #00d9ff; */
-    text-shadow: 0 0 15px rgba(0, 200, 255, 0.8);
+/* Esquinas tipo marco HUD */
+.menu-container::before,
+.menu-container::after {
+    content: "";
+    position: absolute;
+    width: 40px;
+    height: 40px;
+    border: 3px solid #00f7ff;
 }
+
+.menu-container::before {
+    top: -15px;
+    left: -15px;
+    border-right: none;
+    border-bottom: none;
+}
+
+.menu-container::after {
+    bottom: -15px;
+    right: -15px;
+    border-left: none;
+    border-top: none;
+}
+
+.menu-container h1 {
+    text-align: center;
+    margin-bottom: 35px;
+    font-size: 28px;
+    letter-spacing: 2px;
+
+    color: #7ef9ff;
+    text-shadow:
+        0 0 8px #00f7ff,
+        0 0 20px #00f7ff;
+}
+
+/* ===== BOTONES ===== */
 
 .menu-btn {
-    display: block;
-    width: 320px;
-    margin: 18px auto;
-    padding: 18px;
-    font-size: 15px;
+    width: 100%;
+    padding: 14px;
+    margin-bottom: 18px;
+
     background: transparent;
-    /* border: 2px solid #00d9ff;
-    color: #00d9ff; */
-    border: 2px solid #00ffcc;
-    color: #00ffcc;
+    border: 2px solid rgba(0,180,255,0.7);
+    border-radius: 4px;
+
+    color: #7ef9ff;
+    font-size: 16px;
+    letter-spacing: 1px;
+
     cursor: pointer;
     transition: all 0.25s ease;
-    letter-spacing: 1px;
-    border-radius: 8px;
 }
 
+/* Hover neon rosa (como el primero de la imagen) */
 .menu-btn:hover {
-    /* background: #00d9ff; */
-    background: #00ffcc;
-    color: #001018;
-    box-shadow: 0 0 20px rgba(0, 200, 255, 0.8);
-    transform: scale(1.05);
+    border-color: #005eff;
+    color: #ffffff;
+    box-shadow:
+        0 0 10px #0059ff,
+        0 0 25px rgba(0, 89, 255, 0.6);
+    transform: scale(1.03);
 }
 
-.menu-btn:active {
-    transform: scale(0.98);
+/* Botón música */
+#musicToggleBtn {
+    display: inline-block;
+    width: 48%;
 }
 
-.music-toggle-floating {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 5;
-    width: 52px;
-    height: 52px;
-    margin: 0;
-    border-radius: 50%;
-    border: 2px solid #00ffcc;
-    background: rgba(0, 0, 0, 0.65);
-    color: #00ffcc;
-    font-size: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    box-shadow: 0 0 12px rgba(0, 255, 204, 0.35);
-    transition: all 0.2s ease;
+/* Botón logout rojo */
+#logoutBtn {
+    width: 48%;
+    float: right;
+
+    border-color: rgba(255,50,50,0.8);
+    color: #ff8080;
 }
 
-.music-toggle-floating:hover {
-    background: #00ffcc;
-    color: #001018;
-    transform: scale(1.06);
-}
-
-.music-toggle-floating:active {
-    transform: scale(0.96);
+#logoutBtn:hover {
+    border-color: #ff0000
 }

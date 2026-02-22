@@ -2,9 +2,10 @@ package com.example.proyect.auth.api;
 import java.util.Map;
 
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -110,16 +111,27 @@ public class AuthController {
                 .body(Map.of("message", "Logged out successfully"));
     }
         
-    @RestController
+     @RestController
         @RequestMapping("/api/users")
-        public class UserMeController {
+                public class UserMeController {
+                        @GetMapping("/me")  
+                        public ResponseEntity<?> me(@CookieValue(name = "authToken", required = false) String token) {
 
-        @GetMapping("/me")
-        public ResponseEntity<Map<String, Object>> me(Authentication auth) {
-                // auth.getName() ← el username que pusiste en el SecurityContext
-                return ResponseEntity.ok(Map.of(
-                "username", auth.getName()
-                ));
-        }
-        }
+                        if (token == null || !jwtService.isTokenValid(token)) {
+                                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+                        }
+
+                        String username = jwtService.extractUsername(token);
+
+                        return ResponseEntity.ok(Map.of("username", username));
+                        }
+        //         @GetMapping("/me")
+        //         public ResponseEntity<Map<String, Object>> me(Authentication auth) {
+        //                 // auth.getName() ← el username que pusiste en el SecurityContext
+        //                 return ResponseEntity.ok(Map.of(
+        //                 "username", auth.getName()
+        //                 ));
+                }
 }
+
+       
