@@ -2,10 +2,10 @@ package com.example.proyect.persistence.classes;
 //Con jakarte persistence podemos definir entidades que luego JPA sabe manejar en el repositorio
 import java.time.OffsetDateTime;
 
-import com.example.proyect.game.GameStateJsonConverter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import jakarta.persistence.Column;
-import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -35,7 +35,7 @@ public class Game {
     private Long id;
 
     @Column(name = "state", nullable = false, columnDefinition = "jsonb")
-    @Convert(converter = GameStateJsonConverter.class)
+    @JdbcTypeCode(SqlTypes.JSON)
     private GameState state = defaultState();
 
     @Column(name = "player1_id", nullable = false)
@@ -56,7 +56,7 @@ public class Game {
     private static GameState defaultState() {
         GameState state = new GameState();
         state.setStatus(GameStatus.IN_PROGRESS);
-        state.setTurn(1);
+        state.setTurn(0);
         return state;
     }
 

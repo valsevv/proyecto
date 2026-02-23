@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Partidas Guardadas - Drone Carrier Command</title>
+    <link rel="stylesheet" href="/screen/styles/menu.css">
+    <link rel="stylesheet" href="/screen/styles/saved-games.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <div class="games-container">
+        <h1>Partidas Guardadas</h1>
+
+        <div id="gamesList" class="games-list">
+            <!-- Se renderiza dinámicamente -->
+        </div>
+
+        <button class="menu-btn back-btn" onclick="location.href='/'">
+            ← Volver al Menú
+        </button>
+    </div>
+
+    <script src="/screen/SavedGames.js"></script>
+    <script src="/screen/CheckAuth.js"></script>
+</body>
+</html>

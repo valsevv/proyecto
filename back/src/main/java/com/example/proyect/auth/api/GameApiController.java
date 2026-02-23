@@ -1,3 +1,4 @@
+package com.example.proyect.auth.api;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
@@ -54,6 +55,7 @@ public class GameApiController {
         );
     }
 
+    @SuppressWarnings("unchecked")
     private SnapshotSummary buildSnapshotSummary(Game game) {
         Map<String, Object> meta = game.getState() != null ? game.getState().getMeta() : null;
         Map<String, Object> snapshot = null;

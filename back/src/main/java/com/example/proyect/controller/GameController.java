@@ -64,26 +64,56 @@ public class GameController {
             sessionToUserId.put(sessionId, userId);
         }
     }
-    /**
-     * Create a GameRoom from a lobby when both players are ready.
-     */
-    private GameRoom createRoomFromLobby(Lobby lobby) { //aca no usa el lobby para nada
-        String roomId = "room-" + roomCounter.getAndIncrement();
-        GameRoom newRoom = new GameRoom(roomId);
-        rooms.put(roomId, newRoom);
-        log.info("Created game room {} from lobby {}", roomId, lobby.getLobbyId());
-        return newRoom;
+    
+
+    //Crea el froom apartir del lobby, si ya existe lo retorna
+    private GameRoom findOrCreateRoomForLobby(Lobby lobby) {
+
+        return rooms.computeIfAbsent(
+            lobby.getLobbyId(),
+            id -> {
+                GameRoom newRoom = new GameRoom(id);
+                log.info("Created game room {} from lobby {}", id, lobby.getLobbyId());
+                return newRoom;
+            }
+        );
     }
 
-    private void  createGameFromLobby(Lobby lobby) {
-        List <Long> playersId = lobby.getPlayerIds();
+
+
+    private Game createGameFromLobby(Lobby lobby) {
+
+        String lobbyId = lobby.getLobbyId();
+
+        // Si ya hay un game para esta room/lobby, no crear otro
+        if (roomToGame.containsKey(lobbyId)) {
+            Long existingGameId = roomToGame.get(lobbyId);
+            return games.get(existingGameId);
+        }
+
+        List<Long> playersId = lobby.getPlayerIds();
+
+        if (playersId.size() != 2) {
+            throw new IllegalStateException("Cannot create game: lobby does not have 2 players");
+        }
 
         Game newGame = gameService.createGame(playersId.get(0), playersId.get(1));
         Long gameId = newGame.getId();
-        games.put(gameId, newGame);
-        log.info("Created game  {} from lobby {}", gameId, lobby.getLobbyId());
-    }
 
+        games.put(gameId, newGame);
+
+        // Vinculaciones cruzadas
+        gameToRoom.put(gameId, lobbyId);
+        roomToGame.put(lobbyId, gameId);
+
+        // Lock por partida
+        gameLocks.put(gameId, new ReentrantLock());
+
+        log.info("Created game {} from lobby {}", gameId, lobbyId);
+
+        return newGame;
+}
+ 
     /**
      * Get the room for a given session, or null if not in any room.
      */
@@ -147,13 +177,8 @@ public class GameController {
         // Store userId mapping
         sessionToUserId.put(sessionId, userId);
 
-        // Find or create game room for this lobby
-        GameRoom room = findRoomForLobby(lobbyId);
-        if (room == null) {
-            room = createRoomFromLobby(lobby);
-            // Mark that this room is for this lobby (we'll use the room ID)
-        }
-
+        GameRoom room = findOrCreateRoomForLobby(lobby); 
+   
         PlayerState player = room.addPlayer(sessionId);
         
         if (player == null) {
@@ -169,37 +194,18 @@ public class GameController {
         
         Packet welcome = Packet.welcome(sessionId, player.getPlayerIndex());
         
-        // Mark lobby as started when both players are in the game room
-        if (room.isFull()) {
+    // 4️⃣ Si la room se llenó, crear el Game (solo una vez)
+        if (room.isFull() && !room.isGameStarted()) {
             lobby.markStarted();
-            log.info("Lobby {} marked as STARTED", lobbyId);
-        }
-
-        //Si la partida no existe se crea
-        List <Long> playersId = lobby.getPlayerIds();
-        if (gameService.existsGameBetweenUsers(playersId.get(0), playersId.get(1))){
             createGameFromLobby(lobby);
-        }
+
+            log.info("Lobby {} marked as STARTED and game created", lobbyId);
+        }   
 
         return GameResult.ok(welcome);
     }
 
-    /**
-     * Find existing game room for a lobby (by checking if any room has players from this lobby).
-     * This is a simplified approach - in production you'd want a direct lobby→room mapping.
-     */
-    private GameRoom findRoomForLobby(String lobbyId) {
-        // For simplicity, we'll check if there's a room with space that was just created
-        // A better approach would be to maintain a lobbyId → roomId mapping
-        for (GameRoom room : rooms.values()) {
-            if (!room.isFull() && !room.isGameStarted()) {
-                // Check if any player in this room is from the lobby  
-                // Since lobby members should join sequentially, we'll just return the first available room
-                return room;
-            }
-        }
-        return null;
-    }
+    
     
     /**
      * Handle player side selection.
@@ -328,7 +334,7 @@ public class GameController {
                     .findFirst()
                     .orElse(null);
         }
-
+        
         if (gameId == null) {
             return GameResult.error("Could not resolve persisted game id");
         }

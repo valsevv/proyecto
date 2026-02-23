@@ -14,12 +14,13 @@ const API_BASE = 'http://localhost:8080/api';
         document.body.addEventListener('click', () => {
             music.volume = 0.4;
             music.loop = true;
- if (musicEnabled) {
-                music.play().catch(() => {
-                    musicEnabled = false;
-                    updateMusicButton();
-                });
-            }
+
+        if (musicEnabled) {
+                        music.play().catch(() => {
+                            musicEnabled = false;
+                            updateMusicButton();
+                        });
+                    }
                 }, { once: true });
 
  musicToggleBtn.addEventListener('click', async () => {
@@ -60,3 +61,12 @@ document.getElementById('logoutBtn').addEventListener('click', async () => {
         alert('Error during logout.');
     }
 });
+
+
+// Load Game 
+document.getElementById('loadGamesBtn').addEventListener('click', async () => {
+        window.location.href = '/saved-games';
+
+});
+     
+

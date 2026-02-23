@@ -1,0 +1,69 @@
+.games-container {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 650px;
+    max-height: 80vh;
+    overflow-y: auto;
+
+    padding: 40px;
+    border-radius: 10px;
+
+    background: rgba(5, 20, 40, 0.75);
+    backdrop-filter: blur(8px);
+
+    border: 2px solid rgba(0,255,255,0.7);
+    box-shadow:
+        0 0 15px rgba(0,255,255,0.8),
+        inset 0 0 15px rgba(0,255,255,0.3);
+
+    color: #7ef9ff;
+}
+
+.games-container h1 {
+    text-align: center;
+    margin-bottom: 30px;
+    font-size: 26px;
+    letter-spacing: 2px;
+    text-shadow: 0 0 8px #00f7ff;
+}
+
+.games-list {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+/* Card de cada partida */
+.game-card {
+    padding: 18px;
+    border: 2px solid rgba(0,180,255,0.7);
+    border-radius: 6px;
+    background: rgba(0, 30, 60, 0.6);
+
+    transition: all 0.25s ease;
+}
+
+.game-card:hover {
+    box-shadow: 0 0 15px rgba(0,180,255,0.7);
+    transform: scale(1.02);
+}
+
+.game-info {
+    margin-bottom: 12px;
+    font-size: 14px;
+    letter-spacing: 1px;
+}
+
+.game-actions {
+    display: flex;
+    justify-content: space-between;
+}
+
+.game-actions button {
+    width: 48%;
+}
+.back-btn {
+    margin-top: 25px;
+}

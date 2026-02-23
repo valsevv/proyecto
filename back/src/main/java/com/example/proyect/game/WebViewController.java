@@ -1,4 +1,4 @@
-package com.example.proyect.controller;
+package com.example.proyect.game;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -67,6 +67,12 @@ public class WebViewController {
         return serveHtmlFile("LobbyBrowser.html");
     }
 
+    @GetMapping("/saved-games")
+    public ResponseEntity<String> load() {
+        return serveHtmlFile("SavedGames.html");
+    }
+
+
     /**
      * Lobby waiting page - PROTECTED
      */
@@ -80,6 +86,6 @@ public class WebViewController {
      */
     @GetMapping("/game")
     public ResponseEntity<String> game() {
-        return serveHtmlFile("index.html");
+        return serveHtmlFile("Game.html");
     }
 }
