@@ -80,7 +80,6 @@ public class GameController {
     }
 
 
-
     private Game createGameFromLobby(Lobby lobby) {
 
         String lobbyId = lobby.getLobbyId();
@@ -155,57 +154,166 @@ public class GameController {
      * The lobby must exist and the user must be a member.
      */
     public GameResult joinGame(String sessionId, String lobbyId, Long userId) {
-        // Check if already in a room
+
         if (sessionToRoom.containsKey(sessionId)) {
             return GameResult.error("Already in a game");
         }
 
-        // Validate lobby exists
-        Lobby lobby = lobbyService.getLobbyById(lobbyId)
-                .orElse(null);
-       
+        Lobby lobby = lobbyService.getLobbyById(lobbyId).orElse(null);
 
         if (lobby == null) {
             return GameResult.error("Lobby not found");
         }
 
-        // Validate user is in this lobby
         if (!lobby.getPlayerIds().contains(userId)) {
             return GameResult.error("You are not in this lobby");
         }
 
-        // Store userId mapping
         sessionToUserId.put(sessionId, userId);
 
-        GameRoom room = findOrCreateRoomForLobby(lobby); 
-   
+        GameRoom room = findOrCreateRoomForLobby(lobby);
+
         PlayerState player = room.addPlayer(sessionId);
-        
+
         if (player == null) {
-            log.warn("Player {} tried to join but room {} is full", sessionId, room.getRoomId());
             return GameResult.error("Game is full");
         }
 
-        // Track which room this session is in
         sessionToRoom.put(sessionId, room.getRoomId());
 
-        log.info("Player {} (userId {}) joined room {} from lobby {} as index {}", 
-                sessionId, userId, room.getRoomId(), lobbyId, player.getPlayerIndex());
-        
         Packet welcome = Packet.welcome(sessionId, player.getPlayerIndex());
-        
-    // 4️⃣ Si la room se llenó, crear el Game (solo una vez)
-        if (room.isFull() && !room.isGameStarted()) {
-            lobby.markStarted();
-            createGameFromLobby(lobby);
 
-            log.info("Lobby {} marked as STARTED and game created", lobbyId);
-        }   
+        // 🔥 CUANDO LA ROOM SE LLENA
+        if (room.isFull() && !room.isGameStarted()) {
+
+            lobby.markStarted();
+
+            if (lobby.getGameId() == null) {
+                // 🟢 PARTIDA NUEVA
+                createGameFromLobby(lobby);
+                log.info("New game created for lobby {}", lobbyId);
+
+            } else {
+                // 🔵 PARTIDA CARGADA
+                loadSavedGameIntoRoom(lobby.getGameId(), room);
+                log.info("Loaded saved game {} into room {}", lobby.getGameId(), room.getRoomId());
+            }
+        }
 
         return GameResult.ok(welcome);
     }
 
+   @SuppressWarnings("unchecked")
+    private void loadSavedGameIntoRoom(Long gameId, GameRoom room) {
+
+        Game game = gameService.getById(gameId);
+
+        if (game.getState() == null || game.getState().getStatus() != GameStatus.SAVED) {
+            throw new IllegalStateException("Game is not in SAVED state");
+        }
+
+        Map<String, Object> meta = game.getState().getMeta();
+        Map<String, Object> snapshot = (Map<String, Object>) meta.get("snapshot");
+
+        // reconstruye el estado dentro de la room actual
+        GameRoom.fromStateMap(room.getRoomId(), snapshot);
+
+        // Vincular estructuras internas
+        gameToRoom.put(gameId, room.getRoomId());
+        roomToGame.put(room.getRoomId(), gameId);
+        games.put(gameId, game);
+
+        gameLocks.putIfAbsent(gameId, new ReentrantLock());
+
+        room.startGame();
+    }   
     
+    //Esto ver si podemos usar el de arriba loadSavedGameIntoRoom
+        public GameResult loadGame(String sessionId, Long gameId) {
+        if (sessionToRoom.containsKey(sessionId)) {
+            return GameResult.error("Already in a game");
+        }
+
+        Long userId = sessionToUserId.get(sessionId);
+        if (userId == null) {
+            return GameResult.error("User not authenticated");
+        }
+
+        Lock gameLock = getGameLock(gameId);
+        gameLock.lock();
+        try {
+            Game game;
+            try {
+                game = gameService.getById(gameId);
+            } catch (Exception ex) {
+                return GameResult.error("Game not found");
+            }
+
+            boolean isParticipant = userId.equals(game.getPlayer1Id()) || userId.equals(game.getPlayer2Id());
+            if (!isParticipant) {
+                return GameResult.error("You are not part of this game");
+            }
+
+            if (game.getState() == null || game.getState().getStatus() != GameStatus.SAVED) {
+                return GameResult.error("Game is not paused");
+            }
+
+            Map<String, Object> meta = game.getState().getMeta();
+            if (meta == null || !(meta.get("snapshot") instanceof Map<?, ?>)) {
+                return GameResult.error("Saved game snapshot is missing");
+            }
+
+            Map<String, Object> snapshot = (Map<String, Object>) meta.get("snapshot");
+            String roomId = gameToRoom.get(gameId);
+            GameRoom room;
+
+            if (roomId == null) {
+                roomId = "loaded-" + gameId;
+                room = GameRoom.fromStateMap(roomId, snapshot);
+                rooms.put(roomId, room);
+                gameToRoom.put(gameId, roomId);
+                roomToGame.put(roomId, gameId);
+                log.info("Rehydrated saved game {} into room {}", gameId, roomId);
+            } else {
+                room = rooms.get(roomId);
+                if (room == null) {
+                    room = GameRoom.fromStateMap(roomId, snapshot);
+                    rooms.put(roomId, room);
+                    roomToGame.put(roomId, gameId);
+                    log.warn("Room {} missing for mapped game {}. Room restored again", roomId, gameId);
+                }
+            }
+
+            int participantIndex = userId.equals(game.getPlayer1Id()) ? 0 : 1;
+            PlayerState currentPlayer = room.getPlayerByIndex(participantIndex);
+            if (currentPlayer == null) {
+                return GameResult.error("Saved game is corrupted");
+            }
+
+            PlayerState occupiedBy = room.getPlayerBySession(sessionId);
+            if (occupiedBy == null) {
+                PlayerState existingOccupant = room.getPlayerBySession(currentPlayer.getSessionId());
+                if (existingOccupant != null && sessionToRoom.containsKey(existingOccupant.getSessionId())
+                        && !existingOccupant.getSessionId().equals(sessionId)) {
+                    return GameResult.error("Player slot already connected");
+                }
+                room.assignSessionToPlayer(participantIndex, sessionId);
+            }
+
+            sessionToRoom.put(sessionId, roomId);
+            sessionToUserId.put(sessionId, userId);
+
+            if (room.isFull()) {
+                game.getState().setStatus(GameStatus.IN_PROGRESS);
+                gameService.saveGame(game.getPlayer1Id(), game.getPlayer2Id(), game);
+                log.info("Both players loaded game {}. Status moved to IN_PROGRESS", gameId);
+            }
+
+            return GameResult.ok(Packet.gameLoaded(room.toStateMap()));
+        } finally {
+            gameLock.unlock();
+        }
+    }
     
     /**
      * Handle player side selection.
@@ -366,92 +474,6 @@ public class GameController {
         return GameResult.ok(Packet.gameSaved(gameToSave.getId(), actor.getPlayerIndex()));
     }
 
-    @SuppressWarnings("unchecked")
-    public GameResult loadGame(String sessionId, Long gameId) {
-        if (sessionToRoom.containsKey(sessionId)) {
-            return GameResult.error("Already in a game");
-        }
-
-        Long userId = sessionToUserId.get(sessionId);
-        if (userId == null) {
-            return GameResult.error("User not authenticated");
-        }
-
-        Lock gameLock = getGameLock(gameId);
-        gameLock.lock();
-        try {
-            Game game;
-            try {
-                game = gameService.getById(gameId);
-            } catch (Exception ex) {
-                return GameResult.error("Game not found");
-            }
-
-            boolean isParticipant = userId.equals(game.getPlayer1Id()) || userId.equals(game.getPlayer2Id());
-            if (!isParticipant) {
-                return GameResult.error("You are not part of this game");
-            }
-
-            if (game.getState() == null || game.getState().getStatus() != GameStatus.SAVED) {
-                return GameResult.error("Game is not paused");
-            }
-
-            Map<String, Object> meta = game.getState().getMeta();
-            if (meta == null || !(meta.get("snapshot") instanceof Map<?, ?>)) {
-                return GameResult.error("Saved game snapshot is missing");
-            }
-
-            Map<String, Object> snapshot = (Map<String, Object>) meta.get("snapshot");
-            String roomId = gameToRoom.get(gameId);
-            GameRoom room;
-
-            if (roomId == null) {
-                roomId = "loaded-" + gameId;
-                room = GameRoom.fromStateMap(roomId, snapshot);
-                rooms.put(roomId, room);
-                gameToRoom.put(gameId, roomId);
-                roomToGame.put(roomId, gameId);
-                log.info("Rehydrated saved game {} into room {}", gameId, roomId);
-            } else {
-                room = rooms.get(roomId);
-                if (room == null) {
-                    room = GameRoom.fromStateMap(roomId, snapshot);
-                    rooms.put(roomId, room);
-                    roomToGame.put(roomId, gameId);
-                    log.warn("Room {} missing for mapped game {}. Room restored again", roomId, gameId);
-                }
-            }
-
-            int participantIndex = userId.equals(game.getPlayer1Id()) ? 0 : 1;
-            PlayerState currentPlayer = room.getPlayerByIndex(participantIndex);
-            if (currentPlayer == null) {
-                return GameResult.error("Saved game is corrupted");
-            }
-
-            PlayerState occupiedBy = room.getPlayerBySession(sessionId);
-            if (occupiedBy == null) {
-                PlayerState existingOccupant = room.getPlayerBySession(currentPlayer.getSessionId());
-                if (existingOccupant != null && sessionToRoom.containsKey(existingOccupant.getSessionId())
-                        && !existingOccupant.getSessionId().equals(sessionId)) {
-                    return GameResult.error("Player slot already connected");
-                }
-                room.assignSessionToPlayer(participantIndex, sessionId);
-            }
-
-            sessionToRoom.put(sessionId, roomId);
-            sessionToUserId.put(sessionId, userId);
-
-            if (room.isFull()) {
-                game.getState().setStatus(GameStatus.IN_PROGRESS);
-                gameService.saveGame(game.getPlayer1Id(), game.getPlayer2Id(), game);
-                log.info("Both players loaded game {}. Status moved to IN_PROGRESS", gameId);
-            }
-
-            return GameResult.ok(Packet.gameLoaded(room.toStateMap()));
-        } finally {
-            gameLock.unlock();
-        }
-    }
 
     /**
      * Process a move action.

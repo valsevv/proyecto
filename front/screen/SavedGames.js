@@ -1,9 +1,9 @@
-document.addEventListener("DOMContentLoaded", async () => {
-    const gamesList = document.getElementById("gamesList");
+const API_BASE = 'http://localhost:8080/api';
 
-    document.getElementById('loadGamesBtn').addEventListener('click', async () => {
+
+document.getElementById('loadGamesBtn').addEventListener('click', async () => {
     try {
-        const response = await fetch(`${API_BASE}/auth/saved`, {
+        const response = await fetch(`${API_BASE}/api/games/saved`, {
             method: 'GET',
             credentials: 'include'
         });
@@ -47,12 +47,29 @@ document.addEventListener("DOMContentLoaded", async () => {
          gamesList.innerHTML = "<p>Error cargando partidas.</p>";
     }
 });
+   
 
 
+document.getElementById('loadGamesBtn').addEventListener('click', async () => {
+    try {
+        const response = await fetch(`${API_BASE}/api/games/game/${id}`, {
+            method: 'GET',
+            credentials: 'include'
+        });
 
-function loadGame(id) {
-    location.href = `/game/${id}`;
-}
+        if (response.ok) {
+            const game = await response.json();
+            //            
+       } else {
+             alert('Error al cargar la partida');
+             window.location.href = '/login';
+        }
+    } catch (error) {
+         gamesList.innerHTML = "<p>Error al cargar la partida.</p>";
+    }
+});
+
+      
 
 async function deleteGame(id) {
     if (!confirm("¿Eliminar esta partida?")) return;

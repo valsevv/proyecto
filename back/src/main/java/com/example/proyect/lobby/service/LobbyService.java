@@ -8,15 +8,27 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.example.proyect.lobby.Lobby;
 import com.example.proyect.lobby.LobbyStatus;
+import com.example.proyect.persistence.classes.Game;
+import com.example.proyect.persistence.classes.GameStatus;
+import com.example.proyect.persistence.repos.GameRepository;
+
+import jakarta.persistence.EntityNotFoundException;
 
 @Service
 public class LobbyService {
-
+    
     private final Map<String, Lobby> lobbies = new ConcurrentHashMap<>();
     private final Map<Long, String> userToLobby = new ConcurrentHashMap<>(); // Track which lobby each user is in
+
+    private final GameRepository gameRepository;
+
+    public LobbyService(GameRepository gameRepository) {
+        this.gameRepository = gameRepository;
+    }
 
     /**
      * Creates a new lobby with the given creator.
@@ -125,4 +137,42 @@ public class LobbyService {
             }
         }
     }
+
+    @Transactional
+    public Lobby createLoadGameLobby(Long gameId, Long userId) {
+    
+        Game game = gameRepository.findById(gameId)
+                .orElseThrow(() -> new EntityNotFoundException("Game not found: " + gameId));
+
+        if (!game.getPlayer1Id().equals(userId) && !game.getPlayer2Id().equals(userId)) {
+            throw new IllegalArgumentException("User is not part of this game");
+        }
+
+        if (game.getState() == null || game.getState().getStatus() != GameStatus.SAVED) {
+            throw new IllegalArgumentException("Game is not in SAVED state");
+        }
+
+        String lobbyId = UUID.randomUUID().toString();
+
+        Lobby lobby = new Lobby(lobbyId, userId.toString());
+
+        lobby.setGameId(gameId);
+
+        lobby.addPlayer(userId);
+
+        Long opponentId = game.getPlayer1Id().equals(userId)
+                ? game.getPlayer2Id()
+                : game.getPlayer1Id();
+
+        lobby.addPlayer(opponentId); // vas a necesitar este campo
+
+        lobbies.put(lobbyId, lobby);
+
+        return lobby;
+    }
+
+
+
+
 }
+

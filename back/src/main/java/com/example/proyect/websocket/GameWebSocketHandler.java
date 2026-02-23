@@ -14,6 +14,8 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 import com.example.proyect.VOs.GameResult;
 import com.example.proyect.controller.GameController;
+import com.example.proyect.lobby.Lobby;
+import com.example.proyect.lobby.service.LobbyService;
 import com.example.proyect.websocket.packet.Packet;
 import com.example.proyect.websocket.packet.PacketSerializer;
 
@@ -240,32 +242,37 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
     }
 
     private void handleLoadGame(WebSocketSession session, Packet packet) throws IOException {
+// ver bien esto
         Number gameIdNumber = packet.get("gameId");
         if (gameIdNumber == null) {
             send(session, Packet.gameLoadError("gameId is required"));
             return;
         }
+
         Long gameId = gameIdNumber.longValue();
 
         if (gameId <= 0) {
             send(session, Packet.gameLoadError("invalid gameId"));
             return;
         }
-
-        GameResult result = gameController.loadGame(session.getId(), gameId);
-        if (!result.isSuccess()) {
-            send(session, Packet.gameLoadError(result.getErrorMessage()));
+//hay que implementar este getUserID
+        Long userId = gameController.getUserIdBySession(session.getId());
+        if (userId == null) {
+            send(session, Packet.gameLoadError("User not authenticated"));
             return;
         }
 
-        send(session, result.getPacket());
+        try {
+            Lobby lobby = LobbyService.createLoadGameLobby(gameId, userId);
 
-        Packet turnStart = Packet.turnStart(
-                gameController.getCurrentTurn(session.getId()),
-                gameController.getActionsRemaining(session.getId())
-        );
-        send(session, turnStart);
+            // Avisar al cliente que se creó el lobby
+            send(session, Packet.lobbyCreated(lobby.getLobbyId(), lobby.getGameId()));
+
+        } catch (Exception ex) {
+            send(session, Packet.gameLoadError(ex.getMessage()));
+        }
     }
+
 
     private void handleEndTurn(WebSocketSession session) throws IOException {
         GameResult result = gameController.endTurn(session.getId());

@@ -12,6 +12,7 @@ public class Lobby {
     private final LocalDateTime createdAt;
     private final List<Long> playerIds = new ArrayList<>(2);
     private LobbyStatus status = LobbyStatus.WAITING; //comienza pendiente
+    private Long gameId; // null = partida nueva, no null = cargar partida
 
     public Lobby(String lobbyId, String creatorUsername) {
         this.lobbyId = lobbyId;
@@ -24,6 +25,16 @@ public class Lobby {
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LobbyStatus getStatus() { return status; }
     public List<Long> getPlayerIds() { return Collections.unmodifiableList(playerIds); }
+
+    public Long getGameId() { return gameId; }
+
+    public void setGameId(Long gameId) { 
+        this.gameId = gameId; 
+    }
+
+    public boolean isLoadGameLobby() {
+        return gameId != null;
+    }
 
     public boolean isFull() {
         return playerIds.size() >= 2;

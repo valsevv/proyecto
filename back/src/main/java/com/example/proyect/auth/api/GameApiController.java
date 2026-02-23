@@ -37,6 +37,8 @@ public class GameApiController {
                 .toList();
     }
 
+    //Agregar el mapping del load game
+
     private SavedGameResponse toSavedGameResponse(Long currentUserId, Game game) {
         if (!gameService.canUserAccessGame(currentUserId, game)) {
             throw new AccessDeniedException("No autorizado para ver esta partida");
