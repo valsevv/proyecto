@@ -7,14 +7,18 @@
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body>
+<body>
 
-<div class="container">
+<div class="ocean"></div>
+<div class="radar"></div>
+
+<div class="ranking-container">
     <h1>🏆 Ranking Top Players</h1>
 
     <div id="loading" class="loading">Cargando ranking...</div>
     <div id="error" class="error"></div>
 
-    <table id="rankingTable" style="display:none;">
+    <table id="rankingTable" class="ranking-table" style="display:none;">
         <thead>
             <tr>
                 <th>#</th>
@@ -26,6 +30,10 @@
         </thead>
         <tbody></tbody>
     </table>
+
+    <button class="btn-back" onclick="window.location.href='/menu'">
+        Volver al menú
+    </button>
 </div>
 
 <script src="/screen/Ranking.js"></script>

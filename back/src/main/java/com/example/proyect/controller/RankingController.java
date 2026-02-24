@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.example.proyect.auth.RankingTopDTO;
 import com.example.proyect.auth.service.RankingService;
 import com.example.proyect.persistence.classes.Ranking;
 
@@ -71,9 +72,9 @@ public class RankingController {
      * Devuelve el Top N global (por defecto 10).
      */
     @GetMapping("/top")
-    public ResponseEntity<List<Ranking>> getTop(
+    public ResponseEntity<List<RankingTopDTO>> getTop(
             @RequestParam(defaultValue = "10") int limit) {
-        List<Ranking> top = rankingService.getTop(limit);
+        List<RankingTopDTO> top = rankingService.getTop(limit);
         return ResponseEntity.ok(top);
     }
 

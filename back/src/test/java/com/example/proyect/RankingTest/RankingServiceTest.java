@@ -14,6 +14,7 @@ import static org.mockito.Mockito.when;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Pageable;
 
+import com.example.proyect.auth.RankingTopDTO;
 import com.example.proyect.auth.service.RankingService;
 import com.example.proyect.persistence.classes.Ranking;
 import com.example.proyect.persistence.repos.RankingRepository;
@@ -112,7 +113,7 @@ class RankingServiceTest {
                 .findAllByOrderByPointsDescReachedAtAscIdAsc(any(Pageable.class)))
                 .thenReturn(List.of(r1));
 
-        List<Ranking> result = service.getTop(5);
+        List<RankingTopDTO> result = service.getTop(5);
 
         assertThat(result).hasSize(1);
         verify(rankingRepository)

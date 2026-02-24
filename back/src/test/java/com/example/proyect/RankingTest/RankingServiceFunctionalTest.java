@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.example.proyect.auth.RankingTopDTO;
 import com.example.proyect.auth.service.RankingService;
 import com.example.proyect.auth.service.UserService;
 import com.example.proyect.persistence.classes.Ranking;
@@ -62,7 +63,7 @@ class RankingServiceFunctionalTest {
         rankingService.createSnapshot(u2.getUserId(), 300);
         rankingService.createSnapshot(u3.getUserId(), 200);
 
-        List<Ranking> top = rankingService.getTop(3);
+        List<RankingTopDTO> top = rankingService.getTop(3);
 
         assertEquals(300, top.get(0).getPoints());
         assertEquals(200, top.get(1).getPoints());

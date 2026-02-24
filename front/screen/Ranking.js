@@ -19,20 +19,22 @@ async function loadRanking() {
         const data = await response.json();
 
         loading.style.display = "none";
-        table.style.display = "table";
 
         if (data.length === 0) {
             errorDiv.textContent = "No hay datos disponibles.";
-            table.style.display = "none";
             return;
         }
+
+        table.style.display = "table";
 
         data.forEach((player, index) => {
             const row = document.createElement("tr");
 
             row.innerHTML = `
                 <td>${index + 1}</td>
-                <td>${player.username}</td>>
+                <td>${player.username}</td>
+                <td>${player.wins}</td>
+                <td>${player.losses}</td>
                 <td>${player.points}</td>
             `;
 

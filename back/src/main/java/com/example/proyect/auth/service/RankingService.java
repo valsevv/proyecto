@@ -7,6 +7,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.example.proyect.auth.RankingTopDTO;
 import com.example.proyect.persistence.classes.Ranking;
 import com.example.proyect.persistence.repos.RankingRepository;
 import com.example.proyect.persistence.repos.UserRepository;
@@ -64,14 +65,8 @@ public class RankingService {
     /**
      * Devuelve el Top N global.
      */
-    @Transactional(readOnly = true)
-    public List<Ranking> getTop(int limit) {
-        if (limit <= 0) limit = 10;
-
-        return rankingRepository
-                .findAllByOrderByPointsDescReachedAtAscIdAsc(
-                        PageRequest.of(0, limit)
-                );
+    public List<RankingTopDTO> getTop(int limit) {
+        return rankingRepository.findTopWithUsername(PageRequest.of(0, limit));
     }
 
     /**
