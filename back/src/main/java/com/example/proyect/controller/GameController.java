@@ -64,6 +64,10 @@ public class GameController {
             sessionToUserId.put(sessionId, userId);
         }
     }
+
+    public Long getUserIdBySession(String sessionId) {
+        return sessionToUserId.get(sessionId);
+    }
     
 
     //Crea el froom apartir del lobby, si ya existe lo retorna
@@ -181,7 +185,8 @@ public class GameController {
 
         sessionToRoom.put(sessionId, room.getRoomId());
 
-        Packet welcome = Packet.welcome(sessionId, player.getPlayerIndex());
+        boolean isLoadGame = lobby.isLoadGameLobby();
+        Packet welcome = Packet.welcome(sessionId, player.getPlayerIndex(), isLoadGame, lobby.getGameId());
 
         // 🔥 CUANDO LA ROOM SE LLENA
         if (room.isFull() && !room.isGameStarted()) {
@@ -194,9 +199,11 @@ public class GameController {
                 log.info("New game created for lobby {}", lobbyId);
 
             } else {
-                // 🔵 PARTIDA CARGADA
+                // 🔵 PARTIDA CARGADA - game is ready to start immediately
                 loadSavedGameIntoRoom(lobby.getGameId(), room);
                 log.info("Loaded saved game {} into room {}", lobby.getGameId(), room.getRoomId());
+                // Return gameReady so handler broadcasts gameStart
+                return GameResult.gameReady(welcome);
             }
         }
 
@@ -216,7 +223,8 @@ public class GameController {
         Map<String, Object> snapshot = (Map<String, Object>) meta.get("snapshot");
 
         // reconstruye el estado dentro de la room actual
-        GameRoom.fromStateMap(room.getRoomId(), snapshot);
+        GameRoom restoredRoom = GameRoom.fromStateMap(room.getRoomId(), snapshot);
+        room.restoreFrom(restoredRoom);
 
         // Vincular estructuras internas
         gameToRoom.put(gameId, room.getRoomId());

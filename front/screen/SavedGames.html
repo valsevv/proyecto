@@ -3,22 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <title>Partidas Guardadas - Drone Carrier Command</title>
-    <link rel="stylesheet" href="/screen/styles/menu.css">
-    <link rel="stylesheet" href="/screen/styles/saved-games.css">
+    <link rel="stylesheet" href="/screen/styles/lobby.css">
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body>
+    <div class="ocean"></div>
+    <div class="radar"></div>
 
-    <div class="games-container">
+    <div class="lobby-container">
         <h1>Partidas Guardadas</h1>
-
-        <div id="gamesList" class="games-list">
-            <!-- Se renderiza dinámicamente -->
+        
+        <div class="lobby-controls">
+            <button class="btn-secondary" id="refreshBtn">Actualizar</button>
+            <button class="btn-secondary" id="backBtn">Volver al Menú</button>
         </div>
 
-        <button class="menu-btn back-btn" onclick="location.href='/menu'">
-            ← Volver al Menú
-        </button>
+        <div class="lobby-list" id="gamesList">
+            <p class="loading">Cargando partidas...</p>
+        </div>
+
+        <div class="lobby-info">
+            <p>Selecciona una partida para continuar jugando</p>
+        </div>
     </div>
 
     <script src="/screen/SavedGames.js"></script>

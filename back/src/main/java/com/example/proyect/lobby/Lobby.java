@@ -13,6 +13,7 @@ public class Lobby {
     private final List<Long> playerIds = new ArrayList<>(2);
     private LobbyStatus status = LobbyStatus.WAITING; //comienza pendiente
     private Long gameId; // null = partida nueva, no null = cargar partida
+    private Long expectedOpponentId; // For load game lobbies: only this user can join
 
     public Lobby(String lobbyId, String creatorUsername) {
         this.lobbyId = lobbyId;
@@ -30,6 +31,14 @@ public class Lobby {
 
     public void setGameId(Long gameId) { 
         this.gameId = gameId; 
+    }
+
+    public Long getExpectedOpponentId() {
+        return expectedOpponentId;
+    }
+
+    public void setExpectedOpponentId(Long expectedOpponentId) {
+        this.expectedOpponentId = expectedOpponentId;
     }
 
     public boolean isLoadGameLobby() {

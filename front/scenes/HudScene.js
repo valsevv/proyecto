@@ -1,4 +1,5 @@
 import Minimap from '../ui/Minimap.js';
+import networkManager from '../network/NetworkManager.js';
 
 const TEAM_COLORS = [0x00ff00, 0xff4444];
 
@@ -121,6 +122,31 @@ export default class HudScene extends Phaser.Scene {
             mainScene.endTurn();
         });
 
+        // Save & Exit button (always visible during game, positioned at top-right)
+        this.saveExitActiveColor = 0x995500;
+        const saveExitX = this.scale.width - margin - btnWidth / 2;
+        const saveExitY = margin + btnHeight / 2;
+
+        this.saveExitBtnBg = this.add.graphics();
+        this.drawRoundedButton(this.saveExitBtnBg, saveExitX - btnWidth / 2, saveExitY - btnHeight / 2, btnWidth, btnHeight, btnRadius, this.saveExitActiveColor);
+
+        this.saveExitBtnText = this.add.text(saveExitX, saveExitY, '💾 Guardar', {
+            fontSize: '16px',
+            fill: '#ffffff'
+        }).setOrigin(0.5);
+
+        this.saveExitBtn = this.add.rectangle(saveExitX, saveExitY, btnWidth, btnHeight, 0x000000, 0.001)
+            .setInteractive({ useHandCursor: true });
+
+        this.saveExitBtn.on('pointerdown', () => {
+            if (confirm('¿Guardar y salir de la partida?')) {
+                networkManager.saveAndExit();
+            }
+        });
+
+        // Save button hidden until game starts
+        this.setSaveButtonVisible(false);
+
         // Initially hidden
         this.setButtonsVisible(false);
     }
@@ -180,6 +206,7 @@ export default class HudScene extends Phaser.Scene {
     onGameStarted() {
         console.log('[HudScene] === ON GAME STARTED ===');
         this.gameStarted = true;
+        this.setSaveButtonVisible(true);
     }
 
     onTurnChanged({ isMyTurn }) {
@@ -213,6 +240,12 @@ export default class HudScene extends Phaser.Scene {
             this.attackSelected = false;
             this.updateButtonStates();
         }
+    }
+
+    setSaveButtonVisible(visible) {
+        this.saveExitBtn.setVisible(visible);
+        this.saveExitBtnBg.setVisible(visible);
+        this.saveExitBtnText.setVisible(visible);
     }
 
     update() {

@@ -77,6 +77,13 @@ public class LobbyService {
             throw new IllegalStateException("Lobby ya comenzó");
         }
 
+        // For load game lobbies, only the expected opponent can join
+        if (lobby.isLoadGameLobby() && lobby.getExpectedOpponentId() != null) {
+            if (!lobby.getExpectedOpponentId().equals(userId)) {
+                throw new IllegalStateException("Solo el oponente original puede unirse a esta partida guardada");
+            }
+        }
+
         // Remove user from any existing lobby first
         String existingLobbyId = userToLobby.get(userId);
         if (existingLobbyId != null && !existingLobbyId.equals(lobbyId)) {
@@ -139,7 +146,7 @@ public class LobbyService {
     }
 
     @Transactional
-    public Lobby createLoadGameLobby(Long gameId, Long userId) {
+    public Lobby createLoadGameLobby(Long gameId, Long userId, String username) {
     
         Game game = gameRepository.findById(gameId)
                 .orElseThrow(() -> new EntityNotFoundException("Game not found: " + gameId));
@@ -152,21 +159,30 @@ public class LobbyService {
             throw new IllegalArgumentException("Game is not in SAVED state");
         }
 
+        // Remove user from any existing lobby first
+        String existingLobbyId = userToLobby.get(userId);
+        if (existingLobbyId != null) {
+            leaveLobby(userId);
+        }
+
         String lobbyId = UUID.randomUUID().toString();
 
-        Lobby lobby = new Lobby(lobbyId, userId.toString());
+        Lobby lobby = new Lobby(lobbyId, username);
 
         lobby.setGameId(gameId);
 
+        // Only add the creator, not the opponent
         lobby.addPlayer(userId);
 
+        // Store who is allowed to join this lobby
         Long opponentId = game.getPlayer1Id().equals(userId)
                 ? game.getPlayer2Id()
                 : game.getPlayer1Id();
 
-        lobby.addPlayer(opponentId); // vas a necesitar este campo
+        lobby.setExpectedOpponentId(opponentId);
 
         lobbies.put(lobbyId, lobby);
+        userToLobby.put(userId, lobbyId);  // Track the user's lobby
 
         return lobby;
     }

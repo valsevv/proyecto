@@ -25,7 +25,7 @@ async function fetchLobbies() {
     } catch (error) {
         console.error('Error fetching lobbies:', error);
         document.getElementById('lobbyList').innerHTML = 
-            '<p class="error">Error loading lobbies. Please try again.</p>';
+            '<p class="error">Error al cargar los lobbies. Inténtalo de nuevo.</p>';
     }
 }
 
@@ -34,31 +34,39 @@ function displayLobbies(lobbies) {
     const lobbyList = document.getElementById('lobbyList');
     
     if (lobbies.length === 0) {
-        lobbyList.innerHTML = '<p class="no-lobbies">No lobbies available. Create one!</p>';
+        lobbyList.innerHTML = '<p class="no-lobbies">No hay lobbies disponibles. Crea uno!</p>';
         return;
     }
 
     let html = '<table class="lobby-table"><thead><tr>';
-    html += '<th>Creator</th>';
-    html += '<th>Players</th>';
-    html += '<th>Status</th>';
-    html += '<th>Action</th>';
+    html += '<th>Creador</th>';
+    html += '<th>Jugadores</th>';
+    html += '<th>Estado</th>';
+    html += '<th>Acción</th>';
     html += '</tr></thead><tbody>';
 
     lobbies.forEach(lobby => {
         const canJoin = !lobby.isFull && lobby.status === 'WAITING';
-        const statusText = lobby.isFull ? 'Full' : lobby.status;
+        let statusText = lobby.isFull ? 'Llena' : lobby.status;
         
-        html += '<tr>';
+        // Special styling for load-game lobbies (invitations to resume)
+        const isInvitation = lobby.isLoadGame;
+        if (isInvitation) {
+            statusText = '🔄 Partida Guardada';
+        }
+        
+        html += `<tr class="${isInvitation ? 'load-game-invite' : ''}">`;
         html += `<td>${lobby.creatorUsername}</td>`;
         html += `<td>${lobby.playerCount}/${lobby.maxPlayers}</td>`;
         html += `<td class="status-${lobby.status.toLowerCase()}">${statusText}</td>`;
         html += '<td>';
         
         if (canJoin) {
-            html += `<button class="btn-join" onclick="joinLobby('${lobby.lobbyId}')">Join</button>`;
+            const buttonText = isInvitation ? 'Continuar Partida' : 'Unirse';
+            const buttonClass = isInvitation ? 'btn-join btn-resume' : 'btn-join';
+            html += `<button class="${buttonClass}" onclick="joinLobby('${lobby.lobbyId}')">${buttonText}</button>`;
         } else {
-            html += '<span class="unavailable">Unavailable</span>';
+            html += '<span class="unavailable">No Disponible</span>';
         }
         
         html += '</td></tr>';

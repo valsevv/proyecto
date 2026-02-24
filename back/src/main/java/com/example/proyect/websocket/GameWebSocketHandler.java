@@ -44,10 +44,12 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
     private static final Logger log = LoggerFactory.getLogger(GameWebSocketHandler.class);
 
     private final GameController gameController;
+    private final LobbyService lobbyService;
     private final Map<String, WebSocketSession> sessions = new ConcurrentHashMap<>();
 
-    public GameWebSocketHandler(GameController gameController) {
+    public GameWebSocketHandler(GameController gameController, LobbyService lobbyService) {
         this.gameController = gameController;
+        this.lobbyService = lobbyService;
     }
 
     @Override
@@ -133,8 +135,19 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         // Send welcome to joining player
         send(session, result.getPacket());
         
-        // Note: Game will not auto-start anymore
-        // Players must select sides first
+        // If this is a loaded game that's ready (both players joined), broadcast game start
+        if (result.isGameReady()) {
+            Packet gameStart = Packet.gameStart(gameController.getGameState(session.getId()));
+            broadcastToRoom(session.getId(), gameStart);
+            
+            Packet turnStart = Packet.turnStart(
+                gameController.getCurrentTurn(session.getId()), 
+                gameController.getActionsRemaining(session.getId())
+            );
+            broadcastToRoom(session.getId(), turnStart);
+        }
+        
+        // Note: For new games, players must select sides first
     }
     
     private void handleSelectSide(WebSocketSession session, Packet packet) throws IOException {
@@ -262,8 +275,13 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             return;
         }
 
+        String username = (String) session.getAttributes().get("username");
+        if (username == null) {
+            username = userId.toString();
+        }
+
         try {
-            Lobby lobby = LobbyService.createLoadGameLobby(gameId, userId);
+            Lobby lobby = lobbyService.createLoadGameLobby(gameId, userId, username);
 
             // Avisar al cliente que se creó el lobby
             send(session, Packet.lobbyCreated(lobby.getLobbyId(), lobby.getGameId()));

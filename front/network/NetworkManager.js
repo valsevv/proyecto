@@ -81,6 +81,17 @@ class NetworkManager {
     endTurn() {
         this.send({ type: 'endTurn' });
     }
+
+    saveAndExit() {
+        console.log('[net] === SENDING SAVE_AND_EXIT MESSAGE ===');
+        this.send({ type: 'saveAndExit' });
+    }
+
+    loadGame(gameId) {
+        console.log('[net] === SENDING LOAD_GAME MESSAGE ===');
+        console.log('[net] Game ID:', gameId);
+        this.send({ type: 'loadGame', gameId });
+    }
     
     selectSide(side) {
         console.log('[net] === SENDING SELECT_SIDE MESSAGE ===');

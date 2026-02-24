@@ -183,6 +183,26 @@ button:active {
     color: #00ff00;
 }
 
+/* Load game invitation styles */
+.load-game-invite {
+    background: rgba(255, 165, 0, 0.15) !important;
+    border-left: 3px solid #ffaa00;
+}
+
+.load-game-invite:hover {
+    background: rgba(255, 165, 0, 0.25) !important;
+}
+
+.btn-resume {
+    border-color: #ffaa00 !important;
+    color: #ffaa00 !important;
+}
+
+.btn-resume:hover {
+    background: #ffaa00 !important;
+    color: #001018 !important;
+    box-shadow: 0 0 15px rgba(255, 165, 0, 0.8) !important;
+}
 .status-started {
     color: #ff0000;
 }
@@ -293,4 +313,23 @@ button:active {
 .lobby-container::-webkit-scrollbar-thumb:hover,
 .waiting-container::-webkit-scrollbar-thumb:hover {
     background: rgba(0, 255, 204, 0.8);
+}
+/* Delete button style */
+.btn-delete {
+    padding: 8px 16px;
+    font-size: 12px;
+    font-family: 'Orbitron', sans-serif;
+    background: transparent;
+    border: 2px solid #ff4444;
+    color: #ff4444;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-radius: 5px;
+    margin-left: 8px;
+}
+
+.btn-delete:hover {
+    background: #ff4444;
+    color: #001018;
+    box-shadow: 0 0 15px rgba(255, 68, 68, 0.8);
 }

@@ -3,9 +3,12 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -37,7 +40,19 @@ public class GameApiController {
                 .toList();
     }
 
-    //Agregar el mapping del load game
+    @DeleteMapping("/{gameId}")
+    public ResponseEntity<Void> deleteGame(@PathVariable Long gameId, Authentication authentication) {
+        String username = authentication.getName();
+        User currentUser = userService.getByUsername(username);
+
+        Game game = gameService.getById(gameId);
+        if (!gameService.canUserAccessGame(currentUser.getUserId(), game)) {
+            throw new AccessDeniedException("No autorizado para eliminar esta partida");
+        }
+
+        gameService.deleteGame(gameId);
+        return ResponseEntity.noContent().build();
+    }
 
     private SavedGameResponse toSavedGameResponse(Long currentUserId, Game game) {
         if (!gameService.canUserAccessGame(currentUserId, game)) {

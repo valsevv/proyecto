@@ -170,7 +170,20 @@ export default class LobbyScene extends Phaser.Scene {
         Network.on('welcome', (msg) => {
             console.log('[LobbyScene] === WELCOME RECEIVED ===');
             console.log('[LobbyScene] Player index:', msg.playerIndex);
+            console.log('[LobbyScene] isLoadGame:', msg.isLoadGame);
             console.log('[LobbyScene] Full message:', msg);
+            
+            // If this is a loaded game, hide selection UI and wait for gameStart
+            if (msg.isLoadGame) {
+                console.log('[LobbyScene] === LOAD GAME MODE - HIDING SELECTION UI ===');
+                if (this.titleText) this.titleText.setVisible(false);
+                if (this.navalButton) this.navalButton.setVisible(false);
+                if (this.aereoButton) this.aereoButton.setVisible(false);
+                this.statusText.setVisible(true);
+                this.statusText.setText('Cargando partida guardada...');
+                this.sideSelected = true; // Prevent side selection logic
+                return;
+            }
             
             // Update status based on player index
             if (msg.playerIndex === 0) {

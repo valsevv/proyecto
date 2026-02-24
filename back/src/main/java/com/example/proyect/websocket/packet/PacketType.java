@@ -24,6 +24,7 @@ public enum PacketType {
     PLAYER_LEFT("playerLeft"),
     GAME_SAVED("gameSaved"),
     GAME_LOADED("gameLoaded"),
+    LOBBY_CREATED("lobbyCreated"),
     ERROR("error");
 
     private final String value;

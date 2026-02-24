@@ -45,6 +45,7 @@ public class GameService {
         return gameRepository.save(game);
     }
 
+    @Transactional
     public Game saveGame(Long player1Id, Long player2Id, Game gameToSave) {
 
         Objects.requireNonNull(player1Id, "player1 no puede ser null");
@@ -57,7 +58,10 @@ public class GameService {
 
         gameToSave.setPlayer1Id(player1Id);
         gameToSave.setPlayer2Id(player2Id);
-        gameToSave.setStartedAt(OffsetDateTime.now());
+        // Preserve original startedAt if already set
+        if (gameToSave.getStartedAt() == null) {
+            gameToSave.setStartedAt(OffsetDateTime.now());
+        }
 
         return gameRepository.save(gameToSave);
     }
@@ -111,7 +115,8 @@ public class GameService {
     }
 
 
-    
+
+    @Transactional
     public void deleteGame(Long gameId) {
         if (!gameRepository.existsById(gameId)) {
             throw new EntityNotFoundException("No existe partida con id=" + gameId);

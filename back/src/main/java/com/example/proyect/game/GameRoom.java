@@ -442,4 +442,18 @@ public class GameRoom {
         }
         return (Boolean) value;
     }
+
+    /**
+     * Restore state from another GameRoom (used when loading saved games).
+     * Copies players, sides, turn state from source into this room.
+     */
+    public synchronized void restoreFrom(GameRoom source) {
+        this.players.clear();
+        this.players.addAll(source.players);
+        this.playerSides.clear();
+        this.playerSides.putAll(source.playerSides);
+        this.gameStarted = source.gameStarted;
+        this.currentTurn = source.currentTurn;
+        this.actionsRemaining = source.actionsRemaining;
+    }
 }

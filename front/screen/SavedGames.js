@@ -1,7 +1,20 @@
-const API_BASE = 'http://localhost:8080/api';
+const API_BASE = 'http://localhost:8080';
 
+const gamesList = document.getElementById('gamesList');
 
-document.getElementById('loadGamesBtn').addEventListener('click', async () => {
+// Load saved games on page load
+document.addEventListener('DOMContentLoaded', () => {
+    loadSavedGames();
+    
+    document.getElementById('refreshBtn').addEventListener('click', loadSavedGames);
+    document.getElementById('backBtn').addEventListener('click', () => {
+        window.location.href = '/menu';
+    });
+});
+
+async function loadSavedGames() {
+    gamesList.innerHTML = '<p class="loading">Cargando partidas...</p>';
+    
     try {
         const response = await fetch(`${API_BASE}/api/games/saved`, {
             method: 'GET',
@@ -10,70 +23,98 @@ document.getElementById('loadGamesBtn').addEventListener('click', async () => {
         
         if (response.ok) {
             const games = await response.json();
-            if (games.length === 0) {
-                gamesList.innerHTML = "<p>No tienes partidas guardadas.</p>";
-            return;
-            }
-
-            games.forEach(game => {
-                const card = document.createElement("div");
-                card.className = "game-card";
-
-                card.innerHTML = `
-                    <div class="game-info">
-                        <strong>ID:</strong> ${game.id}<br>
-                        <strong>Jugador 1:</strong> ${game.player1Username}<br>
-                        <strong>Jugador 2:</strong> ${game.player2Username}<br>
-                        <strong>Fecha:</strong> ${new Date(game.startedAt).toLocaleString()}
-                    </div>
-                    <div class="game-actions">
-                        <button class="menu-btn" onclick="loadGame(${game.id})">
-                            Continuar
-                        </button>
-                        <button class="menu-btn" onclick="deleteGame(${game.id})">
-                            Eliminar
-                        </button>
-                    </div>
-                `;
-
-                gamesList.appendChild(card);
-            });
-
+            displayGames(games);
+        } else if (response.status === 401) {
+            window.location.href = '/login';
         } else {
-             alert('Get saved games failed. Please try again.');
-             window.location.href = '/login';
+            gamesList.innerHTML = '<p class="error">Error al cargar partidas.</p>';
         }
     } catch (error) {
-         gamesList.innerHTML = "<p>Error cargando partidas.</p>";
+        console.error('Error loading saved games:', error);
+        gamesList.innerHTML = '<p class="error">Error de conexión.</p>';
     }
-});
-   
+}
 
+function displayGames(games) {
+    if (games.length === 0) {
+        gamesList.innerHTML = '<p class="no-lobbies">No tienes partidas guardadas.</p>';
+        return;
+    }
 
-document.getElementById('loadGamesBtn').addEventListener('click', async () => {
+    let html = '<table class="lobby-table"><thead><tr>';
+    html += '<th>Rival</th>';
+    html += '<th>Turno</th>';
+    html += '<th>Fecha</th>';
+    html += '<th>Acciones</th>';
+    html += '</tr></thead><tbody>';
+
+    games.forEach(game => {
+        const rivalName = game.rival?.username || 'Desconocido';
+        const turnInfo = game.currentTurn !== null ? `Turno ${game.currentTurn}` : '-';
+        const dateStr = new Date(game.startedAt).toLocaleDateString();
+        
+        html += '<tr>';
+        html += `<td>${rivalName}</td>`;
+        html += `<td>${turnInfo}</td>`;
+        html += `<td>${dateStr}</td>`;
+        html += '<td>';
+        html += `<button class="btn-join" onclick="loadGame(${game.gameId})">Continuar</button> `;
+        html += `<button class="btn-delete" onclick="deleteGame(${game.gameId})">Eliminar</button>`;
+        html += '</td></tr>';
+    });
+
+    html += '</tbody></table>';
+    gamesList.innerHTML = html;
+}
+
+async function loadGame(gameId) {
     try {
-        const response = await fetch(`${API_BASE}/api/games/game/${id}`, {
-            method: 'GET',
+        // Create a load-game lobby via REST API
+        const response = await fetch(`${API_BASE}/api/lobby/load-game/${gameId}`, {
+            method: 'POST',
             credentials: 'include'
         });
 
         if (response.ok) {
-            const game = await response.json();
-            //            
-       } else {
-             alert('Error al cargar la partida');
-             window.location.href = '/login';
+            const result = await response.json();
+            if (result.success) {
+                // Store lobby ID and redirect to waiting room
+                sessionStorage.setItem('currentLobbyId', result.lobbyId);
+                sessionStorage.setItem('loadingGameId', gameId);
+                window.location.href = '/lobby-waiting';
+            } else {
+                alert('Error al cargar la partida: ' + (result.error || 'Error desconocido'));
+            }
+        } else if (response.status === 401) {
+            window.location.href = '/login';
+        } else {
+            const error = await response.json();
+            alert('Error al cargar la partida: ' + (error.error || 'Error desconocido'));
         }
     } catch (error) {
-         gamesList.innerHTML = "<p>Error al cargar la partida.</p>";
+        console.error('Error loading game:', error);
+        alert('Error de conexión');
     }
-});
-
-      
+}
 
 async function deleteGame(id) {
-    if (!confirm("¿Eliminar esta partida?")) return;
+    if (!confirm('¿Eliminar esta partida?')) return;
 
-    await fetch(`/api/games/${id}`, { method: "DELETE" });
-    location.reload();
+    try {
+        const response = await fetch(`${API_BASE}/api/games/${id}`, {
+            method: 'DELETE',
+            credentials: 'include'
+        });
+
+        if (response.ok || response.status === 204) {
+            loadSavedGames(); // Refresh the list
+        } else if (response.status === 401) {
+            window.location.href = '/login';
+        } else {
+            alert('Error al eliminar la partida');
+        }
+    } catch (error) {
+        console.error('Error deleting game:', error);
+        alert('Error de conexión');
+    }
 }

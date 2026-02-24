@@ -105,9 +105,17 @@ public class Packet {
     }
 
     public static Packet welcome(String playerId, int playerIndex) {
+        return welcome(playerId, playerIndex, false, null);
+    }
+
+    public static Packet welcome(String playerId, int playerIndex, boolean isLoadGame, Long gameId) {
         Map<String, Object> payload = new HashMap<>();
         payload.put("playerId", playerId);
         payload.put("playerIndex", playerIndex);
+        payload.put("isLoadGame", isLoadGame);
+        if (gameId != null) {
+            payload.put("gameId", gameId);
+        }
         return new Packet(PacketType.WELCOME, payload);
     }
 
@@ -163,5 +171,12 @@ public class Packet {
 
     public static Packet bothReady() {
         return new Packet(PacketType.BOTH_READY, new HashMap<>());
+    }
+
+    public static Packet lobbyCreated(String lobbyId, Long gameId) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("lobbyId", lobbyId);
+        payload.put("gameId", gameId);
+        return new Packet(PacketType.LOBBY_CREATED, payload);
     }
 }

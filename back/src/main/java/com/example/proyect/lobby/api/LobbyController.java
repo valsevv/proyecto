@@ -87,21 +87,45 @@ public class LobbyController {
     /**
      * Get all available lobbies.
      * GET /api/lobby/list
+     * Load-game lobbies only appear to their expected opponent.
      */
     @GetMapping("/list")
-    public ResponseEntity<List<Map<String, Object>>> listLobbies() {
+    public ResponseEntity<List<Map<String, Object>>> listLobbies(HttpServletRequest request) {
+        Long userId = null;
+        try {
+            userId = extractUserId(request);
+        } catch (Exception ignored) {
+            // User not authenticated, show only public lobbies
+        }
+
         List<Lobby> lobbies = lobbyService.getAllLobbies();
+        final Long currentUserId = userId;
         
         List<Map<String, Object>> lobbyDtos = lobbies.stream()
-                .map(lobby -> Map.of(
-                        "lobbyId", (Object) lobby.getLobbyId(),
-                        "creatorUsername", lobby.getCreatorUsername(),
-                        "playerCount", lobby.getPlayerIds().size(),
-                        "maxPlayers", 2,
-                        "status", lobby.getStatus().name(),
-                        "isFull", lobby.isFull()
-                ))
-                .toList();
+                .filter(lobby -> {
+                    // Hide load-game lobbies from everyone except the expected opponent
+                    if (lobby.isLoadGameLobby()) {
+                        return currentUserId != null && 
+                               lobby.getExpectedOpponentId() != null &&
+                               lobby.getExpectedOpponentId().equals(currentUserId);
+                    }
+                    return true; // Show normal lobbies to everyone
+                })
+                .map(lobby -> {
+                    Map<String, Object> map = new java.util.HashMap<>();
+                    map.put("lobbyId", lobby.getLobbyId());
+                    map.put("creatorUsername", lobby.getCreatorUsername());
+                    map.put("playerCount", lobby.getPlayerIds().size());
+                    map.put("maxPlayers", 2);
+                    map.put("status", lobby.getStatus().name());
+                    map.put("isFull", lobby.isFull());
+                    map.put("isLoadGame", lobby.isLoadGameLobby());
+                    if (lobby.isLoadGameLobby()) {
+                        map.put("gameId", lobby.getGameId());
+                    }
+                    return map;
+                })
+                .collect(java.util.stream.Collectors.toList());
         
         return ResponseEntity.ok(lobbyDtos);
     }
@@ -148,13 +172,17 @@ public class LobbyController {
             }
             
             Lobby lobby = lobbyOpt.get();
-            return ResponseEntity.ok(Map.of(
-                    "inLobby", true,
-                    "lobbyId", lobby.getLobbyId(),
-                    "creatorUsername", lobby.getCreatorUsername(),
-                    "playerCount", lobby.getPlayerIds().size(),
-                    "status", lobby.getStatus().name()
-            ));
+            Map<String, Object> response = new java.util.HashMap<>();
+            response.put("inLobby", true);
+            response.put("lobbyId", lobby.getLobbyId());
+            response.put("creatorUsername", lobby.getCreatorUsername());
+            response.put("playerCount", lobby.getPlayerIds().size());
+            response.put("status", lobby.getStatus().name());
+            response.put("isLoadGame", lobby.isLoadGameLobby());
+            if (lobby.isLoadGameLobby()) {
+                response.put("gameId", lobby.getGameId());
+            }
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", e.getMessage()));
@@ -174,6 +202,37 @@ public class LobbyController {
             return ResponseEntity.ok(Map.of("success", true));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("success", false, "error", e.getMessage()));
+        }
+    }
+
+    /**
+     * Create a lobby to resume a saved game.
+     * POST /api/lobby/load-game/{gameId}
+     */
+    @PostMapping("/load-game/{gameId}")
+    public ResponseEntity<?> createLoadGameLobby(
+            @PathVariable Long gameId,
+            Authentication auth,
+            HttpServletRequest request) {
+        try {
+            Long userId = extractUserId(request);
+            String username = auth.getName();
+            
+            Lobby lobby = lobbyService.createLoadGameLobby(gameId, userId, username);
+            
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "lobbyId", lobby.getLobbyId(),
+                    "gameId", gameId,
+                    "status", lobby.getStatus().name(),
+                    "playerCount", lobby.getPlayerIds().size()
+            ));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("success", false, "error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("success", false, "error", e.getMessage()));
         }
     }

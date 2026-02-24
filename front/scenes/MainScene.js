@@ -237,6 +237,14 @@ export default class MainScene extends Phaser.Scene {
         Network.on('error', (msg) => {
             console.warn('[game] server error:', msg.message);
         });
+
+        // Handle game saved - redirect to menu
+        Network.on('gameSaved', (msg) => {
+            console.log('[MainScene] === GAME SAVED ===');
+            console.log('[MainScene] Game ID:', msg.gameId);
+            alert('Partida guardada correctamente');
+            window.location.href = '/menu';
+        });
         
         // Note: Connection and join are handled by LobbyScene
     }
