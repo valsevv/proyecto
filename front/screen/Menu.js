@@ -70,3 +70,9 @@ document.getElementById('loadGamesBtn').addEventListener('click', async () => {
 });
      
 
+
+document.getElementById('rankingBtn').addEventListener('click', async () => {
+        window.location.href = '/ranking';
+
+});
+     

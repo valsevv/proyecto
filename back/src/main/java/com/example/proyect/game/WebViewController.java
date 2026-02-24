@@ -72,7 +72,10 @@ public class WebViewController {
         return serveHtmlFile("SavedGames.html");
     }
 
-
+    @GetMapping("/ranking")
+    public ResponseEntity<String> ranking() {
+        return serveHtmlFile("Ranking.html");
+    }
     /**
      * Lobby waiting page - PROTECTED
      */

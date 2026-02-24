@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS ranking (
     ranking_id   SERIAL      PRIMARY KEY,
     user_id      BIGINT      NOT NULL,
     points       INTEGER     NOT NULL DEFAULT 0,
-    reached_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    reach_date   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
     CONSTRAINT fk_ranking_user_ranking
       FOREIGN KEY (ranking_id) REFERENCES ranking(ranking_id)
@@ -17,4 +17,4 @@ CREATE TABLE IF NOT EXISTS ranking (
 
 -- Índices útiles para ordenar/buscar
 CREATE INDEX IF NOT EXISTS idx_ranking_points     ON ranking(points DESC);
-CREATE INDEX IF NOT EXISTS idx_ranking_reach_date ON ranking(reached_at DESC);
+CREATE INDEX IF NOT EXISTS idx_ranking_reach_date ON ranking(reach_date DESC);

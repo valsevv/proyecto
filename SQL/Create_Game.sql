@@ -9,8 +9,8 @@ CREATE TABLE IF NOT EXISTS game (
     player2_id  BIGINT      NOT NULL,
 
     CONSTRAINT chk_game_distinct_players CHECK (player1_id <> player2_id),
-    CONSTRAINT fk_game_player1 FOREIGN KEY (player1_id) REFERENCES users(user_id) ON DELETE RESTRICT,
-    CONSTRAINT fk_game_player2 FOREIGN KEY (player2_id) REFERENCES users(user_id) ON DELETE RESTRICT
+    CONSTRAINT fk_game_player1 FOREIGN KEY (player1_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    CONSTRAINT fk_game_player2 FOREIGN KEY (player2_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
 
 

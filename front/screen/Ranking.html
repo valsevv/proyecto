@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Ranking Top</title>
+    <link rel="stylesheet" href="/screen/styles/ranking.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div class="container">
+    <h1>🏆 Ranking Top Players</h1>
+
+    <div id="loading" class="loading">Cargando ranking...</div>
+    <div id="error" class="error"></div>
+
+    <table id="rankingTable" style="display:none;">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Jugador</th>
+                <th>Wins</th>
+                <th>Losses</th>
+                <th>Puntos</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<script src="/screen/Ranking.js"></script>
+</body>
+</html>
