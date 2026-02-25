@@ -20,6 +20,7 @@ import com.example.proyect.game.units.drone.Drone;
 import com.example.proyect.lobby.Lobby;
 import com.example.proyect.lobby.service.LobbyService;
 import com.example.proyect.persistence.classes.Game;
+import com.example.proyect.persistence.classes.GameState;
 import com.example.proyect.persistence.classes.GameStatus;
 import com.example.proyect.websocket.packet.Packet;
 
@@ -64,7 +65,6 @@ public class GameController {
             sessionToUserId.put(sessionId, userId);
         }
     }
-
     public Long getUserIdBySession(String sessionId) {
         return sessionToUserId.get(sessionId);
     }
@@ -213,6 +213,7 @@ public class GameController {
    @SuppressWarnings("unchecked")
     private void loadSavedGameIntoRoom(Long gameId, GameRoom room) {
 
+        log.info("[GameController] -> begin loadSavedGameIntoRoom ");
         Game game = gameService.getById(gameId);
 
         if (game.getState() == null || game.getState().getStatus() != GameStatus.SAVED) {
@@ -233,111 +234,34 @@ public class GameController {
 
         gameLocks.putIfAbsent(gameId, new ReentrantLock());
 
+        log.info("[GameController] -> end loadSavedGameIntoRoom ");
+        
         room.startGame();
     }   
     
-    //Esto ver si podemos usar el de arriba loadSavedGameIntoRoom
-        public GameResult loadGame(String sessionId, Long gameId) {
-        if (sessionToRoom.containsKey(sessionId)) {
-            return GameResult.error("Already in a game");
-        }
-
-        Long userId = sessionToUserId.get(sessionId);
-        if (userId == null) {
-            return GameResult.error("User not authenticated");
-        }
-
-        Lock gameLock = getGameLock(gameId);
-        gameLock.lock();
-        try {
-            Game game;
-            try {
-                game = gameService.getById(gameId);
-            } catch (Exception ex) {
-                return GameResult.error("Game not found");
-            }
-
-            boolean isParticipant = userId.equals(game.getPlayer1Id()) || userId.equals(game.getPlayer2Id());
-            if (!isParticipant) {
-                return GameResult.error("You are not part of this game");
-            }
-
-            if (game.getState() == null || game.getState().getStatus() != GameStatus.SAVED) {
-                return GameResult.error("Game is not paused");
-            }
-
-            Map<String, Object> meta = game.getState().getMeta();
-            if (meta == null || !(meta.get("snapshot") instanceof Map<?, ?>)) {
-                return GameResult.error("Saved game snapshot is missing");
-            }
-
-            Map<String, Object> snapshot = (Map<String, Object>) meta.get("snapshot");
-            String roomId = gameToRoom.get(gameId);
-            GameRoom room;
-
-            if (roomId == null) {
-                roomId = "loaded-" + gameId;
-                room = GameRoom.fromStateMap(roomId, snapshot);
-                rooms.put(roomId, room);
-                gameToRoom.put(gameId, roomId);
-                roomToGame.put(roomId, gameId);
-                log.info("Rehydrated saved game {} into room {}", gameId, roomId);
-            } else {
-                room = rooms.get(roomId);
-                if (room == null) {
-                    room = GameRoom.fromStateMap(roomId, snapshot);
-                    rooms.put(roomId, room);
-                    roomToGame.put(roomId, gameId);
-                    log.warn("Room {} missing for mapped game {}. Room restored again", roomId, gameId);
-                }
-            }
-
-            int participantIndex = userId.equals(game.getPlayer1Id()) ? 0 : 1;
-            PlayerState currentPlayer = room.getPlayerByIndex(participantIndex);
-            if (currentPlayer == null) {
-                return GameResult.error("Saved game is corrupted");
-            }
-
-            PlayerState occupiedBy = room.getPlayerBySession(sessionId);
-            if (occupiedBy == null) {
-                PlayerState existingOccupant = room.getPlayerBySession(currentPlayer.getSessionId());
-                if (existingOccupant != null && sessionToRoom.containsKey(existingOccupant.getSessionId())
-                        && !existingOccupant.getSessionId().equals(sessionId)) {
-                    return GameResult.error("Player slot already connected");
-                }
-                room.assignSessionToPlayer(participantIndex, sessionId);
-            }
-
-            sessionToRoom.put(sessionId, roomId);
-            sessionToUserId.put(sessionId, userId);
-
-            if (room.isFull()) {
-                game.getState().setStatus(GameStatus.IN_PROGRESS);
-                gameService.saveGame(game.getPlayer1Id(), game.getPlayer2Id(), game);
-                log.info("Both players loaded game {}. Status moved to IN_PROGRESS", gameId);
-            }
-
-            return GameResult.ok(Packet.gameLoaded(room.toStateMap()));
-        } finally {
-            gameLock.unlock();
-        }
-    }
     
     /**
      * Handle player side selection.
      */
     public GameResult selectSide(String sessionId, String side) {
+        log.info("[GameController] -> begin selectSide");
+        log.info("[GameController] -> selectSide, sessionId {}, side {}", sessionId, side);
+        
         // Validate side
         if (!"Naval".equals(side) && !"Aereo".equals(side)) {
             return GameResult.error("Invalid side. Must be 'Naval' or 'Aereo'");
         }
         
         GameRoom room = getRoomForSession(sessionId);
+        log.info("[GameController] -> room {}", room);
+
         if (room == null) {
             return GameResult.error("You are not in a game room");
         }
         
         PlayerState player = room.getPlayerBySession(sessionId);
+        log.info("[GameController] -> player {}", player);
+
         if (player == null) {
             return GameResult.error("You are not in the game");
         }
@@ -362,7 +286,9 @@ public class GameController {
             log.info("Both sides selected! Game started in room {}. Player 0's turn", room.getRoomId());
             return GameResult.gameReady(Packet.sideChosen(playerIndex, side));
         }
-        
+
+        log.info("[GameController] -> End selectSide");
+
         return GameResult.ok(Packet.sideChosen(playerIndex, side));
     }
 
@@ -396,12 +322,82 @@ public class GameController {
      * Save current room state to DB and close the game room for all participants.
      */
     public GameResult saveAndExit(String sessionId) {
+
+        log.info("[GameController] -> begin saveAndExit ");
+     
+        GameResult firstValidation = saveAndExitFirstValidation(sessionId);
+        if (firstValidation != null) {
+            return firstValidation;
+        }
+
         GameRoom room = getRoomForSession(sessionId);
+        PlayerState actor = room.getPlayerBySession(sessionId);
+
+        PlayerState p0 = room.getPlayerByIndex(0);
+        PlayerState p1 = room.getPlayerByIndex(1);
+        
+        Long player1Id = sessionToUserId.get(p0.getSessionId());
+        Long player2Id = sessionToUserId.get(p1.getSessionId());
+        
+        log.info("[GameController] -> player1Id {}, player2Id {}", player1Id, player2Id);
+
+        if (player1Id == null || player2Id == null) {
+            return GameResult.error("Cannot resolve players for persistence");
+        }
+         
+        GameState persistedState = buildPersistedState(room,  actor,  sessionId);
+
+        String roomId = room.getRoomId();
+        Long gameId = resolveGameId(roomId, player1Id, player2Id);
+
+        if (gameId == null) {
+            return GameResult.error("Could not resolve persisted game id");
+        }
+
+        Lock gameLock = getGameLock(gameId);
+        gameLock.lock();
+        Game gameToSave;
+
+        try {
+            gameToSave = gameService.getById(gameId);
+            //Agarro el Game que ya existe y le piso la informacion de la partida que seria el GameRoom en el Meta   snapshot   
+            gameToSave.setState(persistedState);
+            gameToSave = gameService.saveGame(player1Id, player2Id, gameToSave);
+        } finally {
+            gameLock.unlock();
+        }
+
+        
+        clearLoadedGameMapping(gameToSave.getId(), roomId);
+        List<String> sessionsInRoom = getSessionsInSameRoom(sessionId);
+
+        sessionToRoom.entrySet().removeIf(entry -> roomId.equals(entry.getValue()));
+
+        for (String sid : sessionsInRoom) {
+            sessionToUserId.remove(sid);
+        }
+
+        room.reset();
+        cleanupEmptyRooms();
+
+        log.info("Game room {} saved and closed by player {}. Persisted gameId={}", roomId, actor.getPlayerIndex(), gameToSave.getId());
+        
+        return GameResult.ok(Packet.gameSaved(gameToSave.getId(), actor.getPlayerIndex()));
+    }
+
+
+    private GameResult saveAndExitFirstValidation(String sessionId ) {
+
+        GameRoom room = getRoomForSession(sessionId);
+        log.info("[GameController] -> saveAndExitFirstValidation, sessionId {}", sessionId);
+        
         if (room == null) {
             return GameResult.error("You are not in a game room");
         }
-
+        
         PlayerState actor = room.getPlayerBySession(sessionId);
+        log.info("[GameController] -> saveAndExitFirstValidation, actor {}", actor);
+
         if (actor == null) {
             return GameResult.error("You are not in the game");
         }
@@ -412,16 +408,13 @@ public class GameController {
             return GameResult.error("Cannot save an incomplete game");
         }
 
-        
-        Long player1Id = sessionToUserId.get(p0.getSessionId());
-        Long player2Id = sessionToUserId.get(p1.getSessionId());
-        if (player1Id == null || player2Id == null) {
-            return GameResult.error("Cannot resolve players for persistence");
-        }
-         
+        return null;
+    }
 
-        com.example.proyect.persistence.classes.GameState persistedState =
-                new com.example.proyect.persistence.classes.GameState();
+    private GameState buildPersistedState(GameRoom room, PlayerState actor, String sessionId){
+        log.info("[GameController] -> begin buildPersistedState, room {}, actor {}, sessionId {}", room, actor, sessionId);
+
+        GameState persistedState = new GameState();
 
         persistedState.setStatus(GameStatus.SAVED);
         persistedState.setTurn(room.getCurrentTurn());
@@ -435,14 +428,20 @@ public class GameController {
         meta.put("snapshot", room.toStateMap()); //esta es la partida en si
         meta.put("schemaVersion", 1);
         persistedState.setMeta(meta);
-        
-       if (!gameService.existsGameBetweenUsers(player1Id, player2Id)){
 
-            return GameResult.error("The game doesnt exist");
-        }     
-        
-        Long gameId = roomToGame.getOrDefault(room.getRoomId(), null);
-        if (gameId == null && gameService.existsGameBetweenUsers(player1Id, player2Id)) {
+        log.info("[GameController] -> end buildPersistedState, persistedState {} ", persistedState);
+
+        return persistedState;
+    }
+     
+    private Long resolveGameId(String roomId, Long player1Id, Long player2Id){
+        if (!gameService.existsGameBetweenUsers(player1Id, player2Id)){
+            return null;
+        }    
+
+        Long gameId = roomToGame.getOrDefault(roomId, null);
+            
+        if (gameId == null) {
             gameId = games.values().stream()
                     .filter(g -> (player1Id.equals(g.getPlayer1Id()) && player2Id.equals(g.getPlayer2Id()))
                             || (player1Id.equals(g.getPlayer2Id()) && player2Id.equals(g.getPlayer1Id())))
@@ -450,49 +449,24 @@ public class GameController {
                     .findFirst()
                     .orElse(null);
         }
-        
-        if (gameId == null) {
-            return GameResult.error("Could not resolve persisted game id");
-        }
-
-        Lock gameLock = getGameLock(gameId);
-        gameLock.lock();
-        Game gameToSave;
-        try {
-            gameToSave = gameService.getById(gameId);
-        //Agarro el Game que ya existe y le piso la informacion de la partida que seria el GameRoom en el Meta   snapshot   
-        gameToSave.setState(persistedState);
-        gameToSave = gameService.saveGame(player1Id, player2Id, gameToSave);
-        } finally {
-            gameLock.unlock();
-        }
-
-        String roomId = room.getRoomId();
-        clearLoadedGameMapping(gameToSave.getId(), roomId);
-        java.util.List<String> sessionsInRoom = getSessionsInSameRoom(sessionId);
-        sessionToRoom.entrySet().removeIf(entry -> roomId.equals(entry.getValue()));
-        for (String sid : sessionsInRoom) {
-            sessionToUserId.remove(sid);
-        }
-        room.reset();
-        cleanupEmptyRooms();
-
-        log.info("Game room {} saved and closed by player {}. Persisted gameId={}", roomId, actor.getPlayerIndex(), gameToSave.getId());
-
-        return GameResult.ok(Packet.gameSaved(gameToSave.getId(), actor.getPlayerIndex()));
+        return gameId;
     }
-
 
     /**
      * Process a move action.
      */
     public GameResult processMove(String sessionId, int droneIndex, double x, double y) {
+        log.info("[GameController] -> processMove sessionId {}, droneIndex {} ", sessionId, droneIndex);
+
         GameRoom room = getRoomForSession(sessionId);
+        log.info("[GameController] -> room {}", room.toString());
+
         if (room == null) {
             return GameResult.error("You are not in a game room");
         }
 
-        PlayerState player = room.getPlayerBySession(sessionId);
+        PlayerState player = room.getPlayerBySession(sessionId);//player llega en null al cargar partida
+        log.info("[GameController] -> player  {}", player );
         
         if (player == null) {
             return GameResult.error("You are not in the game");
@@ -529,61 +503,38 @@ public class GameController {
             room.endTurn();
             return GameResult.turnEnded(movePacket, room.getCurrentTurn(), room.getActionsRemaining());
         }
-        
+
+        log.info("[GameController] -> End processMove", room);
+
         return GameResult.withActionsRemaining(movePacket, room.getActionsRemaining());
     }
 
-    /**
-     * Process an attack action.
-     */
+
     public GameResult processAttack(String sessionId, int attackerIndex, 
                                      int targetPlayerIndex, int targetDroneIndex) {
+
         GameRoom room = getRoomForSession(sessionId);
-        if (room == null) {
-            return GameResult.error("You are not in a game room");
-        }
 
-        PlayerState attacker = room.getPlayerBySession(sessionId);
+        PlayerState attacker = room.getPlayerBySession(sessionId); 
+
+        GameResult validation = validateAttackContext(room, sessionId, attacker);
+        log.info("[GameController] ->  validation {}", validation);
         
-        if (attacker == null) {
-            return GameResult.error("You are not in the game");
-        }
-
-        if (!room.isPlayerTurn(sessionId)) {
-            return GameResult.error("Not your turn");
-        }
-
-        // Can't attack yourself
-        if (attacker.getPlayerIndex() == targetPlayerIndex) {
-            return GameResult.error("Cannot attack your own drones");
-        }
+        if (validation != null) return validation;
 
         Drone attackerDrone = room.getDrone(attacker.getPlayerIndex(), attackerIndex);
         Drone targetDrone = room.getDrone(targetPlayerIndex, targetDroneIndex);
-
-        if (attackerDrone == null) {
-            return GameResult.error("Invalid attacker drone index");
-        }
-        if (targetDrone == null) {
-            return GameResult.error("Invalid target drone index");
-        }
-
-        if (!attackerDrone.isAlive()) {
-            return GameResult.error("Cannot attack with a destroyed drone");
-        }
-        if (!targetDrone.isAlive()) {
-            return GameResult.error("Target drone is already destroyed");
-        }
-
-        // TODO: Add range validation here using hex distance
-        // For now, all attacks are valid if drones exist
-
-        // Apply damage
+                                        
+        GameResult droneValidation = validateDrones(attacker, attackerDrone, targetDrone, targetPlayerIndex);
+        log.info("[GameController] ->  droneValidation {}", droneValidation);
+        if (droneValidation != null) return droneValidation;
+        
+        // Aplica el daño
         int damage = attackerDrone.getWeapon().getDamage();
         targetDrone.receiveDamage(damage);
 
-        // Consume action
-        room.useAction();
+        // Consume una accion
+        room.useAction();               
 
         log.info("Player {} drone {} attacked player {} drone {} for {} damage (remaining HP: {}) in room {}",
             attacker.getPlayerIndex(), attackerIndex, 
@@ -596,27 +547,84 @@ public class GameController {
             damage, targetDrone.getCurrentHp()
         );
 
-        // Check for game over
+        // Check game over
         if (isPlayerDefeated(room, targetPlayerIndex)) {
             log.info("Player {} has been defeated in room {}!", targetPlayerIndex, room.getRoomId());
-            // Could return a game over result here
+            //Aca hay que manejar el final del juego
         }
 
-        // Check if turn should auto-end
-        if (room.getActionsRemaining() <= 0) {
-            room.endTurn();
-            return GameResult.turnEnded(attackPacket, room.getCurrentTurn(), room.getActionsRemaining());
-        }
-
-        return GameResult.withActionsRemaining(attackPacket, room.getActionsRemaining());
+        return finalizeTurn(room, attackPacket);
     }
 
-    /**
-     * End the current player's turn early.
-     * @return Result with turnStart info or error
-     */
+    private GameResult validateAttackContext(GameRoom room, String sessionId, PlayerState attacker) {
+        log.info("[GameController] -> validateAttackContext, room {}, sessionId {}, playerState {}", room, sessionId, attacker);
+
+        if (room == null) {
+            return GameResult.error("You are not in a game room");
+        }
+    
+        if (attacker == null) {
+            return GameResult.error("You are not in the game");
+        }
+
+        if (!room.isPlayerTurn(sessionId)) {
+            return GameResult.error("Not your turn");
+        }
+
+        log.info("[GameController] -> End validateAttackContext");
+        return null;
+    }
+
+    private GameResult validateDrones(PlayerState attacker, Drone attackerDrone,
+            Drone targetDrone,int targetPlayerIndex) {
+                
+    log.info("[GameController] -> begin validateDrones, attacker {}, attackerDrone {}", attacker, attackerDrone);
+    
+        if (attacker.getPlayerIndex() == targetPlayerIndex) {
+            return GameResult.error("Cannot attack your own drones");
+        }
+
+        if (attackerDrone == null) {
+            return GameResult.error("Invalid attacker drone index");
+        }
+
+        if (targetDrone == null) {
+            return GameResult.error("Invalid target drone index");
+        }
+
+        if (!attackerDrone.isAlive()) {
+            return GameResult.error("Cannot attack with a destroyed drone");
+        }
+
+        if (!targetDrone.isAlive()) {
+            return GameResult.error("Target drone is already destroyed");
+        }
+
+        log.info("[GameController] -> End validateDrones");
+        
+        return null;
+    }
+
+    private GameResult finalizeTurn(GameRoom room, Packet packet) {
+        if (room.getActionsRemaining() <= 0) {
+            room.endTurn();
+            return GameResult.turnEnded(packet,
+                    room.getCurrentTurn(),
+                    room.getActionsRemaining());
+        }
+
+        return GameResult.withActionsRemaining(packet,
+                room.getActionsRemaining());
+    }
+
+//Las 3 funciones anteriores se separan para bajar la complejidad ciclomatica
+
+
     public GameResult endTurn(String sessionId) {
+        
         GameRoom room = getRoomForSession(sessionId);
+        log.info("[GameController] -> endTurn, room {}, sessionId {}", room, sessionId);
+
         if (room == null) {
             return GameResult.error("You are not in a game room");
         }
@@ -632,6 +640,7 @@ public class GameController {
 
         return GameResult.turnStarted(room.getCurrentTurn(), room.getActionsRemaining());
     }
+
 
     public Map<String, Object> getGameState(String sessionId) {
         GameRoom room = getRoomForSession(sessionId);
@@ -667,16 +676,13 @@ public class GameController {
         return true;
     }
 
-    /**
-     * Get the room ID for a session (useful for debugging/admin).
-     */
+    // room ID de la session  
+     
     public String getRoomId(String sessionId) {
         return sessionToRoom.get(sessionId);
     }
 
-    /**
-     * Get all session IDs in the same room as the given session.
-     */
+    // Todas las sessionId de una session
     public java.util.List<String> getSessionsInSameRoom(String sessionId) {
         String roomId = sessionToRoom.get(sessionId);
         if (roomId == null) return java.util.List.of();
@@ -687,9 +693,6 @@ public class GameController {
             .collect(java.util.stream.Collectors.toList());
     }
 
-    /**
-     * Get total number of active rooms.
-     */
     public int getActiveRoomCount() {
         return rooms.size();
     }

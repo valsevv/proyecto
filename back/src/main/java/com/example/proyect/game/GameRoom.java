@@ -8,6 +8,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.example.proyect.game.units.Unit.HexCoord;
 import com.example.proyect.game.units.drone.AerialDrone;
 import com.example.proyect.game.units.drone.Drone;
@@ -17,6 +20,7 @@ import com.example.proyect.game.units.drone.NavalDrone;
 me parece que este GameRoom sustituye nuestro Game o como es la movida
  */
 public class GameRoom {
+    private static final Logger log = LoggerFactory.getLogger(GameRoom.class);
 
     private final String roomId;
 
@@ -31,7 +35,8 @@ public class GameRoom {
     public static final int MAX_PLAYERS = 2;
     public static final int AERIAL_DRONES_PER_PLAYER = 12;
     public static final int NAVAL_DRONES_PER_PLAYER = 6;
-    public static final int ACTIONS_PER_TURN = 99; // Unlimited - frontend tracks per-drone limits
+    public static final int ACTIONS_PER_TURN = 10; // Cambiar aca la cantidad de acciones posibles por turno
+    //  frontend tracks per-drone limits
 
     // Starting positions per player (left side vs right side of the map)
     private static final double[][] STARTS_P0_AERIAL = { {300, 600}, {300, 900}, {300, 1200} };
@@ -80,7 +85,7 @@ public class GameRoom {
         return player;
     }
     
-    /**
+    /*
      * Recreate player's drones based on selected side.
      * Called after side selection.
      */
@@ -138,6 +143,7 @@ public class GameRoom {
     }
 
     public synchronized PlayerState getPlayerBySession(String sessionId) {
+        log.info("[GameRoom] -> getPlayerBySession,  players {}", players);
         for (PlayerState p : players) {
             if (p.getSessionId().equals(sessionId)) return p;
         }
@@ -264,8 +270,12 @@ public class GameRoom {
      * Serialize the full game state to a Map (for JSON).
      */
     public synchronized Map<String, Object> toStateMap() {
+
+        log.info("[GameRoom] -> begin toStateMap {} ");
+
         List<Map<String, Object>> playerMaps = new ArrayList<>();
         for (PlayerState p : players) {
+             log.info("[GameRoom] -> for each player {} ", p);
             Map<String, Object> pm = new LinkedHashMap<>();
             pm.put("playerIndex", p.getPlayerIndex());
             pm.put("side", p.getSide());
@@ -293,10 +303,16 @@ public class GameRoom {
         state.put("currentTurn", currentTurn);
         state.put("actionsRemaining", actionsRemaining);
         state.put("gameStarted", gameStarted);
+        
+        log.info("[GameRoom] -> End toStateMap");
+        
         return state;
     }
 
     public static GameRoom fromSnapshot(String roomId, Map<String, Object> snapshot, String sessionId) {
+        log.info("[GameRoom] -> begin fromSnapshot {} ", snapshot);
+        log.info("[GameRoom] -> sessionId {} ", sessionId); 
+
         GameRoom room = fromStateMap(roomId, snapshot);
         List<PlayerState> restoredPlayers = new ArrayList<>();
         for (PlayerState player : room.players) {
@@ -306,11 +322,17 @@ public class GameRoom {
         }
         room.players.clear();
         room.players.addAll(restoredPlayers);
+        
+        log.info("[GameRoom] -> End fromSnapshot");
+
         return room;
     }
 
     @SuppressWarnings("unchecked")
     public static GameRoom fromStateMap(String roomId, Map<String, Object> stateMap) {
+        log.info("[GameRoom] -> begin fromStateMap ");
+        log.info("[GameRoom] -> restoring stateMap {}", stateMap);
+
         if (stateMap == null) {
             throw new IllegalArgumentException("stateMap is required");
         }
@@ -403,11 +425,16 @@ public class GameRoom {
             }
 
             PlayerState player = new PlayerState("restored-player-" + playerIndex, playerIndex, drones);
+            
+            log.info("[GameRoom] -> el playerState es {}", player);
+
             player.setSide(side);
             room.players.add(player);
             room.playerSides.put(playerIndex, side);
         }
 
+        log.info("[GameRoom] -> End fromStateMap");
+        
         return room;
     }
 
@@ -448,6 +475,8 @@ public class GameRoom {
      * Copies players, sides, turn state from source into this room.
      */
     public synchronized void restoreFrom(GameRoom source) {
+         log.info("[GameRoom] -> begin restoreFrom ");
+         log.info("[GameRoom] -> restoring  {}", source);
         this.players.clear();
         this.players.addAll(source.players);
         this.playerSides.clear();
@@ -455,5 +484,6 @@ public class GameRoom {
         this.gameStarted = source.gameStarted;
         this.currentTurn = source.currentTurn;
         this.actionsRemaining = source.actionsRemaining;
+        log.info("[GameRoom] -> End restoreFrom ");
     }
 }

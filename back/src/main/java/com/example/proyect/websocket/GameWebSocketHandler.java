@@ -191,6 +191,8 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
 
         log.info("[WS] handleMove: droneIndex={}, x={}, y={}", droneIndex, x, y);
 
+        log.info("[WS] handleMove: sessionid={}, packetDrone={}", session.getId(), packet.getInt("droneIndex"));
+
         GameResult result = gameController.processMove(session.getId(), droneIndex, x, y);
         
         log.info("[WS] Move result: success={}, error={}", result.isSuccess(), result.getErrorMessage());
