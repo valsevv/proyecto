@@ -34,15 +34,9 @@ public class GameRoom {
     public static final int DEFAULT_ACTIONS_PER_TURN = 10;
     //  frontend tracks per-drone limits
 
-    // Starting positions per player (left side vs right side of the map)
-    private static final double[][] STARTS_P0_AERIAL = { {300, 600}, {300, 900}, {300, 1200} };
-    private static final double[][] STARTS_P1_AERIAL = { {2100, 600}, {2100, 900}, {2100, 1200} };
-    private static final double[][] STARTS_P0_NAVAL = {
-            {300, 450}, {300, 630}, {300, 810}, {300, 990}, {300, 1170}, {300, 1350}
-    };
-    private static final double[][] STARTS_P1_NAVAL = {
-            {2100, 450}, {2100, 630}, {2100, 810}, {2100, 990}, {2100, 1170}, {2100, 1350}
-    };
+    // Carrier anchor positions (left side vs right side of the map)
+    private static final double[] START_P0 = {300, 900};
+    private static final double[] START_P1 = {2100, 900};
 
     private final List<PlayerState> players = new ArrayList<>();
     
@@ -75,18 +69,15 @@ public class GameRoom {
         if (players.size() >= MAX_PLAYERS) return null;
 
         int index = players.size();
-        double[][] starts = (index == 0) ? STARTS_P0_AERIAL : STARTS_P1_AERIAL;
 
         List<Drone> drones = new ArrayList<>();
         // Note: Drones will be created as placeholders initially
         // They will be recreated with proper type after side selection
-        for (int i = 0; i < starts.length; i++) {
-            double[] pos = starts[i];
-            // Default to AerialDrone, will be replaced after side selection
+        for (int i = 0; i < AERIAL_DRONES_PER_PLAYER; i++) {
             AerialDrone drone = new AerialDrone();
             drone.setId(UUID.randomUUID().toString());
             drone.setOwnerPlayerId(index);
-            drone.setPosition(new HexCoord(pos[0], pos[1]));
+            drone.setPosition(getDroneSpawnPosition(index, i, AERIAL_DRONES_PER_PLAYER));
             drones.add(drone);
         }
 
@@ -104,17 +95,14 @@ public class GameRoom {
         if (player == null) return;
 
         boolean isNaval = "Naval".equals(side);
-        double[][] starts = isNaval
-                ? ((playerIndex == 0) ? STARTS_P0_NAVAL : STARTS_P1_NAVAL)
-                : ((playerIndex == 0) ? STARTS_P0_AERIAL : STARTS_P1_AERIAL);
+        int droneCount = isNaval ? NAVAL_DRONES_PER_PLAYER : AERIAL_DRONES_PER_PLAYER;
         List<Drone> drones = new ArrayList<>();
-        
-        for (int i = 0; i < starts.length; i++) {
-            double[] pos = starts[i];
+
+        for (int i = 0; i < droneCount; i++) {
             Drone drone = isNaval ? new NavalDrone() : new AerialDrone();
             drone.setId(UUID.randomUUID().toString());
             drone.setOwnerPlayerId(playerIndex);
-            drone.setPosition(new HexCoord(pos[0], pos[1]));
+            drone.setPosition(getDroneSpawnPosition(playerIndex, i, droneCount));
             drones.add(drone);
         }
         
@@ -122,6 +110,23 @@ public class GameRoom {
         player.getDrones().clear();
         player.getDrones().addAll(drones);
         player.setSide(side);
+    }
+
+
+    private HexCoord getDroneSpawnPosition(int playerIndex, int droneIndex, int droneCount) {
+        double[] start = playerIndex == 0 ? START_P0 : START_P1;
+        if (droneCount <= 1) {
+            return new HexCoord(start[0], start[1]);
+        }
+
+        int ringIndex = droneIndex / 6;
+        int slotInRing = droneIndex % 6;
+        double ringRadius = 16.0 * (ringIndex + 1);
+        double angle = (Math.PI * 2.0 * slotInRing) / 6.0;
+
+        double x = start[0] + (Math.cos(angle) * ringRadius);
+        double y = start[1] + (Math.sin(angle) * ringRadius);
+        return new HexCoord(x, y);
     }
 
     /**
