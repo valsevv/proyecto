@@ -5,6 +5,10 @@ import { WORLD_WIDTH, WORLD_HEIGHT } from '../shared/constants.js';
 
 const TEAM_COLORS = [0x00ff00, 0xff4444]; // green = player 0, red = player 1
 const MAX_MOVE_DISTANCE = 6; // hexes per turn
+const CARRIER_POSITIONS = {
+    0: { x: 300, y: 900 },
+    1: { x: 2100, y: 900 }
+};
 
 // Action modes
 const MODE_MOVE = 'move';
@@ -18,6 +22,8 @@ export default class MainScene extends Phaser.Scene {
         this.drones = {};
         /** Shortcut to the local player's drones */
         this.myDrones = [];
+        /** { playerIndex: Phaser.GameObjects.Image } */
+        this.carriers = {};
         this.isDragging = false;
 
         // Turn state
@@ -30,6 +36,8 @@ export default class MainScene extends Phaser.Scene {
         this.load.image('mar', 'assets/mar.png');
         this.load.image('dron_misil', 'assets/dron_misil.png');
         this.load.image('dron_bomba', 'assets/dron_bomba.png');
+        this.load.image('porta_drones_volador', 'assets/porta_drones_volador.png');
+        this.load.image('porta_drones_mar', 'assets/porta_drones_mar.png');
     }
 
 
@@ -249,6 +257,20 @@ export default class MainScene extends Phaser.Scene {
         // Note: Connection and join are handled by LobbyScene
     }
 
+    createCarrierForPlayer(playerIndex, side) {
+        const basePosition = CARRIER_POSITIONS[playerIndex] || CARRIER_POSITIONS[0];
+        const spriteKey = side === 'Naval' ? 'porta_drones_mar' : 'porta_drones_volador';
+
+        if (this.carriers[playerIndex]) {
+            this.carriers[playerIndex].destroy();
+        }
+
+        const carrier = this.add.image(basePosition.x, basePosition.y, spriteKey);
+        carrier.setScale(0.45);
+        carrier.setDepth(1);
+        this.carriers[playerIndex] = carrier;
+    }
+
     createDronesFromState(state) {
         console.log('[MainScene] === createDronesFromState CALLED ===');
         console.log('[MainScene] State:', state);
@@ -264,6 +286,7 @@ export default class MainScene extends Phaser.Scene {
             const isLocal = (player.playerIndex === Network.playerIndex);
             const color = TEAM_COLORS[player.playerIndex];
             this.drones[player.playerIndex] = [];
+            this.createCarrierForPlayer(player.playerIndex, player.side || 'Aereo');
 
             for (const d of player.drones) {
                 const hex = this.hexGrid.getNearestCenter(d.x, d.y);
