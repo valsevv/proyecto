@@ -24,10 +24,6 @@ public class GameRoom {
 
     private final String roomId;
 
-    public GameRoom(String roomId) {
-        this.roomId = roomId;
-    }
-
     public String getRoomId() {
         return roomId;
     }
@@ -35,7 +31,7 @@ public class GameRoom {
     public static final int MAX_PLAYERS = 2;
     public static final int AERIAL_DRONES_PER_PLAYER = 12;
     public static final int NAVAL_DRONES_PER_PLAYER = 6;
-    public static final int ACTIONS_PER_TURN = 10; // Cambiar aca la cantidad de acciones posibles por turno
+    public static final int DEFAULT_ACTIONS_PER_TURN = 10;
     //  frontend tracks per-drone limits
 
     // Starting positions per player (left side vs right side of the map)
@@ -56,7 +52,21 @@ public class GameRoom {
     // Turn state
     private boolean gameStarted = false;
     private int currentTurn = 0; // Player index whose turn it is
-    private int actionsRemaining = ACTIONS_PER_TURN;
+    private final int actionsPerTurn;
+    private int actionsRemaining;
+
+    public GameRoom(String roomId) {
+        this(roomId, DEFAULT_ACTIONS_PER_TURN);
+    }
+
+    public GameRoom(String roomId, int actionsPerTurn) {
+        this.roomId = roomId;
+        if (actionsPerTurn <= 0) {
+            throw new IllegalArgumentException("actionsPerTurn must be > 0");
+        }
+        this.actionsPerTurn = actionsPerTurn;
+        this.actionsRemaining = actionsPerTurn;
+    }
 
     /**
      * Add a player to the room. Returns the new PlayerState, or null if full.
@@ -194,7 +204,7 @@ public class GameRoom {
         playerSides.clear();
         gameStarted = false;
         currentTurn = 0;
-        actionsRemaining = ACTIONS_PER_TURN;
+        actionsRemaining = actionsPerTurn;
     }
 
     // ========== Turn Management ==========
@@ -202,7 +212,7 @@ public class GameRoom {
     public synchronized void startGame() {
         gameStarted = true;
         currentTurn = 0;
-        actionsRemaining = ACTIONS_PER_TURN;
+        actionsRemaining = actionsPerTurn;
     }
 
     public synchronized boolean isGameStarted() {
@@ -215,6 +225,10 @@ public class GameRoom {
 
     public synchronized int getActionsRemaining() {
         return actionsRemaining;
+    }
+
+    public synchronized int getActionsPerTurn() {
+        return actionsPerTurn;
     }
 
     public synchronized boolean isPlayerTurn(int playerIndex) {
@@ -242,7 +256,7 @@ public class GameRoom {
      */
     public synchronized void endTurn() {
         currentTurn = (currentTurn + 1) % MAX_PLAYERS;
-        actionsRemaining = ACTIONS_PER_TURN;
+        actionsRemaining = actionsPerTurn;
     }
 
     // ========== Player/Drone Accessors ==========
@@ -302,6 +316,7 @@ public class GameRoom {
         state.put("players", playerMaps);
         state.put("currentTurn", currentTurn);
         state.put("actionsRemaining", actionsRemaining);
+        state.put("actionsPerTurn", actionsPerTurn);
         state.put("gameStarted", gameStarted);
         
         log.info("[GameRoom] -> End toStateMap");
@@ -347,8 +362,9 @@ public class GameRoom {
 
         boolean gameStarted = getBooleanField(stateMap, "gameStarted");
         int currentTurn = getIntField(stateMap, "currentTurn");
+        int actionsPerTurn = getOptionalPositiveIntField(stateMap, "actionsPerTurn", DEFAULT_ACTIONS_PER_TURN);
         int actionsRemaining = getIntField(stateMap, "actionsRemaining");
-        if (actionsRemaining < 0 || actionsRemaining > ACTIONS_PER_TURN) {
+        if (actionsRemaining < 0 || actionsRemaining > actionsPerTurn) {
             throw new IllegalArgumentException("actionsRemaining out of range");
         }
         if (currentTurn < 0 || currentTurn >= playersList.size()) {
@@ -358,7 +374,7 @@ public class GameRoom {
             throw new IllegalArgumentException("started games must have two players");
         }
 
-        GameRoom room = new GameRoom(roomId);
+        GameRoom room = new GameRoom(roomId, actionsPerTurn);
         room.gameStarted = gameStarted;
         room.currentTurn = currentTurn;
         room.actionsRemaining = actionsRemaining;
@@ -452,6 +468,21 @@ public class GameRoom {
             throw new IllegalArgumentException(field + " is required");
         }
         return ((Number) value).doubleValue();
+    }
+
+    private static int getOptionalPositiveIntField(Map<?, ?> map, String field, int defaultValue) {
+        Object value = map.get(field);
+        if (value == null) {
+            return defaultValue;
+        }
+        if (!(value instanceof Number)) {
+            throw new IllegalArgumentException(field + " must be a number");
+        }
+        int parsed = ((Number) value).intValue();
+        if (parsed <= 0) {
+            throw new IllegalArgumentException(field + " must be > 0");
+        }
+        return parsed;
     }
 
     private static String getStringField(Map<?, ?> map, String field) {

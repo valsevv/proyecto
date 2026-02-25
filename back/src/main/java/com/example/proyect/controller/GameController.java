@@ -10,6 +10,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import com.example.proyect.VOs.GameResult;
@@ -32,6 +33,9 @@ import com.example.proyect.websocket.packet.Packet;
 public class GameController {
 
     private static final Logger log = LoggerFactory.getLogger(GameController.class);
+
+    @Value("${game.actions-per-turn:10}")
+    private int actionsPerTurn;
 
     private final LobbyService lobbyService;
 
@@ -76,7 +80,7 @@ public class GameController {
         return rooms.computeIfAbsent(
             lobby.getLobbyId(),
             id -> {
-                GameRoom newRoom = new GameRoom(id);
+                GameRoom newRoom = new GameRoom(id, actionsPerTurn);
                 log.info("Created game room {} from lobby {}", id, lobby.getLobbyId());
                 return newRoom;
             }
