@@ -24,10 +24,6 @@ public class GameRoom {
 
     private final String roomId;
 
-    public GameRoom(String roomId) {
-        this.roomId = roomId;
-    }
-
     public String getRoomId() {
         return roomId;
     }
@@ -35,18 +31,14 @@ public class GameRoom {
     public static final int MAX_PLAYERS = 2;
     public static final int AERIAL_DRONES_PER_PLAYER = 12;
     public static final int NAVAL_DRONES_PER_PLAYER = 6;
-    public static final int ACTIONS_PER_TURN = 10; // Cambiar aca la cantidad de acciones posibles por turno
+    public static final int DEFAULT_ACTIONS_PER_TURN = 10;
+    public static final int DEFAULT_AERIAL_VISION_RANGE = 4;
+    public static final int DEFAULT_NAVAL_VISION_RANGE = 3;
     //  frontend tracks per-drone limits
 
-    // Starting positions per player (left side vs right side of the map)
-    private static final double[][] STARTS_P0_AERIAL = { {300, 600}, {300, 900}, {300, 1200} };
-    private static final double[][] STARTS_P1_AERIAL = { {2100, 600}, {2100, 900}, {2100, 1200} };
-    private static final double[][] STARTS_P0_NAVAL = {
-            {300, 450}, {300, 630}, {300, 810}, {300, 990}, {300, 1170}, {300, 1350}
-    };
-    private static final double[][] STARTS_P1_NAVAL = {
-            {2100, 450}, {2100, 630}, {2100, 810}, {2100, 990}, {2100, 1170}, {2100, 1350}
-    };
+    // Carrier anchor positions (left side vs right side of the map)
+    private static final double[] START_P0 = {300, 900};
+    private static final double[] START_P1 = {2100, 900};
 
     private final List<PlayerState> players = new ArrayList<>();
     
@@ -56,7 +48,35 @@ public class GameRoom {
     // Turn state
     private boolean gameStarted = false;
     private int currentTurn = 0; // Player index whose turn it is
-    private int actionsRemaining = ACTIONS_PER_TURN;
+    private int actionsPerTurn;
+    private int aerialVisionRange;
+    private int navalVisionRange;
+    private int actionsRemaining;
+
+    public GameRoom(String roomId) {
+        this(roomId, DEFAULT_ACTIONS_PER_TURN, DEFAULT_AERIAL_VISION_RANGE, DEFAULT_NAVAL_VISION_RANGE);
+    }
+
+    public GameRoom(String roomId, int actionsPerTurn) {
+        this(roomId, actionsPerTurn, DEFAULT_AERIAL_VISION_RANGE, DEFAULT_NAVAL_VISION_RANGE);
+    }
+
+    public GameRoom(String roomId, int actionsPerTurn, int aerialVisionRange, int navalVisionRange) {
+        this.roomId = roomId;
+        if (actionsPerTurn <= 0) {
+            throw new IllegalArgumentException("actionsPerTurn must be > 0");
+        }
+        if (aerialVisionRange < 0) {
+            throw new IllegalArgumentException("aerialVisionRange must be >= 0");
+        }
+        if (navalVisionRange < 0) {
+            throw new IllegalArgumentException("navalVisionRange must be >= 0");
+        }
+        this.actionsPerTurn = actionsPerTurn;
+        this.aerialVisionRange = aerialVisionRange;
+        this.navalVisionRange = navalVisionRange;
+        this.actionsRemaining = actionsPerTurn;
+    }
 
     /**
      * Add a player to the room. Returns the new PlayerState, or null if full.
@@ -65,18 +85,16 @@ public class GameRoom {
         if (players.size() >= MAX_PLAYERS) return null;
 
         int index = players.size();
-        double[][] starts = (index == 0) ? STARTS_P0_AERIAL : STARTS_P1_AERIAL;
 
         List<Drone> drones = new ArrayList<>();
         // Note: Drones will be created as placeholders initially
         // They will be recreated with proper type after side selection
-        for (int i = 0; i < starts.length; i++) {
-            double[] pos = starts[i];
-            // Default to AerialDrone, will be replaced after side selection
+        for (int i = 0; i < AERIAL_DRONES_PER_PLAYER; i++) {
             AerialDrone drone = new AerialDrone();
             drone.setId(UUID.randomUUID().toString());
             drone.setOwnerPlayerId(index);
-            drone.setPosition(new HexCoord(pos[0], pos[1]));
+            drone.setPosition(getDroneSpawnPosition(index, i, AERIAL_DRONES_PER_PLAYER));
+            applyVisionRange(drone);
             drones.add(drone);
         }
 
@@ -94,17 +112,15 @@ public class GameRoom {
         if (player == null) return;
 
         boolean isNaval = "Naval".equals(side);
-        double[][] starts = isNaval
-                ? ((playerIndex == 0) ? STARTS_P0_NAVAL : STARTS_P1_NAVAL)
-                : ((playerIndex == 0) ? STARTS_P0_AERIAL : STARTS_P1_AERIAL);
+        int droneCount = isNaval ? NAVAL_DRONES_PER_PLAYER : AERIAL_DRONES_PER_PLAYER;
         List<Drone> drones = new ArrayList<>();
-        
-        for (int i = 0; i < starts.length; i++) {
-            double[] pos = starts[i];
+
+        for (int i = 0; i < droneCount; i++) {
             Drone drone = isNaval ? new NavalDrone() : new AerialDrone();
             drone.setId(UUID.randomUUID().toString());
             drone.setOwnerPlayerId(playerIndex);
-            drone.setPosition(new HexCoord(pos[0], pos[1]));
+            drone.setPosition(getDroneSpawnPosition(playerIndex, i, droneCount));
+            applyVisionRange(drone);
             drones.add(drone);
         }
         
@@ -112,6 +128,32 @@ public class GameRoom {
         player.getDrones().clear();
         player.getDrones().addAll(drones);
         player.setSide(side);
+    }
+
+
+    private HexCoord getDroneSpawnPosition(int playerIndex, int droneIndex, int droneCount) {
+        double[] start = playerIndex == 0 ? START_P0 : START_P1;
+        if (droneCount <= 1) {
+            return new HexCoord(start[0], start[1]);
+        }
+
+        int ringIndex = droneIndex / 6;
+        int slotInRing = droneIndex % 6;
+        double ringRadius = 16.0 * (ringIndex + 1);
+        double angle = (Math.PI * 2.0 * slotInRing) / 6.0;
+
+        double x = start[0] + (Math.cos(angle) * ringRadius);
+        double y = start[1] + (Math.sin(angle) * ringRadius);
+        return new HexCoord(x, y);
+    }
+
+
+    private void applyVisionRange(Drone drone) {
+        if (drone instanceof NavalDrone) {
+            drone.setVisionRange(navalVisionRange);
+            return;
+        }
+        drone.setVisionRange(aerialVisionRange);
     }
 
     /**
@@ -194,7 +236,7 @@ public class GameRoom {
         playerSides.clear();
         gameStarted = false;
         currentTurn = 0;
-        actionsRemaining = ACTIONS_PER_TURN;
+        actionsRemaining = actionsPerTurn;
     }
 
     // ========== Turn Management ==========
@@ -202,7 +244,7 @@ public class GameRoom {
     public synchronized void startGame() {
         gameStarted = true;
         currentTurn = 0;
-        actionsRemaining = ACTIONS_PER_TURN;
+        actionsRemaining = actionsPerTurn;
     }
 
     public synchronized boolean isGameStarted() {
@@ -215,6 +257,18 @@ public class GameRoom {
 
     public synchronized int getActionsRemaining() {
         return actionsRemaining;
+    }
+
+    public synchronized int getActionsPerTurn() {
+        return actionsPerTurn;
+    }
+
+    public synchronized int getAerialVisionRange() {
+        return aerialVisionRange;
+    }
+
+    public synchronized int getNavalVisionRange() {
+        return navalVisionRange;
     }
 
     public synchronized boolean isPlayerTurn(int playerIndex) {
@@ -242,7 +296,7 @@ public class GameRoom {
      */
     public synchronized void endTurn() {
         currentTurn = (currentTurn + 1) % MAX_PLAYERS;
-        actionsRemaining = ACTIONS_PER_TURN;
+        actionsRemaining = actionsPerTurn;
     }
 
     // ========== Player/Drone Accessors ==========
@@ -289,6 +343,7 @@ public class GameRoom {
                 dm.put("maxHealth", d.getMaxHp());
                 dm.put("attackDamage", d.getWeapon().getDamage());
                 dm.put("attackRange", d.getWeapon().getRange());
+                dm.put("visionRange", d.getVisionRange());
                 dm.put("alive", d.isAlive());
                 // Add drone type for frontend rendering
                 dm.put("droneType", d instanceof NavalDrone ? "Naval" : "Aereo");
@@ -302,6 +357,9 @@ public class GameRoom {
         state.put("players", playerMaps);
         state.put("currentTurn", currentTurn);
         state.put("actionsRemaining", actionsRemaining);
+        state.put("actionsPerTurn", actionsPerTurn);
+        state.put("aerialVisionRange", aerialVisionRange);
+        state.put("navalVisionRange", navalVisionRange);
         state.put("gameStarted", gameStarted);
         
         log.info("[GameRoom] -> End toStateMap");
@@ -347,8 +405,11 @@ public class GameRoom {
 
         boolean gameStarted = getBooleanField(stateMap, "gameStarted");
         int currentTurn = getIntField(stateMap, "currentTurn");
+        int actionsPerTurn = getOptionalPositiveIntField(stateMap, "actionsPerTurn", DEFAULT_ACTIONS_PER_TURN);
+        int aerialVisionRange = getOptionalNonNegativeIntField(stateMap, "aerialVisionRange", DEFAULT_AERIAL_VISION_RANGE);
+        int navalVisionRange = getOptionalNonNegativeIntField(stateMap, "navalVisionRange", DEFAULT_NAVAL_VISION_RANGE);
         int actionsRemaining = getIntField(stateMap, "actionsRemaining");
-        if (actionsRemaining < 0 || actionsRemaining > ACTIONS_PER_TURN) {
+        if (actionsRemaining < 0 || actionsRemaining > actionsPerTurn) {
             throw new IllegalArgumentException("actionsRemaining out of range");
         }
         if (currentTurn < 0 || currentTurn >= playersList.size()) {
@@ -358,7 +419,7 @@ public class GameRoom {
             throw new IllegalArgumentException("started games must have two players");
         }
 
-        GameRoom room = new GameRoom(roomId);
+        GameRoom room = new GameRoom(roomId, actionsPerTurn, aerialVisionRange, navalVisionRange);
         room.gameStarted = gameStarted;
         room.currentTurn = currentTurn;
         room.actionsRemaining = actionsRemaining;
@@ -416,6 +477,9 @@ public class GameRoom {
                     throw new IllegalArgumentException("alive drones must have positive health");
                 }
 
+                int visionRange = getOptionalNonNegativeIntField(rawDrone, "visionRange", "Naval".equals(droneType) ? room.navalVisionRange : room.aerialVisionRange);
+                drone.setVisionRange(visionRange);
+
                 drone.setCurrentHp(health);
                 if (!alive) {
                     drone.setCurrentHp(0);
@@ -454,6 +518,36 @@ public class GameRoom {
         return ((Number) value).doubleValue();
     }
 
+    private static int getOptionalPositiveIntField(Map<?, ?> map, String field, int defaultValue) {
+        Object value = map.get(field);
+        if (value == null) {
+            return defaultValue;
+        }
+        if (!(value instanceof Number)) {
+            throw new IllegalArgumentException(field + " must be a number");
+        }
+        int parsed = ((Number) value).intValue();
+        if (parsed <= 0) {
+            throw new IllegalArgumentException(field + " must be > 0");
+        }
+        return parsed;
+    }
+
+    private static int getOptionalNonNegativeIntField(Map<?, ?> map, String field, int defaultValue) {
+        Object value = map.get(field);
+        if (value == null) {
+            return defaultValue;
+        }
+        if (!(value instanceof Number)) {
+            throw new IllegalArgumentException(field + " must be a number");
+        }
+        int parsed = ((Number) value).intValue();
+        if (parsed < 0) {
+            throw new IllegalArgumentException(field + " must be >= 0");
+        }
+        return parsed;
+    }
+
     private static String getStringField(Map<?, ?> map, String field) {
         Object value = map.get(field);
         if (value == null || value.toString().isBlank()) {
@@ -483,6 +577,9 @@ public class GameRoom {
         this.playerSides.putAll(source.playerSides);
         this.gameStarted = source.gameStarted;
         this.currentTurn = source.currentTurn;
+        this.actionsPerTurn = source.actionsPerTurn;
+        this.aerialVisionRange = source.aerialVisionRange;
+        this.navalVisionRange = source.navalVisionRange;
         this.actionsRemaining = source.actionsRemaining;
         log.info("[GameRoom] -> End restoreFrom ");
     }

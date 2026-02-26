@@ -29,27 +29,32 @@ export default class Drone {
         // Create sprite instead of circle - use image instead of sprite since they're not animated
         this.sprite = scene.add.image(x, y, spriteKey);
         this.sprite.setScale(0.125); // Scale down the 64x64 image to 8x8
+        this.sprite.setDepth(10);
         this.sprite.setOrigin(0.5);
 
         // Don't tint - keep original drone colors
 
         // Health bar background (positioned above the smaller sprite)
         this.healthBarBg = scene.add.rectangle(x, y - 10, 20, 3, 0x333333);
+        this.healthBarBg.setDepth(11);
         this.healthBarBg.setOrigin(0.5);
 
         // Health bar fill
         this.healthBar = scene.add.rectangle(x - 10, y - 10, 20, 2, 0x00ff00);
+        this.healthBar.setDepth(12);
         this.healthBar.setOrigin(0, 0.5);
         this.updateHealthBar();
 
         // Selection ring (only relevant for your own drones)
         this.ring = scene.add.circle(x, y, 10);
+        this.ring.setDepth(13);
         this.ring.setStrokeStyle(2, 0xffff00);
         this.ring.setFillStyle();
         this.ring.setVisible(false);
 
         // Target ring (shown when this drone is targetable for attack)
         this.targetRing = scene.add.circle(x, y, 12);
+        this.targetRing.setDepth(13);
         this.targetRing.setStrokeStyle(2, 0xff0000);
         this.targetRing.setFillStyle();
         this.targetRing.setVisible(false);
