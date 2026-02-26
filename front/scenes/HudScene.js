@@ -14,6 +14,7 @@ export default class HudScene extends Phaser.Scene {
         this.gameStarted = false;
         this.actionsRemaining = 0;
         this.actionsPerTurn = 10;
+        this.selectionData = null;
     }
 
     create() {
@@ -63,6 +64,7 @@ export default class HudScene extends Phaser.Scene {
         mainScene.events.on('turnChanged', this.onTurnChanged, this);
         mainScene.events.on('actionsUpdated', this.onActionsUpdated, this);
         mainScene.events.on('attackModeEnded', this.deselectAttackButton, this);
+        mainScene.events.on('selectionChanged', this.onSelectionChanged, this);
         
         console.log('[HudScene] === EVENT LISTENERS REGISTERED ===');
         console.log('[HudScene] === CREATE COMPLETE ===');
@@ -207,6 +209,11 @@ export default class HudScene extends Phaser.Scene {
         this.updateButtonStates();
     }
 
+
+    onSelectionChanged(selectionData) {
+        this.selectionData = selectionData;
+    }
+
     onStatusChanged(status) {
         console.log('[HudScene] === ON STATUS CHANGED ===');
         console.log('[HudScene] New status:', status);
@@ -279,15 +286,19 @@ export default class HudScene extends Phaser.Scene {
             this.updateButtonStates();
         }
 
-        // Update drone info if we have a selected drone
+        // Update selected unit info
         if (this.isMyTurn && mainScene.selectedDrone) {
             const drone = mainScene.selectedDrone;
             const canAttack = !drone.hasAttacked;
-            const parts = ['Puede moverse'];
+            const droneNumber = mainScene.myDrones.indexOf(drone) + 1;
+            const parts = [`Dron seleccionado: #${droneNumber}`, 'Puede moverse'];
             if (canAttack) parts.push('Puede atacar');
             this.droneInfoText.setText(parts.join('  |  '));
+        } else if (this.isMyTurn && mainScene.selectedCarrier) {
+            const maxMove = mainScene.selectedCarrier.maxMoveDistance;
+            this.droneInfoText.setText(`Portadrones seleccionado  |  Movimiento máx: ${maxMove} casillas`);
         } else if (this.isMyTurn) {
-            this.droneInfoText.setText('Selecciona un dron');
+            this.droneInfoText.setText('Selecciona un dron o portadrones');
         }
 
         const allDrones = mainScene.getAllDrones();

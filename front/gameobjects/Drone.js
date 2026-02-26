@@ -73,10 +73,28 @@ export default class Drone {
     select() {
         this.ring.setPosition(this.sprite.x, this.sprite.y);
         this.ring.setVisible(true);
+        this.ring.setStrokeStyle(3, 0xfff176);
+
+        if (this.selectionTween) {
+            this.selectionTween.stop();
+        }
+        this.selectionTween = this.scene.tweens.add({
+            targets: this.ring,
+            alpha: { from: 0.35, to: 1 },
+            duration: 500,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
+        });
     }
 
     deselect() {
         this.ring.setVisible(false);
+        this.ring.setAlpha(1);
+        if (this.selectionTween) {
+            this.selectionTween.stop();
+            this.selectionTween = null;
+        }
     }
 
     setTargetable(show) {
