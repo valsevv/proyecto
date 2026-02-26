@@ -51,8 +51,8 @@ CREATE INDEX IF NOT EXISTS idx_users_email    ON users(email);
 CREATE TABLE IF NOT EXISTS game (
     game_id     BIGSERIAL   PRIMARY KEY,
     state       JSONB       NOT NULL,
-    ini_date    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    end_date    TIMESTAMPTZ,
+    started_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    ended_at    TIMESTAMPTZ,
     player1_id  BIGINT      NOT NULL,
     player2_id  BIGINT      NOT NULL,
     started_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),

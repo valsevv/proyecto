@@ -12,6 +12,8 @@ export default class HudScene extends Phaser.Scene {
         super('HudScene');
         this.isMyTurn = false;
         this.gameStarted = false;
+        this.actionsRemaining = 0;
+        this.actionsPerTurn = 10;
     }
 
     create() {
@@ -52,6 +54,7 @@ export default class HudScene extends Phaser.Scene {
         mainScene.events.on('statusChanged', this.onStatusChanged, this);
         mainScene.events.on('gameStarted', this.onGameStarted, this);
         mainScene.events.on('turnChanged', this.onTurnChanged, this);
+        mainScene.events.on('actionsUpdated', this.onActionsUpdated, this);
         mainScene.events.on('attackModeEnded', this.deselectAttackButton, this);
         
         console.log('[HudScene] === EVENT LISTENERS REGISTERED ===');
@@ -216,7 +219,7 @@ export default class HudScene extends Phaser.Scene {
         this.isMyTurn = isMyTurn;
 
         if (isMyTurn) {
-            this.turnText.setText('Tu turno');
+            this.turnText.setText(`Tu turno (${this.actionsRemaining}/${this.actionsPerTurn} acciones)`);
             this.turnText.setStyle({ fill: '#00ff00' });
             this.setButtonsVisible(true);
         } else {
@@ -224,6 +227,18 @@ export default class HudScene extends Phaser.Scene {
             this.turnText.setStyle({ fill: '#ff4444' });
             this.droneInfoText.setText('');
             this.setButtonsVisible(false);
+        }
+    }
+
+
+    onActionsUpdated({ actionsRemaining, actionsPerTurn }) {
+        this.actionsRemaining = actionsRemaining;
+        if (typeof actionsPerTurn === 'number' && actionsPerTurn > 0) {
+            this.actionsPerTurn = actionsPerTurn;
+        }
+
+        if (this.isMyTurn) {
+            this.turnText.setText(`Tu turno (${this.actionsRemaining}/${this.actionsPerTurn} acciones)`);
         }
     }
 
@@ -260,12 +275,10 @@ export default class HudScene extends Phaser.Scene {
         // Update drone info if we have a selected drone
         if (this.isMyTurn && mainScene.selectedDrone) {
             const drone = mainScene.selectedDrone;
-            const canMove = !drone.hasMoved;
             const canAttack = !drone.hasAttacked;
-            const parts = [];
-            if (canMove) parts.push('Puede moverse');
+            const parts = ['Puede moverse'];
             if (canAttack) parts.push('Puede atacar');
-            this.droneInfoText.setText(parts.join('  |  ') || 'Sin acciones');
+            this.droneInfoText.setText(parts.join('  |  '));
         } else if (this.isMyTurn) {
             this.droneInfoText.setText('Selecciona un dron');
         }
