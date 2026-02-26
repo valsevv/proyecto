@@ -14,6 +14,7 @@ export default class HudScene extends Phaser.Scene {
         this.gameStarted = false;
         this.actionsRemaining = 0;
         this.actionsPerTurn = 10;
+        this.selectionData = null;
     }
 
     create() {
@@ -43,6 +44,13 @@ export default class HudScene extends Phaser.Scene {
             backgroundColor: '#000000aa',
         }).setOrigin(0.5, 0);
 
+        this.fuelListText = this.add.text(20, 20, '', {
+            fontSize: '13px',
+            fill: '#ffffff',
+            backgroundColor: '#00000088',
+            padding: { x: 8, y: 6 }
+        }).setOrigin(0, 0);
+
         // Action buttons container (bottom center)
         this.createActionButtons();
 
@@ -56,6 +64,7 @@ export default class HudScene extends Phaser.Scene {
         mainScene.events.on('turnChanged', this.onTurnChanged, this);
         mainScene.events.on('actionsUpdated', this.onActionsUpdated, this);
         mainScene.events.on('attackModeEnded', this.deselectAttackButton, this);
+        mainScene.events.on('selectionChanged', this.onSelectionChanged, this);
         
         console.log('[HudScene] === EVENT LISTENERS REGISTERED ===');
         console.log('[HudScene] === CREATE COMPLETE ===');
@@ -200,6 +209,11 @@ export default class HudScene extends Phaser.Scene {
         this.updateButtonStates();
     }
 
+
+    onSelectionChanged(selectionData) {
+        this.selectionData = selectionData;
+    }
+
     onStatusChanged(status) {
         console.log('[HudScene] === ON STATUS CHANGED ===');
         console.log('[HudScene] New status:', status);
@@ -272,15 +286,19 @@ export default class HudScene extends Phaser.Scene {
             this.updateButtonStates();
         }
 
-        // Update drone info if we have a selected drone
+        // Update selected unit info
         if (this.isMyTurn && mainScene.selectedDrone) {
             const drone = mainScene.selectedDrone;
             const canAttack = !drone.hasAttacked;
-            const parts = ['Puede moverse'];
+            const droneNumber = mainScene.myDrones.indexOf(drone) + 1;
+            const parts = [`Dron seleccionado: #${droneNumber}`, 'Puede moverse'];
             if (canAttack) parts.push('Puede atacar');
             this.droneInfoText.setText(parts.join('  |  '));
+        } else if (this.isMyTurn && mainScene.selectedCarrier) {
+            const maxMove = mainScene.selectedCarrier.maxMoveDistance;
+            this.droneInfoText.setText(`Portadrones seleccionado  |  Movimiento máx: ${maxMove} casillas`);
         } else if (this.isMyTurn) {
-            this.droneInfoText.setText('Selecciona un dron');
+            this.droneInfoText.setText('Selecciona un dron o portadrones');
         }
 
         const allDrones = mainScene.getAllDrones();
@@ -295,5 +313,14 @@ export default class HudScene extends Phaser.Scene {
         }));
 
         this.minimap.update(mainScene.cameras.main, tracked);
+
+        const myAliveDrones = (mainScene.myDrones || []).filter((drone) => drone.isAlive());
+        if (myAliveDrones.length) {
+            const fuelLines = myAliveDrones.map((drone, idx) => `Dron ${idx + 1}: ${drone.fuel}/${drone.maxFuel}`);
+            this.fuelListText.setText(['Combustible', ...fuelLines].join('\n'));
+        } else {
+            this.fuelListText.setText('Combustible\nSin drones activos');
+        }
+
     }
 }

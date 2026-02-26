@@ -5,6 +5,7 @@ import { WORLD_WIDTH, WORLD_HEIGHT } from '../shared/constants.js';
 
 const TEAM_COLORS = [0x00ff00, 0xff4444]; // green = player 0, red = player 1
 const MAX_MOVE_DISTANCE = 6; // hexes per turn
+const MAX_CARRIER_MOVE_DISTANCE = 3; // hexes per turn (parametrizable)
 const CARRIER_POSITIONS = {
     0: { x: 300, y: 900 },
     1: { x: 2100, y: 900 }
@@ -18,11 +19,12 @@ export default class MainScene extends Phaser.Scene {
     constructor() {
         super('MainScene');
         this.selectedDrone = null;
+        this.selectedCarrier = null;
         /** { playerIndex: [Drone, Drone, Drone] } */
         this.drones = {};
         /** Shortcut to the local player's drones */
         this.myDrones = [];
-        /** { playerIndex: Phaser.GameObjects.Image } */
+        /** { playerIndex: { sprite, ring, playerIndex, isLocal, maxMoveDistance } } */
         this.carriers = {};
         this.isDragging = false;
 
@@ -90,20 +92,37 @@ export default class MainScene extends Phaser.Scene {
         this.input.on('pointerup', (pointer) => {
             if (this.isDragging) return;
             if (!this.isMyTurn) return;
-            if (!this.selectedDrone) return;
             if (this.actionMode !== MODE_MOVE) return;
+            if (!this.selectedDrone && !this.selectedCarrier) return;
 
             const nearest = this.hexGrid.getNearestCenter(pointer.worldX, pointer.worldY);
-            
-            // Check movement distance
+
+            if (this.selectedCarrier) {
+                const distance = this.hexGrid.getHexDistance(
+                    this.selectedCarrier.sprite.x,
+                    this.selectedCarrier.sprite.y,
+                    nearest.x,
+                    nearest.y
+                );
+
+                if (distance < 1) return;
+
+                if (distance > this.selectedCarrier.maxMoveDistance) {
+                    console.warn(`Carrier move too far: ${distance} hexes (max ${this.selectedCarrier.maxMoveDistance})`);
+                    return;
+                }
+
+                this.moveCarrier(this.selectedCarrier, nearest.x, nearest.y);
+                return;
+            }
+
             const distance = this.hexGrid.getHexDistance(
                 this.selectedDrone.sprite.x, this.selectedDrone.sprite.y,
                 nearest.x, nearest.y
             );
-            
-            // Skip if clicking on same spot (e.g., when selecting a drone)
+
             if (distance < 1) return;
-            
+
             if (distance > MAX_MOVE_DISTANCE) {
                 console.warn(`Move too far: ${distance} hexes (max ${MAX_MOVE_DISTANCE})`);
                 return;
@@ -217,18 +236,42 @@ export default class MainScene extends Phaser.Scene {
 
         Network.on('moveDrone', (msg) => {
             const drone = this.drones[msg.playerIndex]?.[msg.droneIndex];
-            if (drone) {
-                drone.moveTo(msg.x, msg.y);
-                if (msg.playerIndex === Network.playerIndex) {
-                    this.hexHighlight.clear();
-                    const nextActions = Math.max(0, (Network.actionsRemaining ?? 0) - 1);
-                    Network.actionsRemaining = nextActions;
-                    this.events.emit('actionsUpdated', {
-                        actionsRemaining: nextActions,
-                        actionsPerTurn: this.actionsPerTurn
-                    });
-                }
+            if (!drone) {
+                return;
             }
+
+            if (typeof msg.x === 'number' && typeof msg.y === 'number') {
+                drone.moveTo(msg.x, msg.y);
+            }
+
+            if (typeof msg.remainingFuel === 'number') {
+                drone.setFuel(msg.remainingFuel);
+            }
+
+            const destroyedByFuel = msg.destroyedByFuel || msg.remainingFuel === 0;
+            if (destroyedByFuel && drone.isAlive()) {
+                if (this.selectedDrone === drone) {
+                    this.selectedDrone.deselect();
+                    this.selectedDrone.sprite.clearTint();
+                    this.selectedDrone = null;
+                    this.clearTargetHighlights();
+                    this.actionMode = MODE_MOVE;
+                    this.events.emit('selectionChanged', { type: null });
+                }
+                drone.sinkAndDestroy();
+            }
+
+            if (msg.playerIndex === Network.playerIndex && typeof msg.x === 'number' && typeof msg.y === 'number') {
+                this.hexHighlight.clear();
+                const nextActions = Math.max(0, (Network.actionsRemaining ?? 0) - 1);
+                Network.actionsRemaining = nextActions;
+                this.events.emit('actionsUpdated', {
+                    actionsRemaining: nextActions,
+                    actionsPerTurn: this.actionsPerTurn
+                });
+            }
+
+            this.events.emit('fuelUpdated');
         });
 
         Network.on('attackResult', (msg) => {
@@ -278,12 +321,38 @@ export default class MainScene extends Phaser.Scene {
         const spriteKey = side === 'Naval' ? 'porta_drones_mar' : 'porta_drones_volador';
 
         if (this.carriers[playerIndex]) {
-            this.carriers[playerIndex].destroy();
+            this.carriers[playerIndex].ring.destroy();
+            this.carriers[playerIndex].sprite.destroy();
         }
 
-        const carrier = this.add.image(basePosition.x, basePosition.y, spriteKey);
-        carrier.setScale(0.45);
-        carrier.setDepth(1);
+        const isLocal = playerIndex === Network.playerIndex;
+        const sprite = this.add.image(basePosition.x, basePosition.y, spriteKey);
+        sprite.setScale(0.45);
+        sprite.setDepth(4);
+
+        const ring = this.add.circle(basePosition.x, basePosition.y, 48);
+        ring.setDepth(5);
+        ring.setStrokeStyle(3, 0xfff176);
+        ring.setFillStyle();
+        ring.setVisible(false);
+
+        const carrier = {
+            sprite,
+            ring,
+            playerIndex,
+            isLocal,
+            maxMoveDistance: MAX_CARRIER_MOVE_DISTANCE,
+            type: 'carrier'
+        };
+
+        if (isLocal) {
+            sprite.setInteractive({ useHandCursor: true });
+            sprite.on('pointerdown', (pointer) => {
+                pointer.event.stopPropagation();
+                this.onCarrierClicked(carrier);
+            });
+        }
+
         this.carriers[playerIndex] = carrier;
     }
 
@@ -314,7 +383,9 @@ export default class MainScene extends Phaser.Scene {
                     maxHealth: d.maxHealth,
                     attackDamage: d.attackDamage,
                     attackRange: d.attackRange,
-                    droneType: droneType
+                    droneType: droneType,
+                    fuel: d.fuel,
+                    maxFuel: d.maxFuel
                 });
                 drone.playerIndex = player.playerIndex;
                 drone.droneIndex = this.drones[player.playerIndex].length;
@@ -335,6 +406,81 @@ export default class MainScene extends Phaser.Scene {
         console.log('[MainScene] My drones:', this.myDrones?.length);
     }
 
+
+    onCarrierClicked(carrier) {
+        if (!carrier?.isLocal) return;
+        this.selectCarrier(carrier);
+    }
+
+    selectCarrier(carrier) {
+        if (!carrier?.isLocal) return;
+
+        if (this.selectedDrone) {
+            this.selectedDrone.deselect();
+            this.selectedDrone.sprite.clearTint();
+            this.selectedDrone = null;
+        }
+        if (this.selectedCarrier && this.selectedCarrier !== carrier) {
+            this.selectedCarrier.ring.setVisible(false);
+            this.selectedCarrier.sprite.clearTint();
+            this.stopCarrierPulse(this.selectedCarrier);
+        }
+
+        if (this.selectedCarrier === carrier) {
+            this.selectedCarrier.ring.setVisible(false);
+            this.selectedCarrier.sprite.clearTint();
+            this.stopCarrierPulse(this.selectedCarrier);
+            this.selectedCarrier = null;
+            this.events.emit('selectionChanged', { type: null });
+            return;
+        }
+
+        this.selectedCarrier = carrier;
+        carrier.ring.setVisible(true);
+        carrier.ring.setPosition(carrier.sprite.x, carrier.sprite.y);
+        carrier.sprite.setTint(0xfff176);
+        this.startCarrierPulse(carrier);
+        this.actionMode = MODE_MOVE;
+        this.clearTargetHighlights();
+        this.events.emit('selectionChanged', {
+            type: 'carrier',
+            playerIndex: carrier.playerIndex,
+            maxMoveDistance: carrier.maxMoveDistance
+        });
+    }
+
+    moveCarrier(carrier, x, y) {
+        this.tweens.add({
+            targets: [carrier.sprite, carrier.ring],
+            x,
+            y,
+            duration: 650,
+            ease: 'Power2'
+        });
+    }
+
+    startCarrierPulse(carrier) {
+        this.stopCarrierPulse(carrier);
+        carrier.selectionTween = this.tweens.add({
+            targets: carrier.ring,
+            alpha: { from: 0.35, to: 1 },
+            duration: 600,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
+        });
+    }
+
+    stopCarrierPulse(carrier) {
+        if (carrier?.selectionTween) {
+            carrier.selectionTween.stop();
+            carrier.selectionTween = null;
+        }
+        if (carrier?.ring) {
+            carrier.ring.setAlpha(1);
+        }
+    }
+
     /** Called when any drone is clicked */
     onDroneClicked(drone) {
         // In attack mode, clicking enemy drone = attack
@@ -352,18 +498,36 @@ export default class MainScene extends Phaser.Scene {
     selectDrone(drone) {
         if (!this.myDrones.includes(drone)) return;
 
-        if (this.selectedDrone) this.selectedDrone.deselect();
+        if (this.selectedDrone) {
+            this.selectedDrone.deselect();
+            this.selectedDrone.sprite.clearTint();
+        }
+        if (this.selectedCarrier) {
+            this.selectedCarrier.ring.setVisible(false);
+            this.selectedCarrier.sprite.clearTint();
+            this.stopCarrierPulse(this.selectedCarrier);
+            this.selectedCarrier = null;
+        }
 
         if (this.selectedDrone === drone) {
             this.selectedDrone = null;
             this.actionMode = MODE_MOVE;
             this.clearTargetHighlights();
             this.hexHighlight.clear();
+            this.events.emit('selectionChanged', { type: null });
             return;
         }
 
         this.selectedDrone = drone;
         drone.select();
+        drone.sprite.setTint(0xfff176);
+
+        const droneNumber = this.myDrones.indexOf(drone) + 1;
+        this.events.emit('selectionChanged', {
+            type: 'drone',
+            droneNumber,
+            maxMoveDistance: MAX_MOVE_DISTANCE
+        });
 
         // Reset to move mode when selecting a new drone
         this.actionMode = MODE_MOVE;
@@ -438,17 +602,19 @@ export default class MainScene extends Phaser.Scene {
     updateHexHighlight(pointer) {
         this.hexHighlight.clear();
 
-        // Only show highlight when we have a selected drone, it's our turn, and we're in move mode
-        if (!this.selectedDrone || !this.isMyTurn || this.actionMode !== MODE_MOVE) {
+        // Only show highlight when we have a selected unit, it's our turn, and we're in move mode
+        if ((!this.selectedDrone && !this.selectedCarrier) || !this.isMyTurn || this.actionMode !== MODE_MOVE) {
             this.lastHighlightedHex = null;
             return;
         }
 
         const nearest = this.hexGrid.getNearestCenter(pointer.worldX, pointer.worldY);
-        
-        // Calculate distance from selected drone
+        const selectedUnitSprite = this.selectedCarrier ? this.selectedCarrier.sprite : this.selectedDrone.sprite;
+        const maxDistance = this.selectedCarrier ? this.selectedCarrier.maxMoveDistance : MAX_MOVE_DISTANCE;
+
+        // Calculate distance from selected unit
         const distance = this.hexGrid.getHexDistance(
-            this.selectedDrone.sprite.x, this.selectedDrone.sprite.y,
+            selectedUnitSprite.x, selectedUnitSprite.y,
             nearest.x, nearest.y
         );
 
@@ -459,7 +625,7 @@ export default class MainScene extends Phaser.Scene {
         }
 
         // Choose color based on distance
-        const color = distance <= MAX_MOVE_DISTANCE ? 0x00ff00 : 0xffff00; // green if in range, yellow if too far
+        const color = distance <= maxDistance ? 0x00ff00 : 0xffff00; // green if in range, yellow if too far
         const alpha = 0.3;
 
         this.hexGrid.drawFilledHex(this.hexHighlight, nearest.x, nearest.y, color, alpha);

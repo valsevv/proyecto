@@ -296,14 +296,34 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
 
     private void handleEndTurn(WebSocketSession session) throws IOException {
         GameResult result = gameController.endTurn(session.getId());
-        
+
         if (!result.isSuccess()) {
             send(session, result.getPacket());
             return;
         }
 
+        Packet turnPacket = result.getPacket();
+        java.util.List<?> fuelUpdates = turnPacket.get("fuelUpdates");
+        if (fuelUpdates != null) {
+            for (Object updateObj : fuelUpdates) {
+                if (updateObj instanceof java.util.Map<?, ?> rawUpdate) {
+                    java.util.Map<String, Object> updatePayload = new java.util.HashMap<>();
+                    for (java.util.Map.Entry<?, ?> entry : rawUpdate.entrySet()) {
+                        if (entry.getKey() != null) {
+                            updatePayload.put(entry.getKey().toString(), entry.getValue());
+                        }
+                    }
+                    Packet fuelPacket = Packet.of(com.example.proyect.websocket.packet.PacketType.MOVE_DRONE, updatePayload);
+                    broadcastToRoom(session.getId(), fuelPacket);
+                }
+            }
+            java.util.Map<String, Object> turnPayload = new java.util.HashMap<>(turnPacket.getPayload());
+            turnPayload.remove("fuelUpdates");
+            turnPacket = Packet.of(turnPacket.getType(), turnPayload);
+        }
+
         // Broadcast turn change to room
-        broadcastToRoom(session.getId(), result.getPacket());
+        broadcastToRoom(session.getId(), turnPacket);
     }
 
     private void send(WebSocketSession session, Packet packet) throws IOException {
