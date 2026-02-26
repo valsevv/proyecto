@@ -175,10 +175,7 @@ public class GameController {
         }
 
         Lobby lobby = lobbyService.getLobbyById(lobbyId).orElse(null);
-
-        if (lobby == null) {
-            return GameResult.error("Lobby not found");
-        }
+        if (lobby == null) return GameResult.error("Lobby not found");
 
         if (!lobby.getPlayerIds().contains(userId)) {
             return GameResult.error("You are not in this lobby");
@@ -188,32 +185,60 @@ public class GameController {
 
         GameRoom room = findOrCreateRoomForLobby(lobby);
 
-        PlayerState player = room.addPlayer(sessionId);
+        boolean isLoadGame = lobby.isLoadGameLobby();
 
-        if (player == null) {
-            return GameResult.error("Game is full");
+        PlayerState player;
+
+        if (!isLoadGame) {
+            // 🟢 PARTIDA NUEVA
+            player = room.addPlayer(sessionId);
+            if (player == null) return GameResult.error("Game is full");
+        } else {
+            // 🔵 PARTIDA CARGADA
+            // Solo agregamos placeholder si todavía no está llena
+            if (!room.isFull()) {
+                player = room.addPlayer(sessionId);
+                if (player == null) return GameResult.error("Game is full");
+            } else {
+                player = room.getPlayerByIndex(room.getPlayers().size() - 1);
+            }
         }
 
         sessionToRoom.put(sessionId, room.getRoomId());
 
-        boolean isLoadGame = lobby.isLoadGameLobby();
-        Packet welcome = Packet.welcome(sessionId, player.getPlayerIndex(), isLoadGame, lobby.getGameId());
+        Packet welcome = Packet.welcome(
+            sessionId,
+            player.getPlayerIndex(),
+            isLoadGame,
+            lobby.getGameId()
+        );
 
-        // 🔥 CUANDO LA ROOM SE LLENA
+        // 🔥 Cuando la room se llena
         if (room.isFull() && !room.isGameStarted()) {
 
             lobby.markStarted();
 
-            if (lobby.getGameId() == null) {
-                // 🟢 PARTIDA NUEVA
+            if (!isLoadGame) {
                 createGameFromLobby(lobby);
                 log.info("New game created for lobby {}", lobbyId);
 
             } else {
-                // 🔵 PARTIDA CARGADA - game is ready to start immediately
+                // PRIMERO cargar estado
                 loadSavedGameIntoRoom(lobby.getGameId(), room);
-                log.info("Loaded saved game {} into room {}", lobby.getGameId(), room.getRoomId());
-                // Return gameReady so handler broadcasts gameStart
+
+                // DESPUÉS reasignar sesiones reales
+                for (PlayerState p : room.getPlayers()) {
+                    // buscar qué session corresponde a ese user
+                    sessionToRoom.forEach((sid, rid) -> {
+                        if (rid.equals(room.getRoomId())) {
+                            room.assignSessionToPlayer(p.getPlayerIndex(), sid);
+                        }
+                    });
+                }
+
+                log.info("Loaded saved game {} into room {}", 
+                    lobby.getGameId(), room.getRoomId());
+
                 return GameResult.gameReady(welcome);
             }
         }

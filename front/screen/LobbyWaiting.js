@@ -16,15 +16,12 @@ async function checkLobbyStatus() {
         const result = await response.json();
 
         if (!result.inLobby) {
-            // No longer in a lobby, go back to browser
             window.location.href = '/lobby-browser';
             return;
         }
 
-        // Update UI with lobby info
         displayLobbyInfo(result);
 
-        // If lobby is ready (2 players), redirect to game
         if (result.playerCount >= 2 || result.status === 'READY') {
             console.log('Lobby ready! Starting game...');
             sessionStorage.setItem('currentLobbyId', result.lobbyId);

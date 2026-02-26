@@ -234,6 +234,7 @@ public class GameRoom {
 
     public synchronized PlayerState getPlayerBySession(String sessionId) {
         log.info("[GameRoom] -> getPlayerBySession,  players {}", players);
+        
         for (PlayerState p : players) {
             if (p.getSessionId().equals(sessionId)) return p;
         }
@@ -545,9 +546,13 @@ public class GameRoom {
                 }
                 drones.add(drone);
             }
-
-            PlayerState player = new PlayerState("restored-player-" + playerIndex, playerIndex, drones);
             
+            PlayerState player = new PlayerState(
+                null, // sessionId todavía no asignado
+                playerIndex,
+                drones
+            );
+                        
             log.info("[GameRoom] -> el playerState es {}", player);
 
             player.setSide(side);
