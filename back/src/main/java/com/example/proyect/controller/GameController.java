@@ -37,6 +37,12 @@ public class GameController {
     @Value("${game.actions-per-turn:10}")
     private int actionsPerTurn;
 
+    @Value("${game.vision-range-aereo:4}")
+    private int aerialVisionRange;
+
+    @Value("${game.vision-range-naval:3}")
+    private int navalVisionRange;
+
     private final LobbyService lobbyService;
 
     private final GameService gameService;
@@ -80,7 +86,7 @@ public class GameController {
         return rooms.computeIfAbsent(
             lobby.getLobbyId(),
             id -> {
-                GameRoom newRoom = new GameRoom(id, actionsPerTurn);
+                GameRoom newRoom = new GameRoom(id, actionsPerTurn, aerialVisionRange, navalVisionRange);
                 log.info("Created game room {} from lobby {}", id, lobby.getLobbyId());
                 return newRoom;
             }

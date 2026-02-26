@@ -23,6 +23,8 @@ class GameRoomSnapshotTest {
                 "gameStarted", true,
                 "currentTurn", 1,
                 "actionsPerTurn", 30,
+                "aerialVisionRange", 8,
+                "navalVisionRange", 5,
                 "actionsRemaining", 23,
                 "players", List.of(
                         Map.of(
@@ -48,6 +50,8 @@ class GameRoomSnapshotTest {
         assertTrue(room.isGameStarted());
         assertEquals(1, room.getCurrentTurn());
         assertEquals(30, room.getActionsPerTurn());
+        assertEquals(8, room.getAerialVisionRange());
+        assertEquals(5, room.getNavalVisionRange());
         assertEquals(23, room.getActionsRemaining());
 
         PlayerState p0 = room.getPlayerByIndex(0);
@@ -129,6 +133,8 @@ class GameRoomSnapshotTest {
         GameRoom room = GameRoom.fromStateMap("room-4", snapshot);
 
         assertEquals(10, room.getActionsPerTurn());
+        assertEquals(4, room.getAerialVisionRange());
+        assertEquals(3, room.getNavalVisionRange());
         assertEquals(10, room.getActionsRemaining());
     }
 
@@ -158,6 +164,50 @@ class GameRoomSnapshotTest {
         );
 
         assertThrows(IllegalArgumentException.class, () -> GameRoom.fromStateMap("room-5", invalidSnapshot));
+    }
+
+
+    @Test
+    void shouldFailWhenVisionRangesAreNegative() {
+        Map<String, Object> invalidSnapshot = Map.of(
+                "gameStarted", true,
+                "currentTurn", 0,
+                "actionsPerTurn", 10,
+                "aerialVisionRange", -1,
+                "navalVisionRange", 3,
+                "actionsRemaining", 5,
+                "players", List.of(
+                        Map.of(
+                                "playerIndex", 0,
+                                "side", "Aereo",
+                                "drones", List.of(
+                                        Map.of("x", 1.0, "y", 2.0, "health", 50, "alive", true, "droneType", "Aereo")
+                                )
+                        ),
+                        Map.of(
+                                "playerIndex", 1,
+                                "side", "Naval",
+                                "drones", List.of(
+                                        Map.of("x", 3.0, "y", 4.0, "health", 60, "alive", true, "droneType", "Naval")
+                                )
+                        )
+                )
+        );
+
+        assertThrows(IllegalArgumentException.class, () -> GameRoom.fromStateMap("room-6", invalidSnapshot));
+    }
+
+
+    @Test
+    void shouldCopyVisionAndActionsConfigOnRestoreFrom() {
+        GameRoom target = new GameRoom("target", 10, 4, 3);
+        GameRoom source = new GameRoom("source", 15, 7, 2);
+
+        target.restoreFrom(source);
+
+        assertEquals(15, target.getActionsPerTurn());
+        assertEquals(7, target.getAerialVisionRange());
+        assertEquals(2, target.getNavalVisionRange());
     }
 
 }
