@@ -210,4 +210,42 @@ class GameRoomSnapshotTest {
         assertEquals(2, target.getNavalVisionRange());
     }
 
+    @Test
+    void shouldDestroyDroneWhenMovementConsumesLastFuel() {
+        GameRoom room = new GameRoom("fuel-move-room");
+        PlayerState player = room.addPlayer("session-0");
+
+        assertTrue(room.moveDrone("session-0", 0, 400, 400));
+
+        var drone = player.getDrones().get(0);
+        drone.setFuel(1);
+
+        boolean moved = room.moveDrone("session-0", 0, 410, 410);
+
+        assertTrue(moved);
+        assertEquals(0, drone.getFuel());
+        assertEquals(0, drone.getCurrentHp());
+        assertFalse(drone.isAlive());
+    }
+
+    @Test
+    void shouldDestroyDroneWhenIdleConsumptionReachesZeroFuel() {
+        GameRoom room = new GameRoom("fuel-idle-room");
+        room.addPlayer("session-0");
+        room.addPlayer("session-1");
+        room.startGame();
+
+        PlayerState currentPlayer = room.getPlayerByIndex(room.getCurrentTurn());
+        var drone = currentPlayer.getDrones().get(0);
+        drone.setFuel(1);
+
+        List<Integer> destroyed = room.consumeIdleFuelForCurrentPlayer();
+
+        assertTrue(destroyed.contains(0));
+        assertEquals(0, drone.getFuel());
+        assertEquals(0, drone.getCurrentHp());
+        assertFalse(drone.isAlive());
+    }
+
+
 }

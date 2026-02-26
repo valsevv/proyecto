@@ -1,5 +1,6 @@
 package com.example.proyect.controller;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -506,7 +507,8 @@ public class GameController {
         log.debug("Player {} moved drone {} to ({}, {}) in room {}", 
             player.getPlayerIndex(), droneIndex, x, y, room.getRoomId());
 
-        Packet movePacket = Packet.moveDrone(player.getPlayerIndex(), droneIndex, x, y);
+        boolean destroyedByFuel = !drone.isAlive();
+        Packet movePacket = Packet.moveDrone(player.getPlayerIndex(), droneIndex, x, y, drone.getFuel(), destroyedByFuel);
         
         // Check if turn should auto-end
         if (room.getActionsRemaining() <= 0) {
@@ -643,12 +645,30 @@ public class GameController {
             return GameResult.error("Not your turn");
         }
 
+        int endingPlayer = room.getCurrentTurn();
+        List<Integer> destroyedByIdleIndexes = room.consumeIdleFuelForCurrentPlayer();
         room.endTurn();
-        
+
         log.info("Turn ended in room {}. Now player {}'s turn with {} actions",
             room.getRoomId(), room.getCurrentTurn(), room.getActionsRemaining());
 
-        return GameResult.turnStarted(room.getCurrentTurn(), room.getActionsRemaining());
+        Packet turnPacket = Packet.turnStart(room.getCurrentTurn(), room.getActionsRemaining());
+        if (destroyedByIdleIndexes.isEmpty()) {
+            return GameResult.turnStarted(room.getCurrentTurn(), room.getActionsRemaining());
+        }
+
+        List<Map<String, Object>> fuelUpdates = new ArrayList<>();
+        for (Integer droneIndex : destroyedByIdleIndexes) {
+            Drone destroyedDrone = room.getDrone(endingPlayer, droneIndex);
+            if (destroyedDrone == null) {
+                continue;
+            }
+            fuelUpdates.add(Packet.fuelUpdate(endingPlayer, droneIndex, destroyedDrone.getFuel(), true).toMap());
+        }
+
+        Map<String, Object> payload = new LinkedHashMap<>(turnPacket.getPayload());
+        payload.put("fuelUpdates", fuelUpdates);
+        return GameResult.ok(Packet.of(turnPacket.getType(), payload));
     }
 
 
