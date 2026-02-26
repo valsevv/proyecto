@@ -51,14 +51,14 @@ CREATE INDEX IF NOT EXISTS idx_users_email    ON users(email);
 CREATE TABLE IF NOT EXISTS game (
     game_id     BIGSERIAL   PRIMARY KEY,
     state       JSONB       NOT NULL,
-    ini_date    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    end_date    TIMESTAMPTZ,
+    started_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    ended_at    TIMESTAMPTZ,
     player1_id  BIGINT      NOT NULL,
     player2_id  BIGINT      NOT NULL,
 
     CONSTRAINT chk_game_distinct_players CHECK (player1_id <> player2_id),
-    CONSTRAINT fk_game_player1 FOREIGN KEY (player1_id) REFERENCES users(id) ON DELETE RESTRICT,
-    CONSTRAINT fk_game_player2 FOREIGN KEY (player2_id) REFERENCES users(id) ON DELETE RESTRICT
+    CONSTRAINT fk_game_player1 FOREIGN KEY (player1_id) REFERENCES users(user_id) ON DELETE RESTRICT,
+    CONSTRAINT fk_game_player2 FOREIGN KEY (player2_id) REFERENCES users(user_id) ON DELETE RESTRICT
 );
 
 

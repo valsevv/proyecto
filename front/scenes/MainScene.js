@@ -29,6 +29,7 @@ export default class MainScene extends Phaser.Scene {
         // Turn state
         this.isMyTurn = false;
         this.actionMode = MODE_MOVE;
+        this.actionsPerTurn = 10;
     }
 
 
@@ -91,7 +92,6 @@ export default class MainScene extends Phaser.Scene {
             if (!this.isMyTurn) return;
             if (!this.selectedDrone) return;
             if (this.actionMode !== MODE_MOVE) return;
-            if (this.selectedDrone.hasMoved) return;
 
             const nearest = this.hexGrid.getNearestCenter(pointer.worldX, pointer.worldY);
             
@@ -132,10 +132,6 @@ export default class MainScene extends Phaser.Scene {
     
     initializeGameState(data) {
         console.log('[MainScene] === INITIALIZING GAME STATE ===');
-    }
-    
-    initializeGameState(data) {
-        console.log('[MainScene] === INITIALIZING GAME STATE ===');
         
         // If we have initial game state from LobbyScene, create drones immediately
         console.log('[MainScene] === CHECKING FOR INITIAL GAME STATE ===');
@@ -163,14 +159,19 @@ export default class MainScene extends Phaser.Scene {
             this.actionMode = MODE_MOVE;
             this.clearTargetHighlights();
             
-            // Reset per-drone action state for new turn
+            // Reset per-drone attack state for new turn
             if (this.isMyTurn) {
                 for (const drone of this.myDrones) {
-                    drone.hasMoved = false;
                     drone.hasAttacked = false;
                 }
             }
-            
+
+            this.actionsPerTurn = data.gameState.actionsPerTurn ?? 10;
+            this.events.emit('actionsUpdated', {
+                actionsRemaining: initialActions,
+                actionsPerTurn: this.actionsPerTurn
+            });
+
             // Notify HUD
             console.log('[MainScene] === EMITTING turnChanged EVENT ===');
             this.events.emit('turnChanged', {
@@ -195,13 +196,18 @@ export default class MainScene extends Phaser.Scene {
             this.actionMode = MODE_MOVE;
             this.clearTargetHighlights();
 
-            // Reset per-drone action state for new turn
+            // Reset per-drone attack state for new turn
             if (this.isMyTurn) {
                 for (const drone of this.myDrones) {
-                    drone.hasMoved = false;
                     drone.hasAttacked = false;
                 }
             }
+
+            this.actionsPerTurn = msg.actionsPerTurn ?? this.actionsPerTurn;
+            this.events.emit('actionsUpdated', {
+                actionsRemaining: msg.actionsRemaining,
+                actionsPerTurn: this.actionsPerTurn
+            });
 
             // Notify HUD
             this.events.emit('turnChanged', {
@@ -213,10 +219,14 @@ export default class MainScene extends Phaser.Scene {
             const drone = this.drones[msg.playerIndex]?.[msg.droneIndex];
             if (drone) {
                 drone.moveTo(msg.x, msg.y);
-                // Mark drone as moved if it's ours
                 if (msg.playerIndex === Network.playerIndex) {
-                    drone.hasMoved = true;
                     this.hexHighlight.clear();
+                    const nextActions = Math.max(0, (Network.actionsRemaining ?? 0) - 1);
+                    Network.actionsRemaining = nextActions;
+                    this.events.emit('actionsUpdated', {
+                        actionsRemaining: nextActions,
+                        actionsPerTurn: this.actionsPerTurn
+                    });
                 }
             }
         });
@@ -230,6 +240,12 @@ export default class MainScene extends Phaser.Scene {
             const attackerDrone = this.drones[msg.attackerPlayer]?.[msg.attackerDrone];
             if (attackerDrone && msg.attackerPlayer === Network.playerIndex) {
                 attackerDrone.hasAttacked = true;
+                const nextActions = Math.max(0, (Network.actionsRemaining ?? 0) - 1);
+                Network.actionsRemaining = nextActions;
+                this.events.emit('actionsUpdated', {
+                    actionsRemaining: nextActions,
+                    actionsPerTurn: this.actionsPerTurn
+                });
             }
             this.clearTargetHighlights();
             this.actionMode = MODE_MOVE;
@@ -424,12 +440,6 @@ export default class MainScene extends Phaser.Scene {
 
         // Only show highlight when we have a selected drone, it's our turn, and we're in move mode
         if (!this.selectedDrone || !this.isMyTurn || this.actionMode !== MODE_MOVE) {
-            this.lastHighlightedHex = null;
-            return;
-        }
-
-        // Don't show if drone already moved
-        if (this.selectedDrone.hasMoved) {
             this.lastHighlightedHex = null;
             return;
         }
