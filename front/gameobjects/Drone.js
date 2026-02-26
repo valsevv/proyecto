@@ -18,6 +18,9 @@ export default class Drone {
         this.attackDamage = stats.attackDamage ?? 25;
         this.attackRange = stats.attackRange ?? 3;
         this.droneType = stats.droneType ?? 'Aereo';
+        this.maxFuel = stats.maxFuel ?? 10;
+        this.fuel = stats.fuel ?? this.maxFuel;
+        this.destroyed = false;
 
         // Turn action tracking (reset each turn)
         this.hasMoved = false;
@@ -139,10 +142,49 @@ export default class Drone {
     }
 
     isAlive() {
-        return this.health > 0;
+        return !this.destroyed && this.health > 0;
+    }
+
+    setFuel(remainingFuel) {
+        if (typeof remainingFuel === "number") {
+            this.fuel = Math.max(0, remainingFuel);
+        }
+    }
+
+    sinkAndDestroy() {
+        if (this.destroyed) return;
+        this.destroyed = true;
+        this.health = 0;
+        this.fuel = 0;
+
+        this.scene.tweens.add({
+            targets: [this.sprite, this.ring, this.targetRing, this.healthBar, this.healthBarBg],
+            y: `+=20`,
+            alpha: 0,
+            duration: 700,
+            ease: "Cubic.easeIn"
+        });
+        this.scene.tweens.add({
+            targets: this.sprite,
+            angle: 15,
+            scaleX: 0.05,
+            scaleY: 0.05,
+            duration: 700,
+            ease: "Cubic.easeIn",
+            onComplete: () => {
+                this.sprite.destroy();
+                this.ring.destroy();
+                this.targetRing.destroy();
+                this.healthBar.destroy();
+                this.healthBarBg.destroy();
+            }
+        });
     }
 
     destroy() {
+        if (this.destroyed) return;
+        this.destroyed = true;
+        this.health = 0;
         this.scene.tweens.add({
             targets: [this.sprite, this.ring, this.targetRing, this.healthBar, this.healthBarBg],
             alpha: 0,

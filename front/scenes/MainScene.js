@@ -217,18 +217,40 @@ export default class MainScene extends Phaser.Scene {
 
         Network.on('moveDrone', (msg) => {
             const drone = this.drones[msg.playerIndex]?.[msg.droneIndex];
-            if (drone) {
-                drone.moveTo(msg.x, msg.y);
-                if (msg.playerIndex === Network.playerIndex) {
-                    this.hexHighlight.clear();
-                    const nextActions = Math.max(0, (Network.actionsRemaining ?? 0) - 1);
-                    Network.actionsRemaining = nextActions;
-                    this.events.emit('actionsUpdated', {
-                        actionsRemaining: nextActions,
-                        actionsPerTurn: this.actionsPerTurn
-                    });
-                }
+            if (!drone) {
+                return;
             }
+
+            if (typeof msg.x === 'number' && typeof msg.y === 'number') {
+                drone.moveTo(msg.x, msg.y);
+            }
+
+            if (typeof msg.remainingFuel === 'number') {
+                drone.setFuel(msg.remainingFuel);
+            }
+
+            const destroyedByFuel = msg.destroyedByFuel || msg.remainingFuel === 0;
+            if (destroyedByFuel && drone.isAlive()) {
+                if (this.selectedDrone === drone) {
+                    this.selectedDrone.deselect();
+                    this.selectedDrone = null;
+                    this.clearTargetHighlights();
+                    this.actionMode = MODE_MOVE;
+                }
+                drone.sinkAndDestroy();
+            }
+
+            if (msg.playerIndex === Network.playerIndex && typeof msg.x === 'number' && typeof msg.y === 'number') {
+                this.hexHighlight.clear();
+                const nextActions = Math.max(0, (Network.actionsRemaining ?? 0) - 1);
+                Network.actionsRemaining = nextActions;
+                this.events.emit('actionsUpdated', {
+                    actionsRemaining: nextActions,
+                    actionsPerTurn: this.actionsPerTurn
+                });
+            }
+
+            this.events.emit('fuelUpdated');
         });
 
         Network.on('attackResult', (msg) => {
@@ -314,7 +336,9 @@ export default class MainScene extends Phaser.Scene {
                     maxHealth: d.maxHealth,
                     attackDamage: d.attackDamage,
                     attackRange: d.attackRange,
-                    droneType: droneType
+                    droneType: droneType,
+                    fuel: d.fuel,
+                    maxFuel: d.maxFuel
                 });
                 drone.playerIndex = player.playerIndex;
                 drone.droneIndex = this.drones[player.playerIndex].length;

@@ -132,12 +132,23 @@ public class Packet {
         return new Packet(PacketType.TURN_START, payload);
     }
 
-    public static Packet moveDrone(int playerIndex, int droneIndex, double x, double y) {
+    public static Packet moveDrone(int playerIndex, int droneIndex, double x, double y, int remainingFuel, boolean destroyedByFuel) {
         Map<String, Object> payload = new HashMap<>();
         payload.put("playerIndex", playerIndex);
         payload.put("droneIndex", droneIndex);
         payload.put("x", x);
         payload.put("y", y);
+        payload.put("remainingFuel", remainingFuel);
+        payload.put("destroyedByFuel", destroyedByFuel);
+        return new Packet(PacketType.MOVE_DRONE, payload);
+    }
+
+    public static Packet fuelUpdate(int playerIndex, int droneIndex, int remainingFuel, boolean destroyedByFuel) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("playerIndex", playerIndex);
+        payload.put("droneIndex", droneIndex);
+        payload.put("remainingFuel", remainingFuel);
+        payload.put("destroyedByFuel", destroyedByFuel);
         return new Packet(PacketType.MOVE_DRONE, payload);
     }
 

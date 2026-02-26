@@ -34,6 +34,9 @@ public class GameRoom {
     public static final int DEFAULT_ACTIONS_PER_TURN = 10;
     public static final int DEFAULT_AERIAL_VISION_RANGE = 4;
     public static final int DEFAULT_NAVAL_VISION_RANGE = 3;
+
+    public static final int MOVEMENT_FUEL_COST = 1;
+    public static final int IDLE_FUEL_COST = 1;
     //  frontend tracks per-drone limits
 
     // Carrier anchor positions (left side vs right side of the map)
@@ -180,8 +183,53 @@ public class GameRoom {
         if (droneIndex < 0 || droneIndex >= player.getDrones().size()) return false;
 
         Drone drone = player.getDrones().get(droneIndex);
+        if (!drone.isAlive()) return false;
+
         drone.setPosition(new HexCoord(x, y));
+        consumeMovementFuel(drone);
         return true;
+    }
+
+    public synchronized boolean consumeMovementFuel(Drone drone) {
+        if (drone == null || !drone.isAlive()) {
+            return false;
+        }
+        drone.consumeFuel(MOVEMENT_FUEL_COST);
+        if (drone.getFuel() <= 0) {
+            destroyDroneByFuel(drone);
+            return true;
+        }
+        return false;
+    }
+
+    public synchronized List<Integer> consumeIdleFuelForCurrentPlayer() {
+        PlayerState activePlayer = getPlayerByIndex(currentTurn);
+        if (activePlayer == null) {
+            return List.of();
+        }
+
+        List<Integer> destroyedDroneIndexes = new ArrayList<>();
+        List<Drone> drones = activePlayer.getDrones();
+        for (int i = 0; i < drones.size(); i++) {
+            Drone drone = drones.get(i);
+            if (!drone.isAlive()) {
+                continue;
+            }
+            drone.consumeFuel(IDLE_FUEL_COST);
+            if (drone.getFuel() <= 0) {
+                destroyDroneByFuel(drone);
+                destroyedDroneIndexes.add(i);
+            }
+        }
+        return destroyedDroneIndexes;
+    }
+
+    private void destroyDroneByFuel(Drone drone) {
+        if (!drone.isAlive()) {
+            return;
+        }
+        drone.setCurrentHp(0);
+        drone.receiveDamage(1);
     }
 
     public synchronized PlayerState getPlayerBySession(String sessionId) {
@@ -345,6 +393,8 @@ public class GameRoom {
                 dm.put("attackRange", d.getWeapon().getRange());
                 dm.put("visionRange", d.getVisionRange());
                 dm.put("alive", d.isAlive());
+                dm.put("fuel", d.getFuel());
+                dm.put("maxFuel", d.getMaxFuel());
                 // Add drone type for frontend rendering
                 dm.put("droneType", d instanceof NavalDrone ? "Naval" : "Aereo");
                 droneMaps.add(dm);
@@ -479,6 +529,14 @@ public class GameRoom {
 
                 int visionRange = getOptionalNonNegativeIntField(rawDrone, "visionRange", "Naval".equals(droneType) ? room.navalVisionRange : room.aerialVisionRange);
                 drone.setVisionRange(visionRange);
+
+                int maxFuel = getOptionalNonNegativeIntField(rawDrone, "maxFuel", drone.getMaxFuel());
+                drone.setMaxFuel(maxFuel);
+                int fuel = getOptionalNonNegativeIntField(rawDrone, "fuel", drone.getFuel());
+                if (fuel > drone.getMaxFuel()) {
+                    throw new IllegalArgumentException("fuel out of range");
+                }
+                drone.setFuel(fuel);
 
                 drone.setCurrentHp(health);
                 if (!alive) {
