@@ -164,11 +164,7 @@ public class GameController {
         });
     }
 
-    /**
-     * Join a player to a game room from their lobby.
-     * The lobby must exist and the user must be a member.
-     */
-    public GameResult joinGame(String sessionId, String lobbyId, Long userId) {
+   public GameResult joinGame(String sessionId, String lobbyId, Long userId) {
 
         if (sessionToRoom.containsKey(sessionId)) {
             return GameResult.error("Already in a game");
@@ -184,23 +180,30 @@ public class GameController {
         sessionToUserId.put(sessionId, userId);
 
         GameRoom room = findOrCreateRoomForLobby(lobby);
-
         boolean isLoadGame = lobby.isLoadGameLobby();
 
         PlayerState player;
 
         if (!isLoadGame) {
-            // 🟢 PARTIDA NUEVA
+            // PARTIDA NUEVA
             player = room.addPlayer(sessionId);
             if (player == null) return GameResult.error("Game is full");
+
         } else {
-            // 🔵 PARTIDA CARGADA
-            // Solo agregamos placeholder si todavía no está llena
-            if (!room.isFull()) {
-                player = room.addPlayer(sessionId);
-                if (player == null) return GameResult.error("Game is full");
-            } else {
-                player = room.getPlayerByIndex(room.getPlayers().size() - 1);
+            // PARTIDA CARGADA
+            // Cargar snapshot solo una vez
+            if (room.getPlayers().isEmpty()) {
+                loadSavedGameIntoRoom(lobby.getGameId(), room);
+            }
+
+            try {
+                player = bindLoadedPlayerSession(room, lobby.getGameId(), userId, sessionId);
+            } catch (IllegalStateException ex) {
+                return GameResult.error(ex.getMessage());
+            }
+
+            if (player == null) {
+                return GameResult.error("User not part of saved game");
             }
         }
 
@@ -213,37 +216,56 @@ public class GameController {
             lobby.getGameId()
         );
 
-        // 🔥 Cuando la room se llena
-        if (room.isFull() && !room.isGameStarted()) {
+        // =========================
+        // START GAME WHEN READY
+        // =========================
 
-            lobby.markStarted();
-
-            if (!isLoadGame) {
-                createGameFromLobby(lobby);
-                log.info("New game created for lobby {}", lobbyId);
-
-            } else {
-                // PRIMERO cargar estado
-                loadSavedGameIntoRoom(lobby.getGameId(), room);
-
-                // DESPUÉS reasignar sesiones reales
-                for (PlayerState p : room.getPlayers()) {
-                    // buscar qué session corresponde a ese user
-                    sessionToRoom.forEach((sid, rid) -> {
-                        if (rid.equals(room.getRoomId())) {
-                            room.assignSessionToPlayer(p.getPlayerIndex(), sid);
-                        }
-                    });
-                }
-
-                log.info("Loaded saved game {} into room {}", 
-                    lobby.getGameId(), room.getRoomId());
-
+        if (room.allPlayersConnected()) {
+            if (isLoadGame) {
+                lobby.markStarted();
                 return GameResult.gameReady(welcome);
             }
         }
 
         return GameResult.ok(welcome);
+    }
+
+    private PlayerState bindLoadedPlayerSession(GameRoom room, Long gameId, Long userId, String sessionId) {
+        if (room == null || gameId == null || userId == null || sessionId == null) {
+            return null;
+        }
+
+        Game game = games.get(gameId);
+        if (game == null) {
+            game = gameService.getById(gameId);
+            games.put(gameId, game);
+        }
+
+        int playerIndex;
+        if (userId.equals(game.getPlayer1Id())) {
+            playerIndex = 0;
+        } else if (userId.equals(game.getPlayer2Id())) {
+            playerIndex = 1;
+        } else {
+            return null;
+        }
+
+        PlayerState bySession = room.getPlayerBySession(sessionId);
+        if (bySession != null && bySession.getPlayerIndex() != playerIndex) {
+            throw new IllegalStateException("Session already bound to another player");
+        }
+
+        PlayerState player = room.getPlayerByIndex(playerIndex);
+        if (player == null) {
+            throw new IllegalStateException("Saved game player slot not found");
+        }
+
+        if (player.getSessionId() != null && !player.getSessionId().equals(sessionId)) {
+            throw new IllegalStateException("Player already connected");
+        }
+
+        player.setSessionId(sessionId);
+        return player;
     }
 
    @SuppressWarnings("unchecked")
@@ -272,7 +294,7 @@ public class GameController {
 
         log.info("[GameController] -> end loadSavedGameIntoRoom ");
         
-        room.startGame();
+
     }   
     
     
@@ -319,6 +341,10 @@ public class GameController {
         // Check if both players have selected
         if (room.bothSidesSelected() && room.isFull()) {
             room.startGame();
+            lobbyService.getLobbyById(room.getRoomId()).ifPresent(lobby -> {
+                lobby.markStarted();
+                createGameFromLobby(lobby);
+            });
             log.info("Both sides selected! Game started in room {}. Player 0's turn", room.getRoomId());
             return GameResult.gameReady(Packet.sideChosen(playerIndex, side));
         }
@@ -495,11 +521,10 @@ public class GameController {
         log.info("[GameController] -> processMove sessionId {}, droneIndex {} ", sessionId, droneIndex);
 
         GameRoom room = getRoomForSession(sessionId);
-        log.info("[GameController] -> room {}", room.toString());
-
         if (room == null) {
             return GameResult.error("You are not in a game room");
         }
+        log.info("[GameController] -> room {}", room);
 
         PlayerState player = room.getPlayerBySession(sessionId);//player llega en null al cargar partida
         log.info("[GameController] -> player  {}", player );
@@ -551,14 +576,15 @@ public class GameController {
                                      int targetPlayerIndex, int targetDroneIndex) {
 
         GameRoom room = getRoomForSession(sessionId);
+        if (room == null) {
+            return GameResult.error("You are not in a game room");
+        }
 
-        PlayerState attacker = room.getPlayerBySession(sessionId); 
-
+        PlayerState attacker = room.getPlayerBySession(sessionId);
         GameResult validation = validateAttackContext(room, sessionId, attacker);
         log.info("[GameController] ->  validation {}", validation);
-        
         if (validation != null) return validation;
-
+                
         Drone attackerDrone = room.getDrone(attacker.getPlayerIndex(), attackerIndex);
         Drone targetDrone = room.getDrone(targetPlayerIndex, targetDroneIndex);
                                         

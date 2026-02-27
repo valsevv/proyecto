@@ -112,6 +112,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
     }
 
     private void handleJoin(WebSocketSession session, Packet packet) throws IOException {
+        log.info("[GameWebSocketHandler] -> begin handleJoin ");
         String lobbyId = packet.getString("lobbyId");
         Long userId = (Long) session.getAttributes().get("userId");
         
@@ -146,8 +147,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             );
             broadcastToRoom(session.getId(), turnStart);
         }
-        
-        // Note: For new games, players must select sides first
+         log.info("[GameWebSocketHandler] ->Endbegin handleJoin ");
     }
     
     private void handleSelectSide(WebSocketSession session, Packet packet) throws IOException {

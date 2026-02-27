@@ -106,18 +106,15 @@ class RankingServiceTest {
     void getTop_returnsList() {
         RankingService service = new RankingService(rankingRepository, userRepository);
 
-        Ranking r1 = new Ranking();
-        r1.setPoints(200);
+        RankingTopDTO r1 = new RankingTopDTO(1L, "alex", 10, 2, 200);
 
-        when(rankingRepository
-                .findAllByOrderByPointsDescReachedAtAscIdAsc(any(Pageable.class)))
+        when(rankingRepository.findTopWithUsername(any(Pageable.class)))
                 .thenReturn(List.of(r1));
 
         List<RankingTopDTO> result = service.getTop(5);
 
         assertThat(result).hasSize(1);
-        verify(rankingRepository)
-                .findAllByOrderByPointsDescReachedAtAscIdAsc(any(Pageable.class));
+        verify(rankingRepository).findTopWithUsername(any(Pageable.class));
     }
 
     // ---------------- DELETE ----------------

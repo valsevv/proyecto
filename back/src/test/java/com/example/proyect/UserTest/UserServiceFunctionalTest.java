@@ -11,6 +11,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.example.proyect.auth.Exceptions.EmailAlreadyExistsException;
+import com.example.proyect.auth.Exceptions.InvalidCredentialsException;
+import com.example.proyect.auth.Exceptions.UserAlreadyExistsException;
 import com.example.proyect.auth.service.UserService;
 import com.example.proyect.persistence.classes.User;
 import com.example.proyect.persistence.repos.UserRepository;
@@ -57,20 +60,20 @@ class UserServiceFunctionalTest {
     @Test
     void shouldNotAllowDuplicateUsername() {
 
-        userService.register("duplicate", "dup@mail.com", "123456789");
+        userService.register("duplicate_u", "dup_u@mail.com", "123456789");
 
-        assertThrows(IllegalStateException.class, () ->
-                userService.register("duplicate", "other@mail.com", "456456456")
+        assertThrows(UserAlreadyExistsException.class, () ->
+            userService.register("duplicate_u", "other_u@mail.com", "456456456")
         );
     }
 
     @Test
     void shouldNotAllowDuplicateEmail() {
 
-        userService.register("user1", "same@mail.com", "123456789");
+        userService.register("user_same_1", "same_u@mail.com", "123456789");
 
-        assertThrows(IllegalStateException.class, () ->
-                userService.register("user2", "same@mail.com", "456456456")
+        assertThrows(EmailAlreadyExistsException.class, () ->
+            userService.register("user_same_2", "same_u@mail.com", "456456456")
         );
     }
 
@@ -92,17 +95,17 @@ class UserServiceFunctionalTest {
     @Test
     void shouldFailLoginWithWrongPassword() {
 
-        userService.register("user1", "user1@mail.com", "correct");
+        userService.register("wrong_pwd_user", "wrong_pwd_user@mail.com", "correct");
 
-        assertThrows(IllegalArgumentException.class, () ->
-                userService.login("user1", "wrong")
+        assertThrows(InvalidCredentialsException.class, () ->
+            userService.login("wrong_pwd_user", "wrong")
         );
     }
 
     @Test
     void shouldFailLoginIfUserDoesNotExist() {
 
-        assertThrows(IllegalArgumentException.class, () ->
+        assertThrows(InvalidCredentialsException.class, () ->
                 userService.login("ghost", "123")
         );
     }

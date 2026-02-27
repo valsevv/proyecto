@@ -101,7 +101,7 @@ public class GameRoom {
             drones.add(drone);
         }
 
-        PlayerState player = new PlayerState(sessionId, index, drones);
+        PlayerState player = new PlayerState( sessionId, index, drones);
         players.add(player);
         return player;
     }
@@ -232,24 +232,12 @@ public class GameRoom {
         drone.receiveDamage(1);
     }
 
-    public synchronized PlayerState getPlayerBySession(String sessionId) {
-        log.info("[GameRoom] -> getPlayerBySession,  players {}", players);
-        
-        for (PlayerState p : players) {
-            if (p.getSessionId().equals(sessionId)) return p;
-        }
-        return null;
-    }
 
     public synchronized void assignSessionToPlayer(int playerIndex, String sessionId) {
-        PlayerState existing = getPlayerByIndex(playerIndex);
-        if (existing == null) {
-            return;
+        PlayerState player = getPlayerByIndex(playerIndex);
+        if (player != null) {
+            player.setSessionId(sessionId);
         }
-
-        PlayerState reassigned = new PlayerState(sessionId, playerIndex, existing.getDrones());
-        reassigned.setSide(existing.getSide());
-        players.set(playerIndex, reassigned);
     }
 
     public synchronized boolean isFull() {
@@ -296,6 +284,11 @@ public class GameRoom {
         actionsRemaining = actionsPerTurn;
     }
 
+    public synchronized boolean allPlayersConnected() {
+        if (players.size() < MAX_PLAYERS) return false;
+        return players.stream().allMatch(p -> p.getSessionId() != null);
+    }
+
     public synchronized boolean isGameStarted() {
         return gameStarted;
     }
@@ -327,6 +320,17 @@ public class GameRoom {
     public synchronized boolean isPlayerTurn(String sessionId) {
         PlayerState player = getPlayerBySession(sessionId);
         return player != null && isPlayerTurn(player.getPlayerIndex());
+    }
+
+    public synchronized PlayerState getPlayerBySession(String sessionId) {
+        if (sessionId == null) return null;
+
+        for (PlayerState p : players) {
+            if (sessionId.equals(p.getSessionId())) {
+                return p;
+            }
+        }
+        return null;
     }
 
     /**
@@ -378,11 +382,10 @@ public class GameRoom {
 
         List<Map<String, Object>> playerMaps = new ArrayList<>();
         for (PlayerState p : players) {
-             log.info("[GameRoom] -> for each player {} ", p);
             Map<String, Object> pm = new LinkedHashMap<>();
             pm.put("playerIndex", p.getPlayerIndex());
             pm.put("side", p.getSide());
-
+            log.info("Saving player {} side={}", p.getPlayerIndex(), p.getSide());
             List<Map<String, Object>> droneMaps = new ArrayList<>();
             for (Drone d : p.getDrones()) {
                 Map<String, Object> dm = new LinkedHashMap<>();
@@ -416,25 +419,6 @@ public class GameRoom {
         log.info("[GameRoom] -> End toStateMap");
         
         return state;
-    }
-
-    public static GameRoom fromSnapshot(String roomId, Map<String, Object> snapshot, String sessionId) {
-        log.info("[GameRoom] -> begin fromSnapshot {} ", snapshot);
-        log.info("[GameRoom] -> sessionId {} ", sessionId); 
-
-        GameRoom room = fromStateMap(roomId, snapshot);
-        List<PlayerState> restoredPlayers = new ArrayList<>();
-        for (PlayerState player : room.players) {
-            PlayerState restored = new PlayerState(sessionId, player.getPlayerIndex(), player.getDrones());
-            restored.setSide(player.getSide());
-            restoredPlayers.add(restored);
-        }
-        room.players.clear();
-        room.players.addAll(restoredPlayers);
-        
-        log.info("[GameRoom] -> End fromSnapshot");
-
-        return room;
     }
 
     @SuppressWarnings("unchecked")
@@ -552,6 +536,7 @@ public class GameRoom {
                 playerIndex,
                 drones
             );
+            
                         
             log.info("[GameRoom] -> el playerState es {}", player);
 
@@ -564,6 +549,7 @@ public class GameRoom {
         
         return room;
     }
+
 
     private static int getIntField(Map<?, ?> map, String field) {
         Object value = map.get(field);

@@ -56,7 +56,7 @@ public class Game {
     private static GameState defaultState() {
         GameState state = new GameState();
         state.setStatus(GameStatus.IN_PROGRESS);
-        state.setTurn(0);
+        state.setTurn(1);
         return state;
     }
 

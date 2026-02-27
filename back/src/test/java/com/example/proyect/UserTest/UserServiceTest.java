@@ -15,6 +15,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.example.proyect.auth.Exceptions.InvalidCredentialsException;
+import com.example.proyect.auth.Exceptions.UserAlreadyExistsException;
 import com.example.proyect.auth.security.PasswordHasher;
 import com.example.proyect.auth.service.UserService;
 import com.example.proyect.persistence.classes.User;
@@ -60,8 +62,8 @@ class UserServiceTest {
         when(userRepository.existsByUsername("alex")).thenReturn(true);
 
         assertThatThrownBy(() -> service.register("alex","alex@mail.com", "x"))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Username ya existe");
+                .isInstanceOf(UserAlreadyExistsException.class)
+                .hasMessageContaining("usuario ya existe");
 
         verify(userRepository).existsByUsername("alex");
         verify(userRepository, never()).save(any());
@@ -107,7 +109,7 @@ class UserServiceTest {
             mocked.when(() -> PasswordHasher.matches("bad", hashed)).thenReturn(false);
 
             assertThatThrownBy(() -> service.login(username, "bad"))
-                    .isInstanceOf(IllegalArgumentException.class)
+                    .isInstanceOf(InvalidCredentialsException.class)
                     .hasMessageContaining("Credenciales");
         }
     }
@@ -118,7 +120,7 @@ class UserServiceTest {
         when(userRepository.findByUsername("missing")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.login("missing", "x"))
-                .isInstanceOf(IllegalArgumentException.class)
+            .isInstanceOf(InvalidCredentialsException.class)
                 .hasMessageContaining("Credenciales");
     }
 }
