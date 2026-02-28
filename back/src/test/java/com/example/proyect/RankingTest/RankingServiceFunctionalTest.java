@@ -54,19 +54,27 @@ class RankingServiceFunctionalTest {
 
     @Test
     void shouldReturnTopOrdered() {
-
-        User u1 = userService.register("alexis1", "alexis1@mail.com", "12345678");
-        User u2 = userService.register("alexis2", "alexis2@mail.com", "12345689");
-        User u3 = userService.register("alexis3", "alexis3@mail.com", "12345689");
+        long timestamp = System.currentTimeMillis();
+        User u1 = userService.register("test_top1_" + timestamp, "test1" + timestamp + "@mail.com", "12345678");
+        User u2 = userService.register("test_top2_" + timestamp, "test2" + timestamp + "@mail.com", "12345689");
+        User u3 = userService.register("test_top3_" + timestamp, "test3" + timestamp + "@mail.com", "12345689");
 
         rankingService.createSnapshot(u1.getUserId(), 100);
         rankingService.createSnapshot(u2.getUserId(), 300);
         rankingService.createSnapshot(u3.getUserId(), 200);
 
-        List<RankingTopDTO> top = rankingService.getTop(3);
+        List<RankingTopDTO> top = rankingService.getTop(100); // Get more to ensure we find our users
 
-        assertEquals(300, top.get(0).getPoints());
-        assertEquals(200, top.get(1).getPoints());
-        assertEquals(100, top.get(2).getPoints());
+        // Filter to only our test users
+        List<RankingTopDTO> ourUsers = top.stream()
+            .filter(dto -> dto.getUserId().equals(u1.getUserId()) || 
+                          dto.getUserId().equals(u2.getUserId()) || 
+                          dto.getUserId().equals(u3.getUserId()))
+            .toList();
+
+        assertEquals(3, ourUsers.size());
+        assertEquals(u2.getUserId(), ourUsers.get(0).getUserId()); // 300 points
+        assertEquals(u3.getUserId(), ourUsers.get(1).getUserId()); // 200 points
+        assertEquals(u1.getUserId(), ourUsers.get(2).getUserId()); // 100 points
     }
 }
