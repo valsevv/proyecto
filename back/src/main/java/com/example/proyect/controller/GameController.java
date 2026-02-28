@@ -18,7 +18,10 @@ import com.example.proyect.VOs.GameResult;
 import com.example.proyect.auth.service.GameService;
 import com.example.proyect.game.GameRoom;
 import com.example.proyect.game.PlayerState;
+import com.example.proyect.game.units.drone.AerialDrone;
 import com.example.proyect.game.units.drone.Drone;
+import com.example.proyect.game.units.drone.NavalDrone;
+import com.example.proyect.game.units.weapons.MissileWeapon;
 import com.example.proyect.lobby.Lobby;
 import com.example.proyect.lobby.service.LobbyService;
 import com.example.proyect.persistence.classes.Game;
@@ -43,6 +46,12 @@ public class GameController {
 
     @Value("${game.vision-range-naval:3}")
     private int navalVisionRange;
+
+    @Value("${game.missile.max-distance:15}")
+    private int missileMaxDistance;
+
+    @Value("${game.missile.damage-percent-on-naval:0.5}")
+    private double missileDamagePercentOnNaval;
 
     private final LobbyService lobbyService;
 
@@ -592,8 +601,19 @@ public class GameController {
         log.info("[GameController] ->  droneValidation {}", droneValidation);
         if (droneValidation != null) return droneValidation;
         
+        AttackResolution attackResolution = resolveAttack(attackerDrone, targetDrone);
+        if (!attackResolution.hit()) {
+            room.useAction();
+            Packet missPacket = Packet.attackResult(
+                attacker.getPlayerIndex(), attackerIndex,
+                targetPlayerIndex, targetDroneIndex,
+                0, targetDrone.getCurrentHp(), false
+            );
+            return finalizeTurn(room, missPacket);
+        }
+
         // Aplica el daño
-        int damage = attackerDrone.getWeapon().getDamage();
+        int damage = attackResolution.damage();
         targetDrone.receiveDamage(damage);
 
         // Consume una accion
@@ -607,7 +627,7 @@ public class GameController {
         Packet attackPacket = Packet.attackResult(
             attacker.getPlayerIndex(), attackerIndex,
             targetPlayerIndex, targetDroneIndex,
-            damage, targetDrone.getCurrentHp()
+            damage, targetDrone.getCurrentHp(), true
         );
 
         // Check game over
@@ -659,6 +679,10 @@ public class GameController {
             return GameResult.error("Cannot attack with a destroyed drone");
         }
 
+        if (attackerDrone instanceof AerialDrone aerialDrone && targetDrone instanceof NavalDrone && !aerialDrone.hasMissiles()) {
+            return GameResult.error("No missiles remaining for this aerial drone");
+        }
+
         if (!targetDrone.isAlive()) {
             return GameResult.error("Target drone is already destroyed");
         }
@@ -678,6 +702,45 @@ public class GameController {
 
         return GameResult.withActionsRemaining(packet,
                 room.getActionsRemaining());
+    }
+
+    private AttackResolution resolveAttack(Drone attackerDrone, Drone targetDrone) {
+        if (!(attackerDrone instanceof AerialDrone aerialDrone) || !(targetDrone instanceof NavalDrone)) {
+            return new AttackResolution(attackerDrone.getWeapon().getDamage(), true);
+        }
+
+        if (!(aerialDrone.getWeapon() instanceof MissileWeapon missileWeapon)) {
+            return new AttackResolution(attackerDrone.getWeapon().getDamage(), true);
+        }
+
+        if (!aerialDrone.hasMissiles()) {
+            return new AttackResolution(0, false);
+        }
+
+        double traveledDistance = distanceBetween(attackerDrone, targetDrone);
+        if (!missileWeapon.canReach(traveledDistance) || traveledDistance > missileMaxDistance) {
+            aerialDrone.consumeMissile();
+            return new AttackResolution(0, false);
+        }
+
+        double effectiveAccuracy = missileWeapon.getEffectiveAccuracy(traveledDistance);
+        boolean hit = Math.random() <= effectiveAccuracy;
+        aerialDrone.consumeMissile();
+        if (!hit) {
+            return new AttackResolution(0, false);
+        }
+
+        int damage = (int) Math.round(targetDrone.getMaxHp() * missileDamagePercentOnNaval);
+        return new AttackResolution(Math.max(1, damage), true);
+    }
+
+    private double distanceBetween(Drone attackerDrone, Drone targetDrone) {
+        double dx = attackerDrone.getPosition().getX() - targetDrone.getPosition().getX();
+        double dy = attackerDrone.getPosition().getY() - targetDrone.getPosition().getY();
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    private record AttackResolution(int damage, boolean hit) {
     }
 
 //Las 3 funciones anteriores se separan para bajar la complejidad ciclomatica
