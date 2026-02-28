@@ -509,8 +509,12 @@ export default class MainScene extends Phaser.Scene {
 
     /** Called when any drone is clicked */
     onDroneClicked(drone) {
-        // In attack mode, enemy drones are no longer clicked directly.
-        if (this.actionMode === MODE_ATTACK && !drone.isLocal && drone.isAlive()) {
+        if (this.actionMode === MODE_ATTACK) {
+            // Allow direct enemy click in attack mode as a valid manual shot direction.
+            if (!drone.isLocal && drone.isAlive() && this.selectedDrone && this.isMyTurn) {
+                this.setManualAttackLine({ x: drone.sprite.x, y: drone.sprite.y });
+                this.executeAttack(drone);
+            }
             return;
         }
 
@@ -568,6 +572,13 @@ export default class MainScene extends Phaser.Scene {
         this.actionMode = MODE_ATTACK;
         this.hexHighlight.clear();
         this.manualTargetHex = null;
+
+        const pointer = this.input.activePointer;
+        if (pointer) {
+            const nearest = this.hexGrid.getNearestCenter(pointer.worldX, pointer.worldY);
+            this.setManualAttackLine(nearest);
+        }
+
         this.highlightEnemyTargets();
     }
 
