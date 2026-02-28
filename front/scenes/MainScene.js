@@ -659,7 +659,7 @@ export default class MainScene extends Phaser.Scene {
         const magnitude = Math.sqrt(dx * dx + dy * dy);
         if (magnitude === 0) return;
 
-        const maxDistancePixels = this.hexGrid.hexSize * Math.sqrt(3) * MAX_MANUAL_ATTACK_DISTANCE;
+        const maxDistancePixels = this.hexGrid.size * Math.sqrt(3) * MAX_MANUAL_ATTACK_DISTANCE;
         const clampedDistance = Math.min(magnitude, maxDistancePixels);
         const factor = clampedDistance / magnitude;
 
