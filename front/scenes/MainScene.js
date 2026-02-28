@@ -79,6 +79,11 @@ export default class MainScene extends Phaser.Scene {
             // Handle hex highlight for movement
             this.updateHexHighlight(pointer);
 
+            if (this.actionMode === MODE_ATTACK && this.selectedDrone && !pointer.isDown && this.isMyTurn) {
+                const nearest = this.hexGrid.getNearestCenter(pointer.worldX, pointer.worldY);
+                this.setManualAttackLine(nearest);
+            }
+
             if (!pointer.isDown) return;
             const dx = pointer.x - this.dragStartX;
             const dy = pointer.y - this.dragStartY;
@@ -224,6 +229,7 @@ export default class MainScene extends Phaser.Scene {
             this.isMyTurn = (msg.activePlayer === Network.playerIndex);
             this.actionMode = MODE_MOVE;
             this.clearTargetHighlights();
+            this.clearSelections();
 
             // Reset per-drone attack state for new turn
             if (this.isMyTurn) {
@@ -727,9 +733,33 @@ export default class MainScene extends Phaser.Scene {
         });
     }
 
+    clearSelections() {
+        if (this.selectedDrone) {
+            this.selectedDrone.deselect();
+            this.selectedDrone.sprite.clearTint();
+            this.selectedDrone = null;
+        }
+
+        if (this.selectedCarrier) {
+            this.selectedCarrier.ring.setVisible(false);
+            this.selectedCarrier.sprite.clearTint();
+            this.stopCarrierPulse(this.selectedCarrier);
+            this.selectedCarrier = null;
+        }
+
+        this.events.emit('selectionChanged', { type: null });
+    }
+
     /** End turn early - called from HUD */
     endTurn() {
         if (!this.isMyTurn) return;
+
+        this.isMyTurn = false;
+        this.actionMode = MODE_MOVE;
+        this.clearTargetHighlights();
+        this.clearSelections();
+        this.events.emit('turnChanged', { isMyTurn: false });
+
         Network.endTurn();
     }
 
