@@ -179,7 +179,9 @@ export default class HudScene extends Phaser.Scene {
 
         // Check if selected drone can attack
         const mainScene = this.scene.get('MainScene');
-        const canAttack = mainScene?.selectedDrone && !mainScene.selectedDrone.hasAttacked;
+        const selectedDrone = mainScene?.selectedDrone;
+        const hasMissilesForAerial = !selectedDrone || selectedDrone.droneType !== 'Aereo' || selectedDrone.canUseMissileAttack();
+        const canAttack = selectedDrone && !selectedDrone.hasAttacked && hasMissilesForAerial;
 
         // Update attack button color and alpha
         let attackColor, attackAlpha, textAlpha;

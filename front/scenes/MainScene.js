@@ -284,6 +284,9 @@ export default class MainScene extends Phaser.Scene {
             const attackerDrone = this.drones[msg.attackerPlayer]?.[msg.attackerDrone];
             if (attackerDrone && msg.attackerPlayer === Network.playerIndex) {
                 attackerDrone.hasAttacked = true;
+                if (attackerDrone.droneType === 'Aereo') {
+                    attackerDrone.consumeMissile();
+                }
                 const nextActions = Math.max(0, (Network.actionsRemaining ?? 0) - 1);
                 Network.actionsRemaining = nextActions;
                 this.events.emit('actionsUpdated', {
@@ -347,7 +350,7 @@ export default class MainScene extends Phaser.Scene {
         };
 
         if (isLocal) {
-            sprite.setInteractive({ useHandCursor: true });
+            sprite.setInteractive({ useHandCursor: true, pixelPerfect: true, alphaTolerance: 1 });
             sprite.on('pointerdown', (pointer) => {
                 pointer.event.stopPropagation();
                 this.onCarrierClicked(carrier);
@@ -385,6 +388,7 @@ export default class MainScene extends Phaser.Scene {
                     attackDamage: d.attackDamage,
                     attackRange: d.attackRange,
                     droneType: droneType,
+                    missiles: d.missiles,
                     fuel: d.fuel,
                     maxFuel: d.maxFuel
                 });
@@ -539,6 +543,7 @@ export default class MainScene extends Phaser.Scene {
     enterAttackMode() {
         if (!this.isMyTurn || !this.selectedDrone) return;
         if (this.selectedDrone.hasAttacked) return; // Already attacked this turn
+        if (this.selectedDrone.droneType === 'Aereo' && !this.selectedDrone.canUseMissileAttack()) return;
 
         this.actionMode = MODE_ATTACK;
         this.hexHighlight.clear();
@@ -573,6 +578,7 @@ export default class MainScene extends Phaser.Scene {
     executeAttack(targetDrone) {
         if (!this.selectedDrone || !this.isMyTurn) return;
         if (this.selectedDrone.hasAttacked) return; // Already attacked this turn
+        if (this.selectedDrone.droneType === 'Aereo' && !this.selectedDrone.canUseMissileAttack()) return;
 
         const attackerIndex = this.myDrones.indexOf(this.selectedDrone);
         if (attackerIndex < 0) return;
