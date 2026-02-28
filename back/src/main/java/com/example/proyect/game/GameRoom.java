@@ -401,6 +401,9 @@ public class GameRoom {
                 dm.put("maxFuel", d.getMaxFuel());
                 // Add drone type for frontend rendering
                 dm.put("droneType", d instanceof NavalDrone ? "Naval" : "Aereo");
+                if (d instanceof AerialDrone aerialDrone) {
+                    dm.put("missiles", aerialDrone.getMissiles());
+                }
                 droneMaps.add(dm);
             }
             pm.put("drones", droneMaps);
@@ -522,6 +525,11 @@ public class GameRoom {
                     throw new IllegalArgumentException("fuel out of range");
                 }
                 drone.setFuel(fuel);
+
+                if (drone instanceof AerialDrone aerialDrone) {
+                    int missiles = getOptionalNonNegativeIntField(rawDrone, "missiles", AerialDrone.DEFAULT_MISSILES);
+                    aerialDrone.setMissiles(missiles);
+                }
 
                 drone.setCurrentHp(health);
                 if (!alive) {

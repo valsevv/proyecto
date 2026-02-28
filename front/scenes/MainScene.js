@@ -276,7 +276,8 @@ export default class MainScene extends Phaser.Scene {
 
         Network.on('attackResult', (msg) => {
             const targetDrone = this.drones[msg.targetPlayer]?.[msg.targetDrone];
-            if (targetDrone) {
+            const hit = msg.hit !== false;
+            if (targetDrone && hit) {
                 targetDrone.takeDamage(msg.damage, msg.remainingHealth);
             }
             // Mark attacker as having attacked
