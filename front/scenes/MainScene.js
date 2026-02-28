@@ -59,6 +59,7 @@ export default class MainScene extends Phaser.Scene {
 
         // Graphics for hex hover highlight
         this.hexHighlight = this.add.graphics();
+        this.missileGuideGraphics = this.add.graphics();
         this.lastHighlightedHex = null;
 
         // Camera bounds and initial position
@@ -276,13 +277,22 @@ export default class MainScene extends Phaser.Scene {
 
         Network.on('attackResult', (msg) => {
             const targetDrone = this.drones[msg.targetPlayer]?.[msg.targetDrone];
-            if (targetDrone) {
+            const hit = msg.hit !== false;
+            const attackerDrone = this.drones[msg.attackerPlayer]?.[msg.attackerDrone];
+
+            if (attackerDrone && targetDrone) {
+                this.playMissileShot(attackerDrone, targetDrone, hit);
+            }
+
+            if (targetDrone && hit) {
                 targetDrone.takeDamage(msg.damage, msg.remainingHealth);
             }
             // Mark attacker as having attacked
-            const attackerDrone = this.drones[msg.attackerPlayer]?.[msg.attackerDrone];
             if (attackerDrone && msg.attackerPlayer === Network.playerIndex) {
                 attackerDrone.hasAttacked = true;
+                if (attackerDrone.droneType === 'Aereo') {
+                    attackerDrone.consumeMissile();
+                }
                 const nextActions = Math.max(0, (Network.actionsRemaining ?? 0) - 1);
                 Network.actionsRemaining = nextActions;
                 this.events.emit('actionsUpdated', {
@@ -346,7 +356,7 @@ export default class MainScene extends Phaser.Scene {
         };
 
         if (isLocal) {
-            sprite.setInteractive({ useHandCursor: true });
+            sprite.setInteractive({ useHandCursor: true, pixelPerfect: true, alphaTolerance: 1 });
             sprite.on('pointerdown', (pointer) => {
                 pointer.event.stopPropagation();
                 this.onCarrierClicked(carrier);
@@ -384,6 +394,7 @@ export default class MainScene extends Phaser.Scene {
                     attackDamage: d.attackDamage,
                     attackRange: d.attackRange,
                     droneType: droneType,
+                    missiles: d.missiles,
                     fuel: d.fuel,
                     maxFuel: d.maxFuel
                 });
@@ -538,6 +549,7 @@ export default class MainScene extends Phaser.Scene {
     enterAttackMode() {
         if (!this.isMyTurn || !this.selectedDrone) return;
         if (this.selectedDrone.hasAttacked) return; // Already attacked this turn
+        if (this.selectedDrone.droneType === 'Aereo' && !this.selectedDrone.canUseMissileAttack()) return;
 
         this.actionMode = MODE_ATTACK;
         this.hexHighlight.clear();
@@ -559,6 +571,7 @@ export default class MainScene extends Phaser.Scene {
                 drone.setTargetable(true);
             }
         }
+        this.drawMissileGuides(enemies.filter((drone) => drone.isAlive()));
     }
 
     clearTargetHighlights() {
@@ -567,16 +580,74 @@ export default class MainScene extends Phaser.Scene {
                 drone.setTargetable(false);
             }
         }
+        this.missileGuideGraphics.clear();
     }
 
     executeAttack(targetDrone) {
         if (!this.selectedDrone || !this.isMyTurn) return;
         if (this.selectedDrone.hasAttacked) return; // Already attacked this turn
+        if (this.selectedDrone.droneType === 'Aereo' && !this.selectedDrone.canUseMissileAttack()) return;
 
         const attackerIndex = this.myDrones.indexOf(this.selectedDrone);
         if (attackerIndex < 0) return;
 
         Network.requestAttack(attackerIndex, targetDrone.playerIndex, targetDrone.droneIndex);
+    }
+
+    drawMissileGuides(enemyDrones) {
+        this.missileGuideGraphics.clear();
+        if (!this.selectedDrone || this.actionMode !== MODE_ATTACK) return;
+
+        const startX = this.selectedDrone.sprite.x;
+        const startY = this.selectedDrone.sprite.y;
+
+        for (const enemy of enemyDrones) {
+            this.missileGuideGraphics.lineStyle(2, 0xffc107, 0.8);
+            this.missileGuideGraphics.beginPath();
+            this.missileGuideGraphics.moveTo(startX, startY);
+            this.missileGuideGraphics.lineTo(enemy.sprite.x, enemy.sprite.y);
+            this.missileGuideGraphics.strokePath();
+        }
+    }
+
+    playMissileShot(attackerDrone, targetDrone, hit) {
+        const missile = this.add.circle(attackerDrone.sprite.x, attackerDrone.sprite.y, 4, 0xff9800, 1);
+        missile.setDepth(30);
+
+        const trail = this.add.graphics();
+        trail.setDepth(29);
+        trail.lineStyle(2, 0xffb74d, 0.7);
+
+        this.tweens.add({
+            targets: missile,
+            x: targetDrone.sprite.x,
+            y: targetDrone.sprite.y,
+            duration: 320,
+            ease: 'Quad.easeIn',
+            onUpdate: () => {
+                trail.clear();
+                trail.lineStyle(2, 0xffb74d, 0.7);
+                trail.beginPath();
+                trail.moveTo(attackerDrone.sprite.x, attackerDrone.sprite.y);
+                trail.lineTo(missile.x, missile.y);
+                trail.strokePath();
+            },
+            onComplete: () => {
+                trail.clear();
+                trail.destroy();
+                missile.destroy();
+
+                const impact = this.add.circle(targetDrone.sprite.x, targetDrone.sprite.y, hit ? 12 : 8, hit ? 0xff5722 : 0x9e9e9e, 0.55);
+                impact.setDepth(31);
+                this.tweens.add({
+                    targets: impact,
+                    alpha: 0,
+                    scale: 1.6,
+                    duration: 180,
+                    onComplete: () => impact.destroy()
+                });
+            }
+        });
     }
 
     /** End turn early - called from HUD */
