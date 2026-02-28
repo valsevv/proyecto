@@ -6,7 +6,7 @@ import { WORLD_WIDTH, WORLD_HEIGHT } from '../shared/constants.js';
 const TEAM_COLORS = [0x00ff00, 0xff4444]; // green = player 0, red = player 1
 const MAX_MOVE_DISTANCE = 6; // hexes per turn
 const MAX_CARRIER_MOVE_DISTANCE = 3; // hexes per turn (parametrizable)
-const MAX_MANUAL_ATTACK_DISTANCE = 10; // max range in hexes for manual missile aiming (parametrizable)
+const MAX_MANUAL_ATTACK_DISTANCE = 15; // max range in hexes for manual missile aiming (parametrizable)
 const CARRIER_POSITIONS = {
     0: { x: 300, y: 900 },
     1: { x: 2100, y: 900 }
@@ -295,7 +295,7 @@ export default class MainScene extends Phaser.Scene {
             const hit = msg.hit !== false;
             const attackerDrone = this.drones[msg.attackerPlayer]?.[msg.attackerDrone];
 
-            if (attackerDrone && targetDrone) {
+            if (attackerDrone && (targetDrone || (typeof msg.lineX === 'number' && typeof msg.lineY === 'number'))) {
                 this.playMissileShot(attackerDrone, targetDrone, hit, msg.lineX, msg.lineY);
             }
 
@@ -631,12 +631,22 @@ export default class MainScene extends Phaser.Scene {
     }
 
     executeManualAttack() {
-        if (!this.manualTargetHex) return;
+        if (!this.manualTargetHex || !this.selectedDrone || !this.isMyTurn) return;
+        if (this.selectedDrone.hasAttacked) return;
+        if (this.selectedDrone.droneType === 'Aereo' && !this.selectedDrone.canUseMissileAttack()) return;
 
-        const targetDrone = this.findBestTargetForManualLine();
-        if (!targetDrone) return;
+        const attackerIndex = this.myDrones.indexOf(this.selectedDrone);
+        if (attackerIndex < 0) return;
 
-        this.executeAttack(targetDrone);
+        // Allow manual fire to any hex even if no enemy drone is visible.
+        const enemyPlayerIndex = Network.playerIndex === 0 ? 1 : 0;
+        Network.requestAttack(
+            attackerIndex,
+            enemyPlayerIndex,
+            -1,
+            this.manualTargetHex.x,
+            this.manualTargetHex.y
+        );
     }
 
     setManualAttackLine(hexCenter) {
@@ -709,8 +719,13 @@ export default class MainScene extends Phaser.Scene {
         trail.setDepth(29);
         trail.lineStyle(2, 0xffb74d, 0.7);
 
-        const endX = typeof lineX === 'number' ? lineX : targetDrone.sprite.x;
-        const endY = typeof lineY === 'number' ? lineY : targetDrone.sprite.y;
+        const endX = typeof lineX === 'number' ? lineX : targetDrone?.sprite?.x;
+        const endY = typeof lineY === 'number' ? lineY : targetDrone?.sprite?.y;
+        if (typeof endX !== 'number' || typeof endY !== 'number') {
+            trail.destroy();
+            missile.destroy();
+            return;
+        }
 
         this.tweens.add({
             targets: missile,
