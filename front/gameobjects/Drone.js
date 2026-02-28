@@ -20,6 +20,7 @@ export default class Drone {
         this.droneType = stats.droneType ?? 'Aereo';
         this.maxFuel = stats.maxFuel ?? 10;
         this.fuel = stats.fuel ?? this.maxFuel;
+        this.missiles = stats.missiles ?? 0;
         this.destroyed = false;
 
         // Turn action tracking (reset each turn)
@@ -63,7 +64,7 @@ export default class Drone {
         this.targetRing.setVisible(false);
 
         // Make drone clickable
-        this.sprite.setInteractive({ useHandCursor: true });
+        this.sprite.setInteractive({ useHandCursor: true, pixelPerfect: true, alphaTolerance: 1 });
         this.sprite.on('pointerdown', (pointer) => {
             pointer.event.stopPropagation();
             scene.onDroneClicked(this);
@@ -167,6 +168,14 @@ export default class Drone {
         if (typeof remainingFuel === "number") {
             this.fuel = Math.max(0, remainingFuel);
         }
+    }
+
+    consumeMissile() {
+        this.missiles = Math.max(0, (this.missiles ?? 0) - 1);
+    }
+
+    canUseMissileAttack() {
+        return this.droneType === 'Aereo' && (this.missiles ?? 0) > 0;
     }
 
     sinkAndDestroy() {
