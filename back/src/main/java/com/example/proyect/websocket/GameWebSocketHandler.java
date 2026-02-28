@@ -216,9 +216,13 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         int attackerIndex = packet.getInt("attackerIndex");
         int targetPlayer = packet.getInt("targetPlayer");
         int targetDrone = packet.getInt("targetDrone");
+        Number lineXNumber = packet.get("lineX");
+        Number lineYNumber = packet.get("lineY");
+        Double lineX = lineXNumber != null ? lineXNumber.doubleValue() : null;
+        Double lineY = lineYNumber != null ? lineYNumber.doubleValue() : null;
 
         GameResult result = gameController.processAttack(
-            session.getId(), attackerIndex, targetPlayer, targetDrone
+            session.getId(), attackerIndex, targetPlayer, targetDrone, lineX, lineY
         );
         
         if (!result.isSuccess()) {

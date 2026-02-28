@@ -582,7 +582,8 @@ public class GameController {
 
 
     public GameResult processAttack(String sessionId, int attackerIndex, 
-                                     int targetPlayerIndex, int targetDroneIndex) {
+                                     int targetPlayerIndex, int targetDroneIndex,
+                                     Double manualLineX, Double manualLineY) {
 
         GameRoom room = getRoomForSession(sessionId);
         if (room == null) {
@@ -601,7 +602,7 @@ public class GameController {
         log.info("[GameController] ->  droneValidation {}", droneValidation);
         if (droneValidation != null) return droneValidation;
         
-        AttackResolution attackResolution = resolveAttack(attackerDrone, targetDrone);
+        AttackResolution attackResolution = resolveAttack(attackerDrone, targetDrone, manualLineX, manualLineY);
         if (!attackResolution.hit()) {
             room.useAction();
             Packet missPacket = Packet.attackResult(
@@ -704,7 +705,7 @@ public class GameController {
                 room.getActionsRemaining());
     }
 
-    private AttackResolution resolveAttack(Drone attackerDrone, Drone targetDrone) {
+    private AttackResolution resolveAttack(Drone attackerDrone, Drone targetDrone, Double manualLineX, Double manualLineY) {
         if (!(attackerDrone instanceof AerialDrone aerialDrone) || !(targetDrone instanceof NavalDrone)) {
             return new AttackResolution(attackerDrone.getWeapon().getDamage(), true);
         }
@@ -717,13 +718,18 @@ public class GameController {
             return new AttackResolution(0, false);
         }
 
-        double traveledDistance = distanceBetween(attackerDrone, targetDrone);
+        double aimX = manualLineX != null ? manualLineX : targetDrone.getPosition().getX();
+        double aimY = manualLineY != null ? manualLineY : targetDrone.getPosition().getY();
+
+        double traveledDistance = distanceBetween(attackerDrone.getPosition().getX(), attackerDrone.getPosition().getY(), aimX, aimY);
         if (!missileWeapon.canReach(traveledDistance) || traveledDistance > missileMaxDistance) {
             aerialDrone.consumeMissile();
             return new AttackResolution(0, false);
         }
 
-        double effectiveAccuracy = missileWeapon.getEffectiveAccuracy(traveledDistance);
+        double targetOffset = distanceBetween(aimX, aimY, targetDrone.getPosition().getX(), targetDrone.getPosition().getY());
+        double alignmentFactor = Math.max(0.0, 1.0 - (targetOffset / 120.0));
+        double effectiveAccuracy = missileWeapon.getEffectiveAccuracy(traveledDistance) * alignmentFactor;
         boolean hit = Math.random() <= effectiveAccuracy;
         aerialDrone.consumeMissile();
         if (!hit) {
@@ -734,9 +740,9 @@ public class GameController {
         return new AttackResolution(Math.max(1, damage), true);
     }
 
-    private double distanceBetween(Drone attackerDrone, Drone targetDrone) {
-        double dx = attackerDrone.getPosition().getX() - targetDrone.getPosition().getX();
-        double dy = attackerDrone.getPosition().getY() - targetDrone.getPosition().getY();
+    private double distanceBetween(double x1, double y1, double x2, double y2) {
+        double dx = x1 - x2;
+        double dy = y1 - y2;
         return Math.sqrt(dx * dx + dy * dy);
     }
 

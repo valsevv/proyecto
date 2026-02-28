@@ -74,8 +74,8 @@ class NetworkManager {
         this.send({ type: 'move', droneIndex, x, y });
     }
 
-    requestAttack(attackerIndex, targetPlayer, targetDrone) {
-        this.send({ type: 'attack', attackerIndex, targetPlayer, targetDrone });
+    requestAttack(attackerIndex, targetPlayer, targetDrone, lineX = null, lineY = null) {
+        this.send({ type: 'attack', attackerIndex, targetPlayer, targetDrone, lineX, lineY });
     }
 
     endTurn() {
