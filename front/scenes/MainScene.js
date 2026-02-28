@@ -6,6 +6,7 @@ import { WORLD_WIDTH, WORLD_HEIGHT } from '../shared/constants.js';
 const TEAM_COLORS = [0x00ff00, 0xff4444]; // green = player 0, red = player 1
 const MAX_MOVE_DISTANCE = 6; // hexes per turn
 const MAX_CARRIER_MOVE_DISTANCE = 3; // hexes per turn (parametrizable)
+const MAX_MANUAL_ATTACK_DISTANCE = 10; // max range in hexes for manual missile aiming (parametrizable)
 const CARRIER_POSITIONS = {
     0: { x: 300, y: 900 },
     1: { x: 2100, y: 900 }
@@ -99,6 +100,7 @@ export default class MainScene extends Phaser.Scene {
 
             if (this.actionMode === MODE_ATTACK && this.selectedDrone) {
                 this.setManualAttackLine(nearest);
+                this.executeManualAttack();
                 return;
             }
 
@@ -288,7 +290,7 @@ export default class MainScene extends Phaser.Scene {
             const attackerDrone = this.drones[msg.attackerPlayer]?.[msg.attackerDrone];
 
             if (attackerDrone && targetDrone) {
-                this.playMissileShot(attackerDrone, targetDrone, hit);
+                this.playMissileShot(attackerDrone, targetDrone, hit, msg.lineX, msg.lineY);
             }
 
             if (targetDrone && hit) {
@@ -501,9 +503,8 @@ export default class MainScene extends Phaser.Scene {
 
     /** Called when any drone is clicked */
     onDroneClicked(drone) {
-        // In attack mode, clicking enemy drone = attack
+        // In attack mode, enemy drones are no longer clicked directly.
         if (this.actionMode === MODE_ATTACK && !drone.isLocal && drone.isAlive()) {
-            this.executeAttack(drone);
             return;
         }
 
@@ -579,7 +580,7 @@ export default class MainScene extends Phaser.Scene {
                 drone.setTargetable(true);
             }
         }
-        this.drawMissileGuides(enemies.filter((drone) => drone.isAlive()));
+        this.drawMissileGuides();
     }
 
     clearTargetHighlights() {
@@ -612,26 +613,65 @@ export default class MainScene extends Phaser.Scene {
         );
     }
 
-    setManualAttackLine(hexCenter) {
-        if (!this.selectedDrone || !hexCenter) return;
-        this.manualTargetHex = hexCenter;
-        this.drawMissileGuides((this.drones[Network.playerIndex === 0 ? 1 : 0] || []).filter((drone) => drone.isAlive()));
+    executeManualAttack() {
+        if (!this.manualTargetHex) return;
+
+        const targetDrone = this.findBestTargetForManualLine();
+        if (!targetDrone) return;
+
+        this.executeAttack(targetDrone);
     }
 
-    drawMissileGuides(enemyDrones) {
+    setManualAttackLine(hexCenter) {
+        if (!this.selectedDrone || !hexCenter) return;
+        const startX = this.selectedDrone.sprite.x;
+        const startY = this.selectedDrone.sprite.y;
+
+        const dx = hexCenter.x - startX;
+        const dy = hexCenter.y - startY;
+        const magnitude = Math.sqrt(dx * dx + dy * dy);
+        if (magnitude === 0) return;
+
+        const maxDistancePixels = this.hexGrid.hexSize * Math.sqrt(3) * MAX_MANUAL_ATTACK_DISTANCE;
+        const clampedDistance = Math.min(magnitude, maxDistancePixels);
+        const factor = clampedDistance / magnitude;
+
+        this.manualTargetHex = {
+            x: startX + (dx * factor),
+            y: startY + (dy * factor)
+        };
+
+        this.drawMissileGuides();
+    }
+
+    findBestTargetForManualLine() {
+        const enemyIndex = Network.playerIndex === 0 ? 1 : 0;
+        const enemies = (this.drones[enemyIndex] || []).filter((drone) => drone.isAlive());
+        if (!enemies.length || !this.manualTargetHex || !this.selectedDrone) return null;
+
+        let closestEnemy = null;
+        let closestDistance = Number.POSITIVE_INFINITY;
+
+        for (const enemy of enemies) {
+            const dx = this.manualTargetHex.x - enemy.sprite.x;
+            const dy = this.manualTargetHex.y - enemy.sprite.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance < closestDistance) {
+                closestDistance = distance;
+                closestEnemy = enemy;
+            }
+        }
+
+        return closestEnemy;
+    }
+
+    drawMissileGuides() {
         this.missileGuideGraphics.clear();
         if (!this.selectedDrone || this.actionMode !== MODE_ATTACK) return;
 
         const startX = this.selectedDrone.sprite.x;
         const startY = this.selectedDrone.sprite.y;
-
-        for (const enemy of enemyDrones) {
-            this.missileGuideGraphics.lineStyle(2, 0xffc107, 0.5);
-            this.missileGuideGraphics.beginPath();
-            this.missileGuideGraphics.moveTo(startX, startY);
-            this.missileGuideGraphics.lineTo(enemy.sprite.x, enemy.sprite.y);
-            this.missileGuideGraphics.strokePath();
-        }
 
         if (this.manualTargetHex) {
             this.missileGuideGraphics.lineStyle(3, 0x29b6f6, 0.95);
@@ -644,7 +684,7 @@ export default class MainScene extends Phaser.Scene {
         }
     }
 
-    playMissileShot(attackerDrone, targetDrone, hit) {
+    playMissileShot(attackerDrone, targetDrone, hit, lineX, lineY) {
         const missile = this.add.circle(attackerDrone.sprite.x, attackerDrone.sprite.y, 4, 0xff9800, 1);
         missile.setDepth(30);
 
@@ -652,10 +692,13 @@ export default class MainScene extends Phaser.Scene {
         trail.setDepth(29);
         trail.lineStyle(2, 0xffb74d, 0.7);
 
+        const endX = typeof lineX === 'number' ? lineX : targetDrone.sprite.x;
+        const endY = typeof lineY === 'number' ? lineY : targetDrone.sprite.y;
+
         this.tweens.add({
             targets: missile,
-            x: targetDrone.sprite.x,
-            y: targetDrone.sprite.y,
+            x: endX,
+            y: endY,
             duration: 320,
             ease: 'Quad.easeIn',
             onUpdate: () => {
@@ -671,7 +714,7 @@ export default class MainScene extends Phaser.Scene {
                 trail.destroy();
                 missile.destroy();
 
-                const impact = this.add.circle(targetDrone.sprite.x, targetDrone.sprite.y, hit ? 12 : 8, hit ? 0xff5722 : 0x9e9e9e, 0.55);
+                const impact = this.add.circle(endX, endY, hit ? 12 : 8, hit ? 0xff5722 : 0x9e9e9e, 0.55);
                 impact.setDepth(31);
                 this.tweens.add({
                     targets: impact,
