@@ -345,6 +345,20 @@ public class GameRoom {
     }
 
     /**
+     * Consume multiple actions atomically. Returns true only if enough actions were available.
+     */
+    public synchronized boolean useActions(int amount) {
+        if (amount <= 0) {
+            throw new IllegalArgumentException("amount must be > 0");
+        }
+        if (actionsRemaining < amount) {
+            return false;
+        }
+        actionsRemaining -= amount;
+        return true;
+    }
+
+    /**
      * End the current turn and switch to the other player.
      */
     public synchronized void endTurn() {

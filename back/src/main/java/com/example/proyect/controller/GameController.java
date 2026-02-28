@@ -18,6 +18,7 @@ import com.example.proyect.VOs.GameResult;
 import com.example.proyect.auth.service.GameService;
 import com.example.proyect.game.GameRoom;
 import com.example.proyect.game.PlayerState;
+import com.example.proyect.game.units.Unit.HexCoord;
 import com.example.proyect.game.units.drone.AerialDrone;
 import com.example.proyect.game.units.drone.Drone;
 import com.example.proyect.game.units.drone.NavalDrone;
@@ -37,6 +38,9 @@ import com.example.proyect.websocket.packet.Packet;
 public class GameController {
 
     private static final Logger log = LoggerFactory.getLogger(GameController.class);
+    private static final int DEFAULT_ATTACK_ACTION_COST = 1;
+    private static final int NAVAL_ATTACK_ACTION_COST = 2;
+    private static final double NAVAL_ATTACK_VERTICAL_OFFSET = 90.0;
 
     @Value("${game.actions-per-turn:10}")
     private int actionsPerTurn;
@@ -602,22 +606,50 @@ public class GameController {
         GameResult droneValidation = validateDrones(attacker, attackerDrone, targetDrone, targetPlayerIndex, manualBlindShot);
         log.info("[GameController] ->  droneValidation {}", droneValidation);
         if (droneValidation != null) return droneValidation;
+
+        int actionCost = getAttackActionCost(attackerDrone);
+        if (room.getActionsRemaining() < actionCost) {
+            return GameResult.error("Not enough actions remaining for this attack");
+        }
         
         if (manualBlindShot && (manualLineX == null || manualLineY == null)) {
             return GameResult.error("Manual missile shot requires target coordinates");
         }
 
-        double lineX = manualLineX != null ? manualLineX : targetDrone.getPosition().getX();
-        double lineY = manualLineY != null ? manualLineY : targetDrone.getPosition().getY();
+        double lineX = manualLineX != null ? manualLineX : (targetDrone != null ? targetDrone.getPosition().getX() : 0.0);
+        double lineY = manualLineY != null ? manualLineY : (targetDrone != null ? targetDrone.getPosition().getY() : 0.0);
+
+        if (attackerDrone instanceof NavalDrone && targetDrone != null) {
+            double targetDistance = distanceBetween(
+                attackerDrone.getPosition().getX(),
+                attackerDrone.getPosition().getY(),
+                targetDrone.getPosition().getX(),
+                targetDrone.getPosition().getY()
+            );
+            if (attackerDrone.getWeapon() == null) {
+                return GameResult.error("Attacker has no weapon configured");
+            }
+            if (targetDistance > attackerDrone.getWeapon().getRange()) {
+                return GameResult.error("Target out of naval attack range");
+            }
+        }
+
+        HexCoord attackerFinalPosition = attackerDrone.getPosition();
+        if (attackerDrone instanceof NavalDrone && targetDrone != null) {
+            attackerFinalPosition = getNavalAttackPosition(targetDrone);
+            attackerDrone.setPosition(attackerFinalPosition);
+        }
 
         AttackResolution attackResolution = resolveAttack(attackerDrone, targetDrone, lineX, lineY);
         if (!attackResolution.hit()) {
-            room.useAction();
+            room.useActions(actionCost);
             Packet missPacket = Packet.attackResult(
                 attacker.getPlayerIndex(), attackerIndex,
                 targetPlayerIndex, targetDroneIndex,
                 0, targetDrone != null ? targetDrone.getCurrentHp() : 0, false,
-                lineX, lineY
+                lineX, lineY,
+                room.getActionsRemaining(),
+                attackerFinalPosition.getX(), attackerFinalPosition.getY()
             );
             return finalizeTurn(room, missPacket);
         }
@@ -629,7 +661,7 @@ public class GameController {
         }
 
         // Consume una accion
-        room.useAction();               
+        room.useActions(actionCost);
 
         log.info("Player {} drone {} attacked player {} drone {} for {} damage (remaining HP: {}) in room {}",
             attacker.getPlayerIndex(), attackerIndex, 
@@ -640,7 +672,9 @@ public class GameController {
             attacker.getPlayerIndex(), attackerIndex,
             targetPlayerIndex, targetDroneIndex,
             damage, targetDrone != null ? targetDrone.getCurrentHp() : 0, true,
-            lineX, lineY
+            lineX, lineY,
+            room.getActionsRemaining(),
+            attackerFinalPosition.getX(), attackerFinalPosition.getY()
         );
 
         // Check game over
@@ -696,6 +730,10 @@ public class GameController {
             return GameResult.error("No missiles remaining for this aerial drone");
         }
 
+        if (attackerDrone instanceof NavalDrone && manualBlindShot) {
+            return GameResult.error("Naval drone attack requires selecting an enemy drone");
+        }
+
         if (!manualBlindShot && !targetDrone.isAlive()) {
             return GameResult.error("Target drone is already destroyed");
         }
@@ -718,6 +756,10 @@ public class GameController {
     }
 
     private AttackResolution resolveAttack(Drone attackerDrone, Drone targetDrone, double lineX, double lineY) {
+        if (attackerDrone.getWeapon() == null) {
+            return new AttackResolution(0, false);
+        }
+
         if (!(attackerDrone instanceof AerialDrone aerialDrone)) {
             return new AttackResolution(attackerDrone.getWeapon().getDamage(), true);
         }
@@ -762,6 +804,17 @@ public class GameController {
         double dx = x1 - x2;
         double dy = y1 - y2;
         return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    private int getAttackActionCost(Drone attackerDrone) {
+        return attackerDrone instanceof NavalDrone ? NAVAL_ATTACK_ACTION_COST : DEFAULT_ATTACK_ACTION_COST;
+    }
+
+    private HexCoord getNavalAttackPosition(Drone targetDrone) {
+        return new HexCoord(
+            targetDrone.getPosition().getX(),
+            targetDrone.getPosition().getY() - NAVAL_ATTACK_VERTICAL_OFFSET
+        );
     }
 
     private record AttackResolution(int damage, boolean hit) {

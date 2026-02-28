@@ -10,10 +10,10 @@ export default class LobbyScene extends Phaser.Scene {
     }
 
     preload() {
-        // Load side preview images (use same keys as MainScene will use)
-        this.load.image('dron_bomba', '/assets/dron_bomba.png');
-        this.load.image('dron_misil', '/assets/dron_misil.png');
-        this.load.image('mar', '/assets/mar.png');
+        // Load side preview images (usar los assets estáticos nuevos)
+        this.load.image('dron_bomba_0', 'assets/dron_bomba/dron_bomba_0.png');
+        this.load.image('dron_misil_0', 'assets/dron_misil/dron_misil_0.png');
+        this.load.image('mar', 'assets/mar.png');
     }
 
     create() {
@@ -37,11 +37,11 @@ export default class LobbyScene extends Phaser.Scene {
         const centerY = VIEW_HEIGHT / 2;
 
         // Naval side (left)
-        this.createSideButton(leftX, centerY, 'Naval', 'dron_bomba', 
+        this.createSideButton(leftX, centerY, 'Naval', 'dron_bomba_0', 
             'Dron Bomba\n\nAlto daño\nCorto alcance\nMovimiento lento');
 
         // Aereo side (right)
-        this.createSideButton(rightX, centerY, 'Aereo', 'dron_misil',
+        this.createSideButton(rightX, centerY, 'Aereo', 'dron_misil_0',
             'Dron Misil\n\nDaño medio\nLargo alcance\nMovimiento rápido');
 
         // Status text (hidden by default, only shown for player 1)

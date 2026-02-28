@@ -38,10 +38,24 @@ export default class MainScene extends Phaser.Scene {
 
     preload() {
         this.load.image('mar', 'assets/mar.png');
-        this.load.image('dron_misil', 'assets/dron_misil.png');
-        this.load.image('dron_bomba', 'assets/dron_bomba.png');
+        // Cargar los 5 assets de dron_misil
+        this.load.image('dron_misil_0', 'assets/dron_misil/dron_misil_0.png'); // estático
+        this.load.image('dron_misil_1', 'assets/dron_misil/dron_misil_1.png'); // izquierda
+        this.load.image('dron_misil_2', 'assets/dron_misil/dron_misil_2.png'); // derecha
+        this.load.image('dron_misil_3', 'assets/dron_misil/dron_misil_3.png'); // abajo
+        this.load.image('dron_misil_4', 'assets/dron_misil/dron_misil_4.png'); // arriba
+        // Cargar los 5 assets de dron_bomba
+        this.load.image('dron_bomba_0', 'assets/dron_bomba/dron_bomba_0.png'); // estático
+        this.load.image('dron_bomba_1', 'assets/dron_bomba/dron_bomba_1.png'); // izquierda
+        this.load.image('dron_bomba_2', 'assets/dron_bomba/dron_bomba_2.png'); // derecha
+        this.load.image('dron_bomba_3', 'assets/dron_bomba/dron_bomba_3.png'); // abajo
+        this.load.image('dron_bomba_4', 'assets/dron_bomba/dron_bomba_4.png'); // arriba
         this.load.image('porta_drones_volador', 'assets/porta_drones_volador.png');
         this.load.image('porta_drones_mar', 'assets/porta_drones_mar.png');
+        // Asset de la bomba para el dron bomba
+        this.load.image('bomba', 'assets/dron_bomba/bomba.png');
+        // Asset del cohete para el dron misil
+        this.load.image('misil', 'assets/dron_misil/misil.png');
     }
 
 
@@ -53,6 +67,7 @@ export default class MainScene extends Phaser.Scene {
         // Tile the background to cover the whole world
         const bg = this.add.tileSprite(0, 0, WORLD_WIDTH, WORLD_HEIGHT, 'mar');
         bg.setOrigin(0, 0);
+        // Ajustar tamaño de los assets de dron_misil a 128x128 si es necesario (Phaser lo puede escalar en Drone.js)
 
         // Draw hex grid over the full world
         this.hexGrid = new HexGrid(this, 35, WORLD_WIDTH, WORLD_HEIGHT);
@@ -296,7 +311,21 @@ export default class MainScene extends Phaser.Scene {
             const attackerDrone = this.drones[msg.attackerPlayer]?.[msg.attackerDrone];
 
             if (attackerDrone && (targetDrone || (typeof msg.lineX === 'number' && typeof msg.lineY === 'number'))) {
-                this.playMissileShot(attackerDrone, targetDrone, hit, msg.lineX, msg.lineY);
+                if (attackerDrone.droneType === 'Naval' && targetDrone) {
+                    // Animación especial para dron bomba
+                    attackerDrone.navalDronAttack(
+                        targetDrone.sprite.x,
+                        targetDrone.sprite.y,
+                        msg.attackerX,
+                        msg.attackerY
+                    );
+                } else if (attackerDrone.droneType === 'Aereo') {
+                    // Animación especial para dron misil
+                    const targetPos = targetDrone?.sprite || { x: msg.lineX, y: msg.lineY };
+                    attackerDrone.launchMissile(targetPos.x, targetPos.y);
+                } else {
+                    this.playMissileShot(attackerDrone, targetDrone, hit, msg.lineX, msg.lineY);
+                }
             }
 
             if (targetDrone && hit) {
@@ -308,7 +337,9 @@ export default class MainScene extends Phaser.Scene {
                 if (attackerDrone.droneType === 'Aereo') {
                     attackerDrone.consumeMissile();
                 }
-                const nextActions = Math.max(0, (Network.actionsRemaining ?? 0) - 1);
+                const nextActions = typeof msg.actionsRemaining === 'number'
+                    ? msg.actionsRemaining
+                    : Math.max(0, (Network.actionsRemaining ?? 0) - 1);
                 Network.actionsRemaining = nextActions;
                 this.events.emit('actionsUpdated', {
                     actionsRemaining: nextActions,
