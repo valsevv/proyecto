@@ -596,12 +596,17 @@ public class GameController {
         if (validation != null) return validation;
                 
         Drone attackerDrone = room.getDrone(attacker.getPlayerIndex(), attackerIndex);
-        Drone targetDrone = room.getDrone(targetPlayerIndex, targetDroneIndex);
+        Drone targetDrone = targetDroneIndex >= 0 ? room.getDrone(targetPlayerIndex, targetDroneIndex) : null;
+        boolean manualBlindShot = targetDroneIndex < 0;
                                         
-        GameResult droneValidation = validateDrones(attacker, attackerDrone, targetDrone, targetPlayerIndex);
+        GameResult droneValidation = validateDrones(attacker, attackerDrone, targetDrone, targetPlayerIndex, manualBlindShot);
         log.info("[GameController] ->  droneValidation {}", droneValidation);
         if (droneValidation != null) return droneValidation;
         
+        if (manualBlindShot && (manualLineX == null || manualLineY == null)) {
+            return GameResult.error("Manual missile shot requires target coordinates");
+        }
+
         double lineX = manualLineX != null ? manualLineX : targetDrone.getPosition().getX();
         double lineY = manualLineY != null ? manualLineY : targetDrone.getPosition().getY();
 
@@ -611,7 +616,7 @@ public class GameController {
             Packet missPacket = Packet.attackResult(
                 attacker.getPlayerIndex(), attackerIndex,
                 targetPlayerIndex, targetDroneIndex,
-                0, targetDrone.getCurrentHp(), false,
+                0, targetDrone != null ? targetDrone.getCurrentHp() : 0, false,
                 lineX, lineY
             );
             return finalizeTurn(room, missPacket);
@@ -619,7 +624,9 @@ public class GameController {
 
         // Aplica el daño
         int damage = attackResolution.damage();
-        targetDrone.receiveDamage(damage);
+        if (targetDrone != null) {
+            targetDrone.receiveDamage(damage);
+        }
 
         // Consume una accion
         room.useAction();               
@@ -627,17 +634,17 @@ public class GameController {
         log.info("Player {} drone {} attacked player {} drone {} for {} damage (remaining HP: {}) in room {}",
             attacker.getPlayerIndex(), attackerIndex, 
             targetPlayerIndex, targetDroneIndex,
-            damage, targetDrone.getCurrentHp(), room.getRoomId());
+            damage, targetDrone != null ? targetDrone.getCurrentHp() : 0, room.getRoomId());
 
         Packet attackPacket = Packet.attackResult(
             attacker.getPlayerIndex(), attackerIndex,
             targetPlayerIndex, targetDroneIndex,
-            damage, targetDrone.getCurrentHp(), true,
+            damage, targetDrone != null ? targetDrone.getCurrentHp() : 0, true,
             lineX, lineY
         );
 
         // Check game over
-        if (isPlayerDefeated(room, targetPlayerIndex)) {
+        if (targetDrone != null && isPlayerDefeated(room, targetPlayerIndex)) {
             log.info("Player {} has been defeated in room {}!", targetPlayerIndex, room.getRoomId());
             //Aca hay que manejar el final del juego
         }
@@ -665,7 +672,7 @@ public class GameController {
     }
 
     private GameResult validateDrones(PlayerState attacker, Drone attackerDrone,
-            Drone targetDrone,int targetPlayerIndex) {
+            Drone targetDrone,int targetPlayerIndex, boolean manualBlindShot) {
                 
     log.info("[GameController] -> begin validateDrones, attacker {}, attackerDrone {}", attacker, attackerDrone);
     
@@ -677,7 +684,7 @@ public class GameController {
             return GameResult.error("Invalid attacker drone index");
         }
 
-        if (targetDrone == null) {
+        if (!manualBlindShot && targetDrone == null) {
             return GameResult.error("Invalid target drone index");
         }
 
@@ -685,11 +692,11 @@ public class GameController {
             return GameResult.error("Cannot attack with a destroyed drone");
         }
 
-        if (attackerDrone instanceof AerialDrone aerialDrone && targetDrone instanceof NavalDrone && !aerialDrone.hasMissiles()) {
+        if (attackerDrone instanceof AerialDrone aerialDrone && !aerialDrone.hasMissiles()) {
             return GameResult.error("No missiles remaining for this aerial drone");
         }
 
-        if (!targetDrone.isAlive()) {
+        if (!manualBlindShot && !targetDrone.isAlive()) {
             return GameResult.error("Target drone is already destroyed");
         }
 
@@ -711,7 +718,7 @@ public class GameController {
     }
 
     private AttackResolution resolveAttack(Drone attackerDrone, Drone targetDrone, double lineX, double lineY) {
-        if (!(attackerDrone instanceof AerialDrone aerialDrone) || !(targetDrone instanceof NavalDrone)) {
+        if (!(attackerDrone instanceof AerialDrone aerialDrone)) {
             return new AttackResolution(attackerDrone.getWeapon().getDamage(), true);
         }
 
@@ -729,16 +736,25 @@ public class GameController {
             return new AttackResolution(0, false);
         }
 
-        double targetOffset = distanceBetween(lineX, lineY, targetDrone.getPosition().getX(), targetDrone.getPosition().getY());
-        double alignmentFactor = Math.max(0.0, 1.0 - (targetOffset / 120.0));
-        double effectiveAccuracy = missileWeapon.getEffectiveAccuracy(traveledDistance) * alignmentFactor;
+        double effectiveAccuracy = missileWeapon.getEffectiveAccuracy(traveledDistance);
+
+        if (targetDrone instanceof NavalDrone) {
+            double targetOffset = distanceBetween(lineX, lineY, targetDrone.getPosition().getX(), targetDrone.getPosition().getY());
+            double alignmentFactor = Math.max(0.0, 1.0 - (targetOffset / 120.0));
+            effectiveAccuracy *= alignmentFactor;
+        }
+
         boolean hit = Math.random() <= effectiveAccuracy;
         aerialDrone.consumeMissile();
         if (!hit) {
             return new AttackResolution(0, false);
         }
 
-        int damage = (int) Math.round(targetDrone.getMaxHp() * missileDamagePercentOnNaval);
+        if (!(targetDrone instanceof NavalDrone navalTarget)) {
+            return new AttackResolution(attackerDrone.getWeapon().getDamage(), true);
+        }
+
+        int damage = (int) Math.round(navalTarget.getMaxHp() * missileDamagePercentOnNaval);
         return new AttackResolution(Math.max(1, damage), true);
     }
 
