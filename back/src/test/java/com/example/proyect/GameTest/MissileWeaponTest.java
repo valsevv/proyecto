@@ -21,6 +21,14 @@ class MissileWeaponTest {
     }
 
     @Test
+    void shouldLimitMissileRangeToFifteenTiles() {
+        MissileWeapon weapon = new MissileWeapon(2, 50, 1, 0.8, 15);
+
+        assertTrue(weapon.canReach(15));
+        assertFalse(weapon.canReach(15.1));
+    }
+
+    @Test
     void shouldRespectMissileStockInAerialDrone() {
         AerialDrone drone = new AerialDrone();
 

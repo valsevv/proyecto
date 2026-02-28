@@ -60,6 +60,7 @@ export default class MainScene extends Phaser.Scene {
         // Graphics for hex hover highlight
         this.hexHighlight = this.add.graphics();
         this.missileGuideGraphics = this.add.graphics();
+        this.manualTargetHex = null;
         this.lastHighlightedHex = null;
 
         // Camera bounds and initial position
@@ -93,10 +94,16 @@ export default class MainScene extends Phaser.Scene {
         this.input.on('pointerup', (pointer) => {
             if (this.isDragging) return;
             if (!this.isMyTurn) return;
-            if (this.actionMode !== MODE_MOVE) return;
-            if (!this.selectedDrone && !this.selectedCarrier) return;
 
             const nearest = this.hexGrid.getNearestCenter(pointer.worldX, pointer.worldY);
+
+            if (this.actionMode === MODE_ATTACK && this.selectedDrone) {
+                this.setManualAttackLine(nearest);
+                return;
+            }
+
+            if (this.actionMode !== MODE_MOVE) return;
+            if (!this.selectedDrone && !this.selectedCarrier) return;
 
             if (this.selectedCarrier) {
                 const distance = this.hexGrid.getHexDistance(
@@ -553,6 +560,7 @@ export default class MainScene extends Phaser.Scene {
 
         this.actionMode = MODE_ATTACK;
         this.hexHighlight.clear();
+        this.manualTargetHex = null;
         this.highlightEnemyTargets();
     }
 
@@ -580,6 +588,7 @@ export default class MainScene extends Phaser.Scene {
                 drone.setTargetable(false);
             }
         }
+        this.manualTargetHex = null;
         this.missileGuideGraphics.clear();
     }
 
@@ -591,7 +600,22 @@ export default class MainScene extends Phaser.Scene {
         const attackerIndex = this.myDrones.indexOf(this.selectedDrone);
         if (attackerIndex < 0) return;
 
-        Network.requestAttack(attackerIndex, targetDrone.playerIndex, targetDrone.droneIndex);
+        const lineTarget = this.manualTargetHex || targetDrone?.sprite;
+        if (!lineTarget) return;
+
+        Network.requestAttack(
+            attackerIndex,
+            targetDrone.playerIndex,
+            targetDrone.droneIndex,
+            lineTarget.x,
+            lineTarget.y
+        );
+    }
+
+    setManualAttackLine(hexCenter) {
+        if (!this.selectedDrone || !hexCenter) return;
+        this.manualTargetHex = hexCenter;
+        this.drawMissileGuides((this.drones[Network.playerIndex === 0 ? 1 : 0] || []).filter((drone) => drone.isAlive()));
     }
 
     drawMissileGuides(enemyDrones) {
@@ -602,11 +626,21 @@ export default class MainScene extends Phaser.Scene {
         const startY = this.selectedDrone.sprite.y;
 
         for (const enemy of enemyDrones) {
-            this.missileGuideGraphics.lineStyle(2, 0xffc107, 0.8);
+            this.missileGuideGraphics.lineStyle(2, 0xffc107, 0.5);
             this.missileGuideGraphics.beginPath();
             this.missileGuideGraphics.moveTo(startX, startY);
             this.missileGuideGraphics.lineTo(enemy.sprite.x, enemy.sprite.y);
             this.missileGuideGraphics.strokePath();
+        }
+
+        if (this.manualTargetHex) {
+            this.missileGuideGraphics.lineStyle(3, 0x29b6f6, 0.95);
+            this.missileGuideGraphics.beginPath();
+            this.missileGuideGraphics.moveTo(startX, startY);
+            this.missileGuideGraphics.lineTo(this.manualTargetHex.x, this.manualTargetHex.y);
+            this.missileGuideGraphics.strokePath();
+
+            this.hexGrid.drawFilledHex(this.missileGuideGraphics, this.manualTargetHex.x, this.manualTargetHex.y, 0x29b6f6, 0.28);
         }
     }
 
