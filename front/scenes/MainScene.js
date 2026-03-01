@@ -12,10 +12,8 @@ const MAX_MANUAL_ATTACK_DISTANCE = 15; // max range in hexes for manual missile 
 // Adjust NAVAL_VISION_RANGE to tune both.
 const NAVAL_VISION_RANGE = 6;
 const AEREO_VISION_RANGE = NAVAL_VISION_RANGE * 2;
-const CARRIER_POSITIONS = {
-    0: { x: 300, y: 900 },
-    1: { x: 2100, y: 900 }
-};
+const CARRIER_EDGE_MARGIN = 320;
+const CARRIER_SPAWN_Y_MARGIN = 240;
 
 // Action modes
 const MODE_MOVE = 'move';
@@ -485,8 +483,8 @@ export default class MainScene extends Phaser.Scene {
         // Note: Connection and join are handled by LobbyScene
     }
 
-    createCarrierForPlayer(playerIndex, side) {
-        const basePosition = CARRIER_POSITIONS[playerIndex] || CARRIER_POSITIONS[0];
+    createCarrierForPlayer(playerIndex, side, spawnHintY = null) {
+        const basePosition = this.getCarrierSpawnPosition(playerIndex, spawnHintY);
         const spriteKey = side === 'Naval' ? 'porta_drones_mar' : 'porta_drones_volador';
 
         if (this.carriers[playerIndex]) {
@@ -525,6 +523,25 @@ export default class MainScene extends Phaser.Scene {
         this.carriers[playerIndex] = carrier;
     }
 
+
+    getCarrierSpawnPosition(playerIndex, spawnHintY = null) {
+        const minY = CARRIER_SPAWN_Y_MARGIN;
+        const maxY = Math.max(minY, WORLD_HEIGHT - CARRIER_SPAWN_Y_MARGIN);
+        const fallbackY = Phaser.Math.Between(minY, maxY);
+        const y = Phaser.Math.Clamp(spawnHintY ?? fallbackY, minY, maxY);
+
+        const leftSpawn = {
+            x: CARRIER_EDGE_MARGIN,
+            y
+        };
+        const rightSpawn = {
+            x: Math.max(CARRIER_EDGE_MARGIN, WORLD_WIDTH - CARRIER_EDGE_MARGIN),
+            y
+        };
+
+        return playerIndex === 0 ? leftSpawn : rightSpawn;
+    }
+
     createDronesFromState(state) {
         console.log('[MainScene] === createDronesFromState CALLED ===');
         console.log('[MainScene] State:', state);
@@ -550,7 +567,8 @@ export default class MainScene extends Phaser.Scene {
             const side = player.side || 'Aereo';
             this.playerSides[player.playerIndex] = side;
             if (isLocal) this.localSide = side;
-            this.createCarrierForPlayer(player.playerIndex, side);
+            const spawnHintY = player.drones?.[0]?.y ?? null;
+            this.createCarrierForPlayer(player.playerIndex, side, spawnHintY);
 
             for (const d of player.drones) {
                 const hex = this.hexGrid.getNearestCenter(d.x, d.y);
