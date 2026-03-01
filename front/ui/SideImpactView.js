@@ -10,12 +10,18 @@ export default class SideImpactView {
         this.container.setScrollFactor(0);
         this.container.setVisible(false);
 
-        this.bg = scene.add.graphics();
-        this.container.add(this.bg);
+        // Fondo con imagen proporcionada para la vista lateral
+        this.bgImage = scene.add.image(0, 0, 'vista_lateral_fondo');
+        this.bgImage.setDisplaySize(this.width, this.height);
+        this.bgImage.setOrigin(0.5);
+        this.container.add(this.bgImage);
+        this.frameBorder = scene.add.graphics();
 
         // Sea/ground layer (inserted between bg and content)
         this.sea = null;
         this._ensureSea();
+        this.container.add(this.frameBorder);
+        this._drawMetalBorder();
 
         this.content = scene.add.container(0, 0);
         this.container.add(this.content);
@@ -24,14 +30,14 @@ export default class SideImpactView {
         this._pendingHideTimer = null;
         this._projectileTween = null;
 
-        this._drawFrame();
+        // Ya no se dibuja el fondo con gráficos, se usa la imagen
     }
 
     _ensureSea() {
         const w = this.width;
-        const seaH = 56;
+        const seaH = 90;
         const seaW = w - 24;
-        const seaCenterY = this.groundY + seaH / 2;
+        const seaCenterY = this.groundY + seaH / 2 + 8;
 
         if (this.sea) {
             this.sea.setSize(seaW, seaH);
@@ -42,27 +48,31 @@ export default class SideImpactView {
         if (this.scene?.textures?.exists('mar')) {
             this.sea = this.scene.add.tileSprite(0, seaCenterY, seaW, seaH, 'mar');
             this.sea.setOrigin(0.5);
-            this.sea.setAlpha(0.85);
+            this.sea.setAlpha(0.7);
             this.container.add(this.sea);
         }
     }
 
     _drawFrame() {
-        const w = this.width;
-        const h = this.height;
+        // Método eliminado, ahora el fondo es una imagen
+    }
 
-        this.bg.clear();
-        this.bg.fillStyle(0x000000, 0.55);
-        this.bg.fillRoundedRect(-w / 2, -h / 2, w, h, 10);
+    _drawMetalBorder() {
+        if (!this.frameBorder) return;
 
-        // ground line
-        this.bg.lineStyle(2, 0xffffff, 0.12);
-        this.bg.lineBetween(-w / 2 + 12, this.groundY, w / 2 - 12, this.groundY);
+        const g = this.frameBorder;
+        const halfWidth = this.width / 2;
+        const halfHeight = this.height / 2;
 
-        // height markers (subtle)
-        this.bg.lineStyle(1, 0xffffff, 0.06);
-        this.bg.lineBetween(-w / 2 + 12, -h / 2 + 24, w / 2 - 12, -h / 2 + 24);
-        this.bg.lineBetween(-w / 2 + 12, -h / 2 + 70, w / 2 - 12, -h / 2 + 70);
+        g.clear();
+        g.lineStyle(10, 0x4c525b, 1);
+        g.strokeRoundedRect(-halfWidth, -halfHeight, this.width, this.height, 18);
+
+        g.lineStyle(3, 0xc3c7cd, 1);
+        g.strokeRoundedRect(-halfWidth + 3, -halfHeight + 3, this.width - 6, this.height - 6, 14);
+
+        g.lineStyle(1, 0xffffff, 0.6);
+        g.strokeRoundedRect(-halfWidth + 6, -halfHeight + 6, this.width - 12, this.height - 12, 10);
     }
 
     reposition(x, y) {
@@ -103,23 +113,24 @@ export default class SideImpactView {
 
         const w = this.width;
         const h = this.height;
-        const leftX = -w / 2 + 44;
-        const rightX = w / 2 - 44;
+        const leftX = -w / 4 + 10;
+        const rightX = w / 4 - 10;
         const groundY = this.groundY;
 
-        // Heights: top is "high altitude".
-        const attackerY = kind === 'bomb' ? -h / 2 + 42 : -h / 2 + 86;
-        const targetY = groundY;
+        // Heights: top is "high altitude" for bomb, mid for missile.
+        const attackerY = kind === 'bomb' ? -h / 2 + 48 : -h / 2 + 70;
+        const targetYOffset = kind === 'bomb' ? 15 : 10;
+        const targetY = groundY - targetYOffset;
 
         const attackerKey = payload?.attackerKey || (kind === 'bomb' ? 'dron_bomba_0' : 'dron_misil_0');
         const targetKey = payload?.targetKey || 'dron_bomba_0';
 
         this._attackerImg = this.scene.add.image(leftX, attackerY, attackerKey);
-        this._attackerImg.setDisplaySize(46, 46);
+        this._attackerImg.setDisplaySize(48, 48);
         this.content.add(this._attackerImg);
 
         this._targetImg = this.scene.add.image(rightX, targetY, targetKey);
-        this._targetImg.setDisplaySize(46, 46);
+        this._targetImg.setDisplaySize(48, 48);
         this.content.add(this._targetImg);
 
         this._trailGfx = this.scene.add.graphics();
@@ -127,14 +138,14 @@ export default class SideImpactView {
 
         const projectileKey = kind === 'bomb' ? 'bomba' : (payload?.projectileKey || 'misil_2');
         this._projectileImg = this.scene.add.image(leftX, attackerY, projectileKey);
-        this._projectileImg.setDisplaySize(kind === 'bomb' ? 26 : 28, kind === 'bomb' ? 26 : 16);
+        this._projectileImg.setDisplaySize(kind === 'bomb' ? 28 : 30, kind === 'bomb' ? 28 : 18);
         this.content.add(this._projectileImg);
 
         const startDelayMs = payload?.startDelayMs ?? (kind === 'bomb' ? 650 : 0);
         const travelMs = payload?.travelMs ?? (kind === 'bomb' ? 1350 : 1500);
 
         // Draw intended trajectory once.
-        this._drawTrajectory(leftX, attackerY, rightX, groundY, groundY);
+        this._drawTrajectory(leftX, attackerY, rightX, targetY, groundY);
 
         this._projectileTween = this.scene.tweens.addCounter({
             from: 0,
@@ -200,7 +211,7 @@ export default class SideImpactView {
 
         // Explosion at target.
         const w = this.width;
-        const rightX = w / 2 - 44;
+        const rightX = w / 4 - 10;
         const groundY = this.groundY;
 
         if (this._explosionImg) {
@@ -209,7 +220,7 @@ export default class SideImpactView {
         }
 
         this._explosionImg = this.scene.add.image(rightX, groundY, 'explosion');
-        this._explosionImg.setDisplaySize(90, 90);
+        this._explosionImg.setDisplaySize(95, 95);
         this._explosionImg.setAlpha(0.95);
         this.content.add(this._explosionImg);
         this.scene.sound.play('explosion', { volume: 0.35 });
@@ -217,7 +228,7 @@ export default class SideImpactView {
         this.scene.tweens.add({
             targets: this._explosionImg,
             alpha: 0,
-            scale: 1.2,
+            scale: 0.5,
             duration: 1420,
             ease: 'Quad.easeOut',
             onComplete: () => {

@@ -24,7 +24,7 @@ h1 {
 }
 
 input {
-    width: 100%;
+    width: 90%;
     padding: 10px;
     margin: 10px 0;
     background: black;
@@ -39,7 +39,7 @@ input:focus {
 }
 
 button {
-    width: 100%;
+    width: 60%;
     padding: 10px;
     margin-top: 10px;
     background: black;

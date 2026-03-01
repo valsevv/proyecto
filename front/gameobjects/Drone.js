@@ -7,7 +7,7 @@ export default class Drone {
      * @param {number} y
      * @param {number} color      – fill colour (e.g. 0x00ff00) - used for health bar and fallback
      * @param {boolean} interactive – only true for the local player's drones
-     * @param {object} stats      – { health, maxHealth, attackDamage, attackRange, droneType }
+     * @param {object} stats      – { health, maxHealth, attackDamage, attackRange, droneType, playerIndex }
      */
     constructor(scene, x, y, color = 0x00ff00, interactive = true, stats = {}) {
         this.scene = scene;
@@ -24,6 +24,7 @@ export default class Drone {
         this.fuel = stats.fuel ?? this.maxFuel;
         this.missiles = stats.missiles ?? 0;
         this.destroyed = false;
+        this.playerIndex = stats.playerIndex ?? 0;
 
         // Visibility (used for fog-of-war/vision).
         // NOTE: This is "visible to the local client", not Phaser's global visibility.
@@ -59,6 +60,15 @@ export default class Drone {
         this.sprite.setDisplaySize(128, 128); // Escala a 128x128
         this.sprite.setDepth(10);
         this.sprite.setOrigin(0.5);
+
+        // Invertir sprite si es necesario según la posición del equipo
+        // Naval drones miran a la izquierda por defecto, así que invierten si están a la izquierda
+        // Aereo drones miran a la derecha por defecto, así que invierten si están a la derecha
+        const shouldInvert = (this.playerIndex === 0 && this.droneType === 'Naval') ||
+                            (this.playerIndex === 1 && this.droneType === 'Aereo');
+        if (shouldInvert) {
+            this.sprite.setFlipX(true);
+        }
 
         // Guardar el estado de movimiento para cambiar el asset
         this.currentDirection = 0; // 0: estático, 1: izq, 2: der, 3: abajo, 4: arriba
@@ -323,6 +333,11 @@ export default class Drone {
         this.currentDirection = direction;
         this.sprite.setTexture(keys[direction]);
         this.sprite.setDisplaySize(128, 128);
+        
+        // Reapply flip if needed when texture changes
+        const shouldInvert = (this.playerIndex === 0 && this.droneType === 'Naval') ||
+                            (this.playerIndex === 1 && this.droneType === 'Aereo');
+        this.sprite.setFlipX(shouldInvert);
     }
 
     /**
@@ -474,7 +489,7 @@ export default class Drone {
             if (dy > 0) missileDir = 3; // abajo
             else if (dy < 0) missileDir = 4; // arriba
         }
-        const missileAssetKeys = ['misil', 'misil_1', 'misil_2', 'misil_3', 'misil_4'];
+        const missileAssetKeys = ['misil_1', 'misil_2', 'misil_3', 'misil_4'];
         const missileKey = missileAssetKeys[missileDir];
 
         // Notify HUD to show the side impact view.

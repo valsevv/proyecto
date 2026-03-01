@@ -12,6 +12,6 @@ public class AerialDrone extends Drone {
         setVisionRange(4);
 
         // Arma por defecto: bombas
-        setWeapon(new BombWeapon(6, 45, 1, 0.60, 2));
+        setWeapon(new BombWeapon(6, 45, 1, 0.60, 4));
     }
 }

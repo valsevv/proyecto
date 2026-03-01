@@ -12,11 +12,11 @@ public class NavalDrone extends Drone {
         super();
 
         // Ajustes típicos (podés tunear)
-        setMovementRange(3);
-        setVisionRange(3);
+        setMovementRange(2);
+        setVisionRange(2);
 
         // Arma por defecto: misiles
-        setWeapon(new MissileWeapon(10, 50, 1, 0.75, 15));
+        setWeapon(new MissileWeapon(10, 50, 1, 0.75, 8));
         this.missiles = DEFAULT_MISSILES;
     }
 
