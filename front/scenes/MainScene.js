@@ -24,6 +24,7 @@ export default class MainScene extends Phaser.Scene {
         super('MainScene');
         this.selectedDrone = null;
         this.selectedCarrier = null;
+        this.gameFinished = false;
         /** { playerIndex: [Drone, Drone, Drone] } */
         this.drones = {};
         /** Shortcut to the local player's drones */
@@ -143,6 +144,7 @@ export default class MainScene extends Phaser.Scene {
         this.input.on('pointerup', (pointer) => {
             if (this.isDragging) return;
             if (!this.isMyTurn) return;
+            if (this.gameFinished) return;
 
             const nearest = this.hexGrid.getNearestCenter(pointer.worldX, pointer.worldY);
 
@@ -167,6 +169,10 @@ export default class MainScene extends Phaser.Scene {
 
             if (this.selectedCarrier) {
                 if (this.selectedCarrier.isMoving) return;
+                if ((Network.actionsRemaining ?? 0) <= 0) {
+                    console.warn('No actions remaining to move carrier');
+                    return;
+                }
                 const distance = this.hexGrid.getHexDistance(
                     this.selectedCarrier.sprite.x,
                     this.selectedCarrier.sprite.y,
@@ -331,6 +337,9 @@ export default class MainScene extends Phaser.Scene {
         // The initial game state is received via scene data from LobbyScene
         
         Network.on('turnStart', (msg) => {
+            if (this.gameFinished) {
+                return;
+            }
             this.isMyTurn = (msg.activePlayer === Network.playerIndex);
             this.actionMode = MODE_MOVE;
             this.clearTargetHighlights();
@@ -355,6 +364,7 @@ export default class MainScene extends Phaser.Scene {
             });
 
             this.updateVision();
+            this.checkDrawByNoDrones();
         });
 
         Network.on('moveDrone', (msg) => {
@@ -398,6 +408,7 @@ export default class MainScene extends Phaser.Scene {
 
             // Movement can affect what is visible.
             this.updateVision();
+            this.checkDrawByNoDrones();
         });
 
         Network.on('attackResult', (msg) => {
@@ -466,6 +477,7 @@ export default class MainScene extends Phaser.Scene {
 
             // Attacks can destroy units and change visibility.
             this.updateVision();
+            this.checkDrawByNoDrones();
         });
 
         Network.on('playerLeft', () => {
@@ -656,7 +668,7 @@ export default class MainScene extends Phaser.Scene {
     }
 
     moveCarrier(carrier, x, y) {
-        if (carrier.isMoving) return;
+        if (carrier.isMoving || this.gameFinished) return;
         carrier.isMoving = true;
         this.tweens.add({
             targets: [carrier.sprite, carrier.ring],
@@ -667,8 +679,46 @@ export default class MainScene extends Phaser.Scene {
             onComplete: () => {
                 carrier.isMoving = false;
                 this.updateVision();
+
+                if (carrier.playerIndex === Network.playerIndex) {
+                    const nextActions = Math.max(0, (Network.actionsRemaining ?? 0) - 1);
+                    Network.actionsRemaining = nextActions;
+                    this.events.emit('actionsUpdated', {
+                        actionsRemaining: nextActions,
+                        actionsPerTurn: this.actionsPerTurn
+                    });
+
+                    if (nextActions <= 0) {
+                        this.endTurn();
+                    }
+                }
             }
         });
+    }
+
+    checkDrawByNoDrones() {
+        if (this.gameFinished) {
+            return;
+        }
+
+        const noAliveDrones = (playerIndex) => {
+            const drones = this.drones[playerIndex] || [];
+            return drones.length > 0 && drones.every((drone) => !drone?.isAlive());
+        };
+
+        if (!noAliveDrones(0) || !noAliveDrones(1)) {
+            return;
+        }
+
+        this.gameFinished = true;
+        this.isMyTurn = false;
+        this.clearTargetHighlights();
+        this.clearSelections();
+        this.events.emit('turnChanged', { isMyTurn: false });
+
+        this.add.text(400, 300, 'Empate\nNo quedan drones activos', {
+            fontSize: '22px', fill: '#ffdd57', align: 'center'
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(1000);
     }
 
     startCarrierPulse(carrier) {
