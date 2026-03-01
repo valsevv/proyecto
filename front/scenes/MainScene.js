@@ -1162,19 +1162,43 @@ export default class MainScene extends Phaser.Scene {
         Network.endTurn();
     }
 
-    /** Returns a flat list of { drone, playerIndex } for the minimap. */
-    getAllDrones() {
+    /** Returns a flat list of visible units for the minimap. */
+    getVisibleUnitsForMinimap() {
         const all = [];
+
+        // Drones
         for (const pi in this.drones) {
             for (const drone of this.drones[pi]) {
                 if (drone.isAlive()) {
                     const playerIndex = parseInt(pi);
                     if (playerIndex === Network.playerIndex || this.isDroneVisibleToLocal(drone)) {
-                        all.push({ drone, playerIndex });
+                        all.push({
+                            x: drone.sprite.x,
+                            y: drone.sprite.y,
+                            playerIndex,
+                            isSelected: this.selectedDrone === drone
+                        });
                     }
                 }
             }
         }
+
+        // Carriers (friendly always visible, enemy only by vision)
+        for (const pi in this.carriers) {
+            const playerIndex = parseInt(pi);
+            const carrier = this.carriers[pi];
+            if (!carrier?.sprite) continue;
+
+            if (playerIndex === Network.playerIndex || this.isCarrierVisibleToLocal(carrier)) {
+                all.push({
+                    x: carrier.sprite.x,
+                    y: carrier.sprite.y,
+                    playerIndex,
+                    isSelected: this.selectedCarrier === carrier
+                });
+            }
+        }
+
         return all;
     }
 
