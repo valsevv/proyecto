@@ -843,6 +843,38 @@ export default class MainScene extends Phaser.Scene {
         return false;
     }
 
+
+    /** Returns true if the given carrier should be visible to the local player. */
+    isCarrierVisibleToLocal(carrier) {
+        if (!carrier?.sprite) return false;
+        if (carrier.playerIndex === Network.playerIndex) return true;
+
+        const visionRange = this.getVisionRangeForSide(this.localSide);
+        if (!visionRange || visionRange <= 0) return false;
+
+        const sources = [];
+        const myDrones = this.drones[Network.playerIndex] || [];
+        for (const d of myDrones) {
+            if (d?.isAlive() && d.sprite) sources.push(d.sprite);
+        }
+
+        const myCarrier = this.carriers?.[Network.playerIndex];
+        if (myCarrier?.sprite) sources.push(myCarrier.sprite);
+
+        for (const sourceSprite of sources) {
+            const distance = this.hexGrid.getHexDistance(
+                sourceSprite.x,
+                sourceSprite.y,
+                carrier.sprite.x,
+                carrier.sprite.y
+            );
+
+            if (distance <= visionRange) return true;
+        }
+
+        return false;
+    }
+
     /**
      * Check if a world position is occupied by any drone or carrier.
      * Uses a tolerance for near-hexagon positions.
@@ -907,6 +939,20 @@ export default class MainScene extends Phaser.Scene {
                     drone.setTargetable(false);
                 }
             }
+        }
+
+        for (const pi in this.carriers) {
+            const playerIndex = parseInt(pi);
+            const carrier = this.carriers[pi];
+            if (!carrier?.sprite) continue;
+
+            if (playerIndex === localIndex) {
+                carrier.sprite.setVisible(true);
+                continue;
+            }
+
+            const visible = this.isCarrierVisibleToLocal(carrier);
+            carrier.sprite.setVisible(visible);
         }
 
         this.updateFogOfWar();
