@@ -265,6 +265,11 @@ export default class Drone {
             duration: DRONE_MOVE_DURATION_MS,
             ease: 'Power2',
             onComplete: () => {
+                if (this.destroyed || !this.sprite?.active) {
+                    this.isMoving = false;
+                    this.moveTweenBody = null;
+                    return;
+                }
                 this.setDirection(0); // volver a estático al terminar
                 this.syncUIPositions();
 
@@ -559,7 +564,9 @@ export default class Drone {
 
     sinkAndDestroy() {
         if (this.destroyed) return;
+        this.stopMotionTweens();
         this.destroyed = true;
+        this.isMoving = false;
         this.health = 0;
         this.fuel = 0;
 
