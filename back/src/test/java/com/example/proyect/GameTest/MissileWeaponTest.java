@@ -3,10 +3,9 @@ package com.example.proyect.GameTest;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-
 import org.junit.jupiter.api.Test;
 
-import com.example.proyect.game.units.drone.AerialDrone;
+import com.example.proyect.game.units.drone.NavalDrone;
 import com.example.proyect.game.units.weapons.MissileWeapon;
 
 class MissileWeaponTest {
@@ -29,10 +28,10 @@ class MissileWeaponTest {
     }
 
     @Test
-    void shouldRespectMissileStockInAerialDrone() {
-        AerialDrone drone = new AerialDrone();
+    void shouldRespectMissileStockInNavalDrone() {
+        NavalDrone drone = new NavalDrone();
 
-        assertEquals(AerialDrone.DEFAULT_MISSILES, drone.getMissiles());
+        assertEquals(NavalDrone.DEFAULT_MISSILES, drone.getMissiles());
         assertTrue(drone.hasMissiles());
 
         drone.consumeMissile();

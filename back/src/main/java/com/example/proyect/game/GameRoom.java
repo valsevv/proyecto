@@ -185,7 +185,14 @@ public class GameRoom {
         Drone drone = player.getDrones().get(droneIndex);
         if (!drone.isAlive()) return false;
 
-        drone.setPosition(new HexCoord(x, y));
+        // Check if target position is occupied by another unit
+        HexCoord targetPos = new HexCoord(x, y);
+        if (isPositionOccupied(targetPos, drone)) {
+            log.warn("Move blocked: target position occupied at ({}, {})", x, y);
+            return false;
+        }
+
+        drone.setPosition(targetPos);
         consumeMovementFuel(drone);
         return true;
     }
@@ -388,6 +395,44 @@ public class GameRoom {
     }
 
     /**
+     * Check if a position is occupied by any drone (except the ignoreDrone).
+     * Uses squared Euclidean distance with tolerance of 15 pixels.
+     * 
+     * @param position Target world position
+     * @param ignoreDrone Drone to ignore in the check (can be null)
+     * @return true if position is occupied
+     */
+    public synchronized boolean isPositionOccupied(HexCoord position, Drone ignoreDrone) {
+        if (position == null) return false;
+
+        final double TOLERANCE_SQ = 15 * 15; // 15 pixel tolerance, squared for performance
+
+        // Check all drones from all players
+        for (PlayerState player : players) {
+            for (Drone drone : player.getDrones()) {
+                // Skip dead drones and the ignored drone
+                if (!drone.isAlive() || drone == ignoreDrone) {
+                    continue;
+                }
+
+                HexCoord dronePos = drone.getPosition();
+                if (dronePos == null) continue;
+
+                // Calculate squared distance
+                double dx = dronePos.getX() - position.getX();
+                double dy = dronePos.getY() - position.getY();
+                double distanceSq = dx * dx + dy * dy;
+
+                if (distanceSq < TOLERANCE_SQ) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Serialize the full game state to a Map (for JSON).
      */
     public synchronized Map<String, Object> toStateMap() {
@@ -415,8 +460,8 @@ public class GameRoom {
                 dm.put("maxFuel", d.getMaxFuel());
                 // Add drone type for frontend rendering
                 dm.put("droneType", d instanceof NavalDrone ? "Naval" : "Aereo");
-                if (d instanceof AerialDrone aerialDrone) {
-                    dm.put("missiles", aerialDrone.getMissiles());
+                if (d instanceof NavalDrone navalDrone) {
+                    dm.put("missiles", navalDrone.getMissiles());
                 }
                 droneMaps.add(dm);
             }
@@ -540,9 +585,9 @@ public class GameRoom {
                 }
                 drone.setFuel(fuel);
 
-                if (drone instanceof AerialDrone aerialDrone) {
-                    int missiles = getOptionalNonNegativeIntField(rawDrone, "missiles", AerialDrone.DEFAULT_MISSILES);
-                    aerialDrone.setMissiles(missiles);
+                if (drone instanceof NavalDrone navalDrone) {
+                    int missiles = getOptionalNonNegativeIntField(rawDrone, "missiles", NavalDrone.DEFAULT_MISSILES);
+                    navalDrone.setMissiles(missiles);
                 }
 
                 drone.setCurrentHp(health);

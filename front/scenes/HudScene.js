@@ -1,4 +1,5 @@
 import Minimap from '../ui/Minimap.js';
+import SideImpactView from '../ui/SideImpactView.js';
 import networkManager from '../network/NetworkManager.js';
 
 const TEAM_COLORS = [0x00ff00, 0xff4444];
@@ -27,6 +28,19 @@ export default class HudScene extends Phaser.Scene {
             this.scale.width - radius - margin,
             this.scale.height - radius - margin,
             radius
+        );
+
+        // Side impact view (bottom-left, opposite minimap). Only visible during attacks.
+        const sideViewW = 300;
+        const sideViewH = 200;
+        // Reserve space for action buttons (40px height) so we don't overlap.
+        const reservedBottom = margin + 40 + 10;
+        this.sideImpactView = new SideImpactView(
+            this,
+            margin + sideViewW / 2,
+            this.scale.height - reservedBottom - sideViewH / 2,
+            sideViewW,
+            sideViewH
         );
 
         // Status/Turn indicator text (centered)
@@ -65,6 +79,31 @@ export default class HudScene extends Phaser.Scene {
         mainScene.events.on('actionsUpdated', this.onActionsUpdated, this);
         mainScene.events.on('attackModeEnded', this.deselectAttackButton, this);
         mainScene.events.on('selectionChanged', this.onSelectionChanged, this);
+
+        // Attack side-view events
+        this._onAttackAnimStart = (payload) => this.sideImpactView?.onAttackStart(payload);
+        this._onAttackAnimImpact = (payload) => this.sideImpactView?.onAttackImpact(payload);
+        this._onAttackAnimEnd = (payload) => this.sideImpactView?.onAttackEnd(payload);
+
+        mainScene.events.on('attackAnimStart', this._onAttackAnimStart, this);
+        mainScene.events.on('attackAnimImpact', this._onAttackAnimImpact, this);
+        mainScene.events.on('attackAnimEnd', this._onAttackAnimEnd, this);
+
+        // Keep UI anchored on resize
+        this.scale.on('resize', (gameSize) => {
+            const w = gameSize.width;
+            const h = gameSize.height;
+            if (this.sideImpactView) {
+                this.sideImpactView.reposition(margin + sideViewW / 2, h - reservedBottom - sideViewH / 2);
+            }
+        });
+
+        this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+            if (!mainScene) return;
+            if (this._onAttackAnimStart) mainScene.events.off('attackAnimStart', this._onAttackAnimStart, this);
+            if (this._onAttackAnimImpact) mainScene.events.off('attackAnimImpact', this._onAttackAnimImpact, this);
+            if (this._onAttackAnimEnd) mainScene.events.off('attackAnimEnd', this._onAttackAnimEnd, this);
+        });
         
         console.log('[HudScene] === EVENT LISTENERS REGISTERED ===');
         console.log('[HudScene] === CREATE COMPLETE ===');
@@ -180,8 +219,8 @@ export default class HudScene extends Phaser.Scene {
         // Check if selected drone can attack
         const mainScene = this.scene.get('MainScene');
         const selectedDrone = mainScene?.selectedDrone;
-        const hasMissilesForAerial = !selectedDrone || selectedDrone.droneType !== 'Aereo' || selectedDrone.canUseMissileAttack();
-        const canAttack = selectedDrone && !selectedDrone.hasAttacked && hasMissilesForAerial;
+        const hasAmmoForAttack = !selectedDrone || selectedDrone.droneType !== 'Naval' || selectedDrone.canUseMissileAttack();
+        const canAttack = selectedDrone && !selectedDrone.hasAttacked && hasAmmoForAttack;
 
         // Update attack button color and alpha
         let attackColor, attackAlpha, textAlpha;
@@ -240,7 +279,7 @@ export default class HudScene extends Phaser.Scene {
             this.setButtonsVisible(true);
         } else {
             this.turnText.setText('Turno del oponente');
-            this.turnText.setStyle({ fill: '#ff4444' });
+            this.turnText.setStyle({ fill: '#fc0f0f' });
             this.droneInfoText.setText('');
             this.setButtonsVisible(false);
         }

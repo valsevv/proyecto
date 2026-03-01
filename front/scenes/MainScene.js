@@ -7,6 +7,11 @@ const TEAM_COLORS = [0x00ff00, 0xff4444]; // green = player 0, red = player 1
 const MAX_MOVE_DISTANCE = 6; // hexes per turn
 const MAX_CARRIER_MOVE_DISTANCE = 3; // hexes per turn (parametrizable)
 const MAX_MANUAL_ATTACK_DISTANCE = 15; // max range in hexes for manual missile aiming (parametrizable)
+
+// Vision ranges (in hexes). Aereo must see 2x Naval.
+// Adjust NAVAL_VISION_RANGE to tune both.
+const NAVAL_VISION_RANGE = 6;
+const AEREO_VISION_RANGE = NAVAL_VISION_RANGE * 2;
 const CARRIER_POSITIONS = {
     0: { x: 300, y: 900 },
     1: { x: 2100, y: 900 }
@@ -28,6 +33,14 @@ export default class MainScene extends Phaser.Scene {
         /** { playerIndex: { sprite, ring, playerIndex, isLocal, maxMoveDistance } } */
         this.carriers = {};
         this.isDragging = false;
+
+        /** { playerIndex: 'Naval' | 'Aereo' } */
+        this.playerSides = {};
+        this.localSide = 'Aereo';
+
+        // Vision ranges (in hexes). Defaults are overridden by server gameState when available.
+        this.navalVisionRange = NAVAL_VISION_RANGE;
+        this.aereoVisionRange = AEREO_VISION_RANGE;
 
         // Turn state
         this.isMyTurn = false;
@@ -54,8 +67,17 @@ export default class MainScene extends Phaser.Scene {
         this.load.image('porta_drones_mar', 'assets/porta_drones_mar.png');
         // Asset de la bomba para el dron bomba
         this.load.image('bomba', 'assets/dron_bomba/bomba.png');
-        // Asset del cohete para el dron misil
-        this.load.image('misil', 'assets/dron_misil/misil.png');
+        // Asset del cohete para el dron misil (directional variants)
+        this.load.image('misil', 'assets/dron_misil/misil.png'); // default/static
+        this.load.image('misil_1', 'assets/dron_misil/misil_1.png'); // izquierda
+        this.load.image('misil_2', 'assets/dron_misil/misil_2.png'); // derecha
+        this.load.image('misil_3', 'assets/dron_misil/misil_3.png'); // abajo
+        this.load.image('misil_4', 'assets/dron_misil/misil_4.png'); // arriba
+
+        // Explosion (used by the side impact view for bomb/missile impacts)
+        this.load.image('explosion', 'assets/explosion.png');
+        this.load.audio('explosion', 'assets/explosion.flac');
+        this.load.audio('missile_launch', 'assets/dron_misil/missile_launch.wav');
     }
 
 
@@ -78,6 +100,14 @@ export default class MainScene extends Phaser.Scene {
         this.missileGuideGraphics = this.add.graphics();
         this.manualTargetHex = null;
         this.lastHighlightedHex = null;
+
+        // Fog-of-war overlay (darkens unexplored/out-of-vision areas)
+        this.fogAlpha = 0.65;
+        this.fogRT = this.add.renderTexture(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+        this.fogRT.setOrigin(0, 0);
+        // Keep fog above background/grid but below units (drones are depth ~10)
+        this.fogRT.setDepth(8);
+        this.fogEraser = this.make.graphics({ x: 0, y: 0, add: false });
 
         // Camera bounds and initial position
         this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
@@ -119,8 +149,12 @@ export default class MainScene extends Phaser.Scene {
             const nearest = this.hexGrid.getNearestCenter(pointer.worldX, pointer.worldY);
 
             if (this.actionMode === MODE_ATTACK && this.selectedDrone) {
-                this.setManualAttackLine(nearest);
-                this.executeManualAttack();
+                // Naval = missile: allow manual aiming to any hex.
+                // Aereo = bomb: requires clicking a target drone (no blind shot on empty space).
+                if (this.selectedDrone.droneType === 'Naval') {
+                    this.setManualAttackLine(nearest);
+                    this.executeManualAttack();
+                }
                 return;
             }
 
@@ -128,6 +162,7 @@ export default class MainScene extends Phaser.Scene {
             if (!this.selectedDrone && !this.selectedCarrier) return;
 
             if (this.selectedCarrier) {
+                if (this.selectedCarrier.isMoving) return;
                 const distance = this.hexGrid.getHexDistance(
                     this.selectedCarrier.sprite.x,
                     this.selectedCarrier.sprite.y,
@@ -142,9 +177,17 @@ export default class MainScene extends Phaser.Scene {
                     return;
                 }
 
+                // Check if target position is occupied (ignore the carrier itself)
+                if (this.isPositionOccupied(nearest.x, nearest.y, 15, this.selectedCarrier)) {
+                    console.warn('Target position is occupied - carrier cannot move there');
+                    return;
+                }
+
                 this.moveCarrier(this.selectedCarrier, nearest.x, nearest.y);
                 return;
             }
+
+            if (this.selectedDrone.isBusy && this.selectedDrone.isBusy()) return;
 
             const distance = this.hexGrid.getHexDistance(
                 this.selectedDrone.sprite.x, this.selectedDrone.sprite.y,
@@ -158,8 +201,18 @@ export default class MainScene extends Phaser.Scene {
                 return;
             }
 
+            // Check if target position is occupied (ignore the drone itself)
+            if (this.isPositionOccupied(nearest.x, nearest.y, 15, this.selectedDrone)) {
+                console.warn('Target position is occupied');
+                return;
+            }
+
             const droneIndex = this.myDrones.indexOf(this.selectedDrone);
             if (droneIndex >= 0) {
+                // Lock further moves until we get the server move + animation completes.
+                if (typeof this.selectedDrone.queueMoveLock === 'function') {
+                    this.selectedDrone.queueMoveLock();
+                }
                 Network.requestMove(droneIndex, nearest.x, nearest.y);
             }
         });
@@ -177,6 +230,39 @@ export default class MainScene extends Phaser.Scene {
         this.time.delayedCall(50, () => {
             this.initializeGameState(data);
         });
+    }
+
+    updateFogOfWar() {
+        if (!this.fogRT || !this.hexGrid) return;
+
+        // Fill the whole world with fog
+        this.fogRT.clear();
+        this.fogRT.fill(0x000000, this.fogAlpha);
+
+        const visionRange = this.getVisionRangeForSide(this.localSide);
+        if (!visionRange || visionRange <= 0) {
+            return;
+        }
+
+        // Approximate vision radius in pixels (matches HexGrid.getHexDistance scaling)
+        const hexWidth = Math.sqrt(3) * this.hexGrid.size;
+        const radiusPx = visionRange * hexWidth;
+
+        this.fogEraser.clear();
+        this.fogEraser.fillStyle(0xffffff, 1);
+        this.fogEraser.fillCircle(0, 0, radiusPx);
+
+        const sources = [];
+        const myDrones = this.drones[Network.playerIndex] || [];
+        for (const d of myDrones) {
+            if (d?.isAlive() && d.sprite) sources.push(d.sprite);
+        }
+        const myCarrier = this.carriers?.[Network.playerIndex];
+        if (myCarrier?.sprite) sources.push(myCarrier.sprite);
+
+        for (const s of sources) {
+            this.fogRT.erase(this.fogEraser, s.x, s.y);
+        }
     }
     
     initializeGameState(data) {
@@ -263,6 +349,8 @@ export default class MainScene extends Phaser.Scene {
             this.events.emit('turnChanged', {
                 isMyTurn: this.isMyTurn
             });
+
+            this.updateVision();
         });
 
         Network.on('moveDrone', (msg) => {
@@ -303,27 +391,49 @@ export default class MainScene extends Phaser.Scene {
             }
 
             this.events.emit('fuelUpdated');
+
+            // Movement can affect what is visible.
+            this.updateVision();
         });
 
         Network.on('attackResult', (msg) => {
+            console.log('[MainScene] === ATTACK RESULT ===', msg);
             const targetDrone = this.drones[msg.targetPlayer]?.[msg.targetDrone];
             const hit = msg.hit !== false;
             const attackerDrone = this.drones[msg.attackerPlayer]?.[msg.attackerDrone];
+            const attackerSide = this.playerSides[msg.attackerPlayer];
+            const isNavalAttacker = attackerSide === 'Naval' || attackerDrone?.droneType === 'Naval';
+            const isAereoAttacker = attackerSide === 'Aereo' || attackerDrone?.droneType === 'Aereo';
+
+            console.log('[MainScene] Attacker:', { isAereoAttacker, isNavalAttacker, droneType: attackerDrone?.droneType });
+            console.log('[MainScene] Target drone found?', !!targetDrone);
+
+            if (attackerDrone && typeof attackerDrone.clearAttackLock === 'function') {
+                attackerDrone.clearAttackLock();
+            }
 
             if (attackerDrone && (targetDrone || (typeof msg.lineX === 'number' && typeof msg.lineY === 'number'))) {
-                if (attackerDrone.droneType === 'Naval' && targetDrone) {
+                if (isAereoAttacker) {
                     // Animación especial para dron bomba
-                    attackerDrone.navalDronAttack(
-                        targetDrone.sprite.x,
-                        targetDrone.sprite.y,
-                        msg.attackerX,
-                        msg.attackerY
-                    );
-                } else if (attackerDrone.droneType === 'Aereo') {
+                    if (targetDrone) {
+                        console.log('[MainScene] Playing Aereo (bomb) attack animation');
+                        attackerDrone.aereoDronAttack(
+                            targetDrone.sprite.x,
+                            targetDrone.sprite.y,
+                            msg.attackerX,
+                            msg.attackerY,
+                            targetDrone
+                        );
+                    } else {
+                        console.warn('[MainScene] Aereo attack but targetDrone not found!');
+                    }
+                } else if (isNavalAttacker) {
                     // Animación especial para dron misil
+                    console.log('[MainScene] Playing Naval (missile) attack animation');
                     const targetPos = targetDrone?.sprite || { x: msg.lineX, y: msg.lineY };
-                    attackerDrone.launchMissile(targetPos.x, targetPos.y);
-                } else {
+                    attackerDrone.launchMissile(targetPos.x, targetPos.y, targetDrone ?? null);
+                } else if (targetDrone) {
+                    console.log('[MainScene] Playing default attack animation');
                     this.playMissileShot(attackerDrone, targetDrone, hit, msg.lineX, msg.lineY);
                 }
             }
@@ -334,7 +444,7 @@ export default class MainScene extends Phaser.Scene {
             // Mark attacker as having attacked
             if (attackerDrone && msg.attackerPlayer === Network.playerIndex) {
                 attackerDrone.hasAttacked = true;
-                if (attackerDrone.droneType === 'Aereo') {
+                if (attackerDrone.droneType === 'Naval') {
                     attackerDrone.consumeMissile();
                 }
                 const nextActions = typeof msg.actionsRemaining === 'number'
@@ -349,6 +459,9 @@ export default class MainScene extends Phaser.Scene {
             this.clearTargetHighlights();
             this.actionMode = MODE_MOVE;
             this.events.emit('attackModeEnded');
+
+            // Attacks can destroy units and change visibility.
+            this.updateVision();
         });
 
         Network.on('playerLeft', () => {
@@ -418,6 +531,13 @@ export default class MainScene extends Phaser.Scene {
         console.log('[MainScene] Players in state:', state?.players);
         console.log('[MainScene] Current turn:', state?.currentTurn);
         console.log('[MainScene] My player index:', Network.playerIndex);
+
+        if (typeof state?.navalVisionRange === 'number') {
+            this.navalVisionRange = state.navalVisionRange;
+        }
+        if (typeof state?.aerialVisionRange === 'number') {
+            this.aereoVisionRange = state.aerialVisionRange;
+        }
         
         for (const player of state.players) {
             console.log('[MainScene] Processing player', player.playerIndex);
@@ -427,11 +547,14 @@ export default class MainScene extends Phaser.Scene {
             const isLocal = (player.playerIndex === Network.playerIndex);
             const color = TEAM_COLORS[player.playerIndex];
             this.drones[player.playerIndex] = [];
-            this.createCarrierForPlayer(player.playerIndex, player.side || 'Aereo');
+            const side = player.side || 'Aereo';
+            this.playerSides[player.playerIndex] = side;
+            if (isLocal) this.localSide = side;
+            this.createCarrierForPlayer(player.playerIndex, side);
 
             for (const d of player.drones) {
                 const hex = this.hexGrid.getNearestCenter(d.x, d.y);
-                const droneType = d.droneType || 'Aereo'; // Default to Aereo if not specified
+                const droneType = d.droneType ?? side ?? 'Aereo';
                 console.log('[MainScene] Creating drone at', hex.x, hex.y, 'type:', droneType);
                 
                 const drone = new Drone(this, hex.x, hex.y, color, isLocal, {
@@ -461,6 +584,8 @@ export default class MainScene extends Phaser.Scene {
         console.log('[MainScene] === DRONE CREATION COMPLETE ===');
         console.log('[MainScene] Total players:', Object.keys(this.drones).length);
         console.log('[MainScene] My drones:', this.myDrones?.length);
+
+        this.updateVision();
     }
 
 
@@ -507,12 +632,18 @@ export default class MainScene extends Phaser.Scene {
     }
 
     moveCarrier(carrier, x, y) {
+        if (carrier.isMoving) return;
+        carrier.isMoving = true;
         this.tweens.add({
             targets: [carrier.sprite, carrier.ring],
             x,
             y,
             duration: 650,
-            ease: 'Power2'
+            ease: 'Power2',
+            onComplete: () => {
+                carrier.isMoving = false;
+                this.updateVision();
+            }
         });
     }
 
@@ -543,7 +674,9 @@ export default class MainScene extends Phaser.Scene {
         if (this.actionMode === MODE_ATTACK) {
             // Allow direct enemy click in attack mode as a valid manual shot direction.
             if (!drone.isLocal && drone.isAlive() && this.selectedDrone && this.isMyTurn) {
-                this.setManualAttackLine({ x: drone.sprite.x, y: drone.sprite.y });
+                if (this.selectedDrone.droneType === 'Naval') {
+                    this.setManualAttackLine({ x: drone.sprite.x, y: drone.sprite.y });
+                }
                 this.executeAttack(drone);
             }
             return;
@@ -598,16 +731,21 @@ export default class MainScene extends Phaser.Scene {
     enterAttackMode() {
         if (!this.isMyTurn || !this.selectedDrone) return;
         if (this.selectedDrone.hasAttacked) return; // Already attacked this turn
-        if (this.selectedDrone.droneType === 'Aereo' && !this.selectedDrone.canUseMissileAttack()) return;
+        if (this.selectedDrone.isBusy && this.selectedDrone.isBusy()) return;
+        if (this.selectedDrone.droneType === 'Naval' && !this.selectedDrone.canUseMissileAttack()) return;
 
         this.actionMode = MODE_ATTACK;
         this.hexHighlight.clear();
         this.manualTargetHex = null;
 
-        const pointer = this.input.activePointer;
-        if (pointer) {
-            const nearest = this.hexGrid.getNearestCenter(pointer.worldX, pointer.worldY);
-            this.setManualAttackLine(nearest);
+        if (this.selectedDrone.droneType === 'Naval') {
+            const pointer = this.input.activePointer;
+            if (pointer) {
+                const nearest = this.hexGrid.getNearestCenter(pointer.worldX, pointer.worldY);
+                this.setManualAttackLine(nearest);
+            }
+        } else {
+            this.missileGuideGraphics.clear();
         }
 
         this.highlightEnemyTargets();
@@ -624,9 +762,20 @@ export default class MainScene extends Phaser.Scene {
         const enemyIndex = Network.playerIndex === 0 ? 1 : 0;
         const enemies = this.drones[enemyIndex] || [];
         for (const drone of enemies) {
-            if (drone.isAlive()) {
-                drone.setTargetable(true);
+            if (!drone.isAlive() || !this.isDroneVisibleToLocal(drone)) continue;
+
+            // Bomb drone: only allow clicking targets within weapon range.
+            if (this.selectedDrone?.droneType === 'Aereo') {
+                const distance = this.hexGrid.getHexDistance(
+                    this.selectedDrone.sprite.x,
+                    this.selectedDrone.sprite.y,
+                    drone.sprite.x,
+                    drone.sprite.y
+                );
+                if (distance > (this.selectedDrone.attackRange ?? 0)) continue;
             }
+
+            drone.setTargetable(true);
         }
         this.drawMissileGuides();
     }
@@ -641,17 +790,139 @@ export default class MainScene extends Phaser.Scene {
         this.missileGuideGraphics.clear();
     }
 
+    getVisionRangeForSide(side) {
+        return side === 'Aereo' ? this.aereoVisionRange : this.navalVisionRange;
+    }
+
+    /** Returns true if the given drone should be visible to the local player. */
+    isDroneVisibleToLocal(drone) {
+        if (!drone || !drone.isAlive()) return false;
+        if (drone.playerIndex === Network.playerIndex) return true;
+
+        const visionRange = this.getVisionRangeForSide(this.localSide);
+        if (!visionRange || visionRange <= 0) return false;
+
+        const sources = [];
+        const myDrones = this.drones[Network.playerIndex] || [];
+        for (const d of myDrones) {
+            if (d?.isAlive() && d.sprite) sources.push(d.sprite);
+        }
+
+        const myCarrier = this.carriers?.[Network.playerIndex];
+        if (myCarrier?.sprite) sources.push(myCarrier.sprite);
+
+        for (const sourceSprite of sources) {
+            const distance = this.hexGrid.getHexDistance(
+                sourceSprite.x,
+                sourceSprite.y,
+                drone.sprite.x,
+                drone.sprite.y
+            );
+
+            if (distance <= visionRange) return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Check if a world position is occupied by any drone or carrier.
+     * Uses a tolerance for near-hexagon positions.
+     * @param {number} x - world x coordinate
+     * @param {number} y - world y coordinate
+     * @param {number} tolerance - distance threshold (pixels)
+     * @param {object} ignoreUnit - drone or carrier to ignore in the check (e.g., the unit being moved)
+     */
+    isPositionOccupied(x, y, tolerance = 15, ignoreUnit = null) {
+        // Check all drones
+        for (const pi in this.drones) {
+            for (const drone of this.drones[pi]) {
+                if (!drone?.isAlive() || !drone.sprite) continue;
+                if (ignoreUnit && ignoreUnit === drone) continue; // Skip the moving unit
+                const dx = drone.sprite.x - x;
+                const dy = drone.sprite.y - y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < tolerance) {
+                    return true;
+                }
+            }
+        }
+
+        // Check all carriers
+        for (const pi in this.carriers) {
+            const carrier = this.carriers[pi];
+            if (!carrier?.sprite) continue;
+            if (ignoreUnit && ignoreUnit === carrier) continue; // Skip the moving unit
+            const dx = carrier.sprite.x - x;
+            const dy = carrier.sprite.y - y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < tolerance) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Updates visibility of enemy units based on the local player's vision range.
+     * (Aereo = 2x Naval)
+     */
+    updateVision() {
+        if (!this.hexGrid) return;
+        const localIndex = Network.playerIndex;
+        if (typeof localIndex !== 'number') return;
+
+        for (const pi in this.drones) {
+            const playerIndex = parseInt(pi);
+            for (const drone of this.drones[pi]) {
+                if (!drone?.isAlive()) continue;
+
+                if (playerIndex === localIndex) {
+                    drone.setLocalVisibility(true);
+                    continue;
+                }
+
+                const visible = this.isDroneVisibleToLocal(drone);
+                drone.setLocalVisibility(visible);
+                if (!visible) {
+                    drone.setTargetable(false);
+                }
+            }
+        }
+
+        this.updateFogOfWar();
+    }
+
     executeAttack(targetDrone) {
         if (!this.selectedDrone || !this.isMyTurn) return;
         if (this.selectedDrone.hasAttacked) return; // Already attacked this turn
-        if (this.selectedDrone.droneType === 'Aereo' && !this.selectedDrone.canUseMissileAttack()) return;
+        if (this.selectedDrone.isBusy && this.selectedDrone.isBusy()) return;
+        if (this.selectedDrone.droneType === 'Naval' && !this.selectedDrone.canUseMissileAttack()) return;
 
         const attackerIndex = this.myDrones.indexOf(this.selectedDrone);
         if (attackerIndex < 0) return;
 
-        const lineTarget = this.manualTargetHex || targetDrone?.sprite;
-        if (!lineTarget) return;
+        if (!targetDrone?.sprite) return;
 
+        // Bomb drone must respect its normal range on the client side (server will also validate).
+        if (this.selectedDrone.droneType === 'Aereo') {
+            const distance = this.hexGrid.getHexDistance(
+                this.selectedDrone.sprite.x,
+                this.selectedDrone.sprite.y,
+                targetDrone.sprite.x,
+                targetDrone.sprite.y
+            );
+            if (distance > (this.selectedDrone.attackRange ?? 0)) return;
+        }
+
+        const lineTarget = this.selectedDrone.droneType === 'Naval'
+            ? (this.manualTargetHex || targetDrone.sprite)
+            : targetDrone.sprite;
+
+        if (typeof this.selectedDrone.queueAttackLock === 'function') {
+            this.selectedDrone.queueAttackLock();
+        }
         Network.requestAttack(
             attackerIndex,
             targetDrone.playerIndex,
@@ -664,13 +935,20 @@ export default class MainScene extends Phaser.Scene {
     executeManualAttack() {
         if (!this.manualTargetHex || !this.selectedDrone || !this.isMyTurn) return;
         if (this.selectedDrone.hasAttacked) return;
-        if (this.selectedDrone.droneType === 'Aereo' && !this.selectedDrone.canUseMissileAttack()) return;
+        if (this.selectedDrone.isBusy && this.selectedDrone.isBusy()) return;
+        // Only missile drones can do blind/manual shots.
+        if (this.selectedDrone.droneType !== 'Naval') return;
+        if (this.selectedDrone.droneType === 'Naval' && !this.selectedDrone.canUseMissileAttack()) return;
 
         const attackerIndex = this.myDrones.indexOf(this.selectedDrone);
         if (attackerIndex < 0) return;
 
         // Allow manual fire to any hex even if no enemy drone is visible.
         const enemyPlayerIndex = Network.playerIndex === 0 ? 1 : 0;
+
+        if (typeof this.selectedDrone.queueAttackLock === 'function') {
+            this.selectedDrone.queueAttackLock();
+        }
         Network.requestAttack(
             attackerIndex,
             enemyPlayerIndex,
@@ -826,7 +1104,10 @@ export default class MainScene extends Phaser.Scene {
         for (const pi in this.drones) {
             for (const drone of this.drones[pi]) {
                 if (drone.isAlive()) {
-                    all.push({ drone, playerIndex: parseInt(pi) });
+                    const playerIndex = parseInt(pi);
+                    if (playerIndex === Network.playerIndex || this.isDroneVisibleToLocal(drone)) {
+                        all.push({ drone, playerIndex });
+                    }
                 }
             }
         }

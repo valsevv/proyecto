@@ -23,8 +23,17 @@ export default class Drone {
         this.missiles = stats.missiles ?? 0;
         this.destroyed = false;
 
+        // Visibility (used for fog-of-war/vision).
+        // NOTE: This is "visible to the local client", not Phaser's global visibility.
+        this.isVisibleToLocal = true;
+
         // Animation/interaction locks
         this.isAttacking = false;
+        this.isMoving = false;
+        this.isMoveQueued = false;
+        this.isAttackQueued = false;
+        this._moveQueueTimer = null;
+        this._attackQueueTimer = null;
 
         // UI offsets relative to sprite
         this.healthBarOffsetY = 16;
@@ -36,10 +45,11 @@ export default class Drone {
 
         // Determine sprite key based on drone type y movimiento
         let spriteKey;
+        // FIX: Assets were swapped. Bomb drone belongs to Aereo; Missile drone belongs to Naval.
         if (this.droneType === 'Naval') {
-            spriteKey = 'dron_bomba_0'; // por defecto, estático
-        } else {
             spriteKey = 'dron_misil_0'; // por defecto, estático
+        } else {
+            spriteKey = 'dron_bomba_0'; // por defecto, estático
         }
 
         // Crear sprite y escalar a 128x128
@@ -78,6 +88,9 @@ export default class Drone {
         this.targetRing.setFillStyle();
         this.targetRing.setVisible(false);
 
+        // Track UI state separate from Phaser visibility (needed for vision/fog).
+        this.isTargetable = false;
+
         // Make drone clickable
         this.sprite.setInteractive({ useHandCursor: true, pixelPerfect: true, alphaTolerance: 1 });
         this.sprite.on('pointerdown', (pointer) => {
@@ -86,6 +99,48 @@ export default class Drone {
         });
 
         this.syncUIPositions();
+    }
+
+    isBusy() {
+        return !!(this.destroyed || this.isMoving || this.isAttacking || this.isMoveQueued || this.isAttackQueued);
+    }
+
+    queueMoveLock(ttlMs = 2500) {
+        this.isMoveQueued = true;
+        if (this._moveQueueTimer) {
+            clearTimeout(this._moveQueueTimer);
+        }
+        this._moveQueueTimer = setTimeout(() => {
+            this.isMoveQueued = false;
+            this._moveQueueTimer = null;
+        }, ttlMs);
+    }
+
+    clearMoveLock() {
+        this.isMoveQueued = false;
+        if (this._moveQueueTimer) {
+            clearTimeout(this._moveQueueTimer);
+            this._moveQueueTimer = null;
+        }
+    }
+
+    queueAttackLock(ttlMs = 3000) {
+        this.isAttackQueued = true;
+        if (this._attackQueueTimer) {
+            clearTimeout(this._attackQueueTimer);
+        }
+        this._attackQueueTimer = setTimeout(() => {
+            this.isAttackQueued = false;
+            this._attackQueueTimer = null;
+        }, ttlMs);
+    }
+
+    clearAttackLock() {
+        this.isAttackQueued = false;
+        if (this._attackQueueTimer) {
+            clearTimeout(this._attackQueueTimer);
+            this._attackQueueTimer = null;
+        }
     }
 
     syncUIPositions() {
@@ -111,6 +166,11 @@ export default class Drone {
 
         for (const tween of tweensToStop) {
             tween.stop();
+        }
+
+        // If we stopped an in-flight move tween, consider movement interrupted.
+        if (this.moveTweenBody || this.moveTweenHealthBg || this.moveTweenHealth) {
+            this.isMoving = false;
         }
 
         this.moveTweenBody = null;
@@ -149,7 +209,26 @@ export default class Drone {
 
     setTargetable(show) {
         this.syncUIPositions();
-        this.targetRing.setVisible(show);
+        this.isTargetable = !!show;
+        // Only show target ring if this drone is currently visible to the local player.
+        this.targetRing.setVisible(this.isTargetable && this.isVisibleToLocal);
+    }
+
+    /**
+     * Sets whether this drone should be visible to the local player.
+     * Used by MainScene's vision system.
+     * @param {boolean} isVisible
+     */
+    setLocalVisibility(isVisible) {
+        this.isVisibleToLocal = !!isVisible;
+        const v = this.isVisibleToLocal;
+        if (this.sprite) this.sprite.setVisible(v);
+        if (this.healthBarBg) this.healthBarBg.setVisible(v);
+        if (this.healthBar) this.healthBar.setVisible(v);
+        if (this.targetRing) this.targetRing.setVisible(v && this.isTargetable);
+
+        // Selection ring is only meaningful for local drones; don't force it on.
+        if (this.ring && !v) this.ring.setVisible(false);
     }
 
     moveTo(x, y) {
@@ -157,6 +236,8 @@ export default class Drone {
 
         // If there were prior tweens (e.g., interrupted movement), stop them.
         this.stopMotionTweens();
+        this.isMoving = true;
+        this.clearMoveLock();
 
         // Detectar dirección del movimiento
         let direction = 0;
@@ -181,6 +262,12 @@ export default class Drone {
             onComplete: () => {
                 this.setDirection(0); // volver a estático al terminar
                 this.syncUIPositions();
+
+                this.isMoving = false;
+
+                if (typeof this.scene?.updateVision === 'function') {
+                    this.scene.updateVision();
+                }
 
                 this.moveTweenBody = null;
             }
@@ -216,10 +303,11 @@ export default class Drone {
      */
     setDirection(direction) {
         let keys;
+        // FIX: Assets were swapped. Bomb = Aereo, Missile = Naval.
         if (this.droneType === 'Naval') {
-            keys = ['dron_bomba_0', 'dron_bomba_1', 'dron_bomba_2', 'dron_bomba_3', 'dron_bomba_4'];
-        } else {
             keys = ['dron_misil_0', 'dron_misil_1', 'dron_misil_2', 'dron_misil_3', 'dron_misil_4'];
+        } else {
+            keys = ['dron_bomba_0', 'dron_bomba_1', 'dron_bomba_2', 'dron_bomba_3', 'dron_bomba_4'];
         }
         if (this.currentDirection === direction) return;
         this.currentDirection = direction;
@@ -233,31 +321,64 @@ export default class Drone {
      * @param {number} targetY - posición Y del enemigo
      * @param {number | null} settleX - posición final X donde queda el dron tras atacar
      * @param {number | null} settleY - posición final Y donde queda el dron tras atacar
+     * @param {Drone | null} targetDrone - dron objetivo (opcional, para UI lateral)
      */
-    navalDronAttack(targetX, targetY, settleX = null, settleY = null) {
-        if (this.droneType !== 'Naval') return;
+    aereoDronAttack(targetX, targetY, settleX = null, settleY = null, targetDrone = null) {
+        if (this.droneType !== 'Aereo') return;
 
         this.isAttacking = true;
         this.stopMotionTweens();
+        this.clearAttackLock();
         this.setDirection(0);
         this.syncUIPositions();
 
-        const finalX = typeof settleX === 'number' ? settleX : targetX;
-        const finalY = typeof settleY === 'number' ? settleY : (targetY - 90);
+        // Notify HUD to show the side impact view.
+        this.scene?.events?.emit('attackAnimStart', {
+            kind: 'bomb',
+            attackerKey: this.sprite?.texture?.key,
+            targetKey: targetDrone?.sprite?.texture?.key ?? null,
+            startDelayMs: 650,
+            travelMs: 1350
+        });
 
-        // Posicionar dron bomba arriba del enemigo y escalar
+        const startX = this.sprite.x;
+        const startY = this.sprite.y;
+
+        const dropX = targetX;
+        const dropY = targetY - 180;
+        const endX = typeof settleX === 'number' ? settleX : startX;
+        const endY = typeof settleY === 'number' ? settleY : startY;
+
+        // Step 1: move above the enemy to drop the bomb.
         this.attackTweenBody = this.scene.tweens.add({
             targets: this.sprite,
-            x: finalX,
-            y: finalY,
-            scale: 0.2, // crecer para simular profundidad
-            duration: 3000,
+            x: dropX,
+            y: dropY,
+            scale: 0.15,
+            duration: 650,
             ease: 'Power2',
             onUpdate: () => this.syncUIPositions(),
             onComplete: () => {
                 this.attackTweenBody = null;
-                // Lanzar bomba
-                this.launchBomb(targetX, targetY);
+                this.launchBomb(targetX, targetY, () => {
+                    // Step 2: settle where the server says (or back to start).
+                    this.attackTweenReturn = this.scene.tweens.add({
+                        targets: this.sprite,
+                        x: endX,
+                        y: endY,
+                        scale: 0.15,
+                        duration: 650,
+                        ease: 'Power2',
+                        onUpdate: () => this.syncUIPositions(),
+                        onComplete: () => {
+                            this.attackTweenReturn = null;
+                            this.isAttacking = false;
+                            this.syncUIPositions();
+
+                            this.scene?.events?.emit('attackAnimEnd', { kind: 'bomb' });
+                        }
+                    });
+                });
             }
         });
     }
@@ -267,24 +388,55 @@ export default class Drone {
      * @param {number} targetX
      * @param {number} targetY
      */
-    launchBomb(targetX, targetY) {
+    launchBomb(targetX, targetY, onComplete) {
         // Crear sprite de la bomba
         const bomb = this.scene.add.image(this.sprite.x, this.sprite.y, 'bomba');
         bomb.setDisplaySize(64, 64);
         bomb.setDepth(20);
+        let finished = false;
+        const finishImpact = () => {
+            if (finished) return;
+            finished = true;
+            if (bomb && bomb.active) {
+                bomb.destroy();
+            }
+
+            // Impact explosion (shared asset)
+            if (this.scene?.textures?.exists('explosion')) {
+                const boom = this.scene.add.image(targetX, targetY, 'explosion');
+                boom.setDepth(22);
+                boom.setDisplaySize(140, 140);
+                boom.setAlpha(0.95);
+                this.scene.tweens.add({
+                    targets: boom,
+                    alpha: 0,
+                    scale: 1.25,
+                    duration: 420,
+                    ease: 'Quad.easeOut',
+                    onComplete: () => boom.destroy()
+                });
+            }
+
+            this.scene?.events?.emit('attackAnimImpact', { kind: 'bomb' });
+            if (typeof onComplete === 'function') {
+                onComplete();
+            }
+        };
+
         this.scene.tweens.add({
             targets: bomb,
             x: targetX,
             y: targetY,
-            scale: 0.1,
             duration: 1350,
             ease: 'Cubic.easeIn',
             onComplete: () => {
-                bomb.destroy();
-                // Opcional: efecto de explosión aquí
-                this.isAttacking = false;
-                this.syncUIPositions();
+                finishImpact();
             }
+        });
+
+        // Failsafe: in case the tween gets interrupted.
+        this.scene?.time?.delayedCall(1550, () => {
+            finishImpact();
         });
     }
 
@@ -292,17 +444,46 @@ export default class Drone {
      * Animación de ataque del dron misil: lanza un cohete rápido
      * @param {number} targetX - posición X del enemigo
      * @param {number} targetY - posición Y del enemigo
+     * @param {Drone | null} targetDrone - dron objetivo (opcional, para UI lateral)
      */
-    launchMissile(targetX, targetY) {
-        if (this.droneType !== 'Aereo') return;
-        // Crear sprite del cohete
-        const missile = this.scene.add.image(this.sprite.x, this.sprite.y, 'misil');
+    launchMissile(targetX, targetY, targetDrone = null) {
+        // FIX: Missile drone belongs to Naval.
+        if (this.droneType !== 'Naval') return;
+        this.isAttacking = true;
+        this.stopMotionTweens();
+        this.clearAttackLock();
+
+        // Detect missile direction based on target position
+        const dx = targetX - this.sprite.x;
+        const dy = targetY - this.sprite.y;
+        let missileDir = 0; // default
+        if (Math.abs(dx) > Math.abs(dy)) {
+            if (dx < 0) missileDir = 1; // izquierda
+            else if (dx > 0) missileDir = 2; // derecha
+        } else if (Math.abs(dy) > 0) {
+            if (dy > 0) missileDir = 3; // abajo
+            else if (dy < 0) missileDir = 4; // arriba
+        }
+        const missileAssetKeys = ['misil', 'misil_1', 'misil_2', 'misil_3', 'misil_4'];
+        const missileKey = missileAssetKeys[missileDir];
+
+        // Notify HUD to show the side impact view.
+        this.scene?.events?.emit('attackAnimStart', {
+            kind: 'missile',
+            attackerKey: this.sprite?.texture?.key,
+            targetKey: targetDrone?.sprite?.texture?.key ?? null,
+            projectileKey: missileKey,
+            startDelayMs: 0,
+            travelMs: 1500
+        });
+
+        // Crear sprite del cohete con dirección correcta
+        const missile = this.scene.add.image(this.sprite.x, this.sprite.y, missileKey);
         missile.setDisplaySize(48, 48);
         missile.setDepth(21);
         
         // Calcular rotación hacia el objetivo
-        const dx = targetX - this.sprite.x;
-        const dy = targetY - this.sprite.y;
+
         const angle = Math.atan2(dy, dx) * (180 / Math.PI);
         missile.setRotation(angle * (Math.PI / 180));
         
@@ -314,6 +495,10 @@ export default class Drone {
             ease: 'Quad.easeIn',
             onComplete: () => {
                 missile.destroy();
+                this.isAttacking = false;
+
+                this.scene?.events?.emit('attackAnimImpact', { kind: 'missile' });
+                this.scene?.events?.emit('attackAnimEnd', { kind: 'missile' });
             }
         });
     }
@@ -363,7 +548,8 @@ export default class Drone {
     }
 
     canUseMissileAttack() {
-        return this.droneType === 'Aereo' && (this.missiles ?? 0) > 0;
+        // FIX: Missile drone belongs to Naval.
+        return this.droneType === 'Naval' && (this.missiles ?? 0) > 0;
     }
 
     sinkAndDestroy() {

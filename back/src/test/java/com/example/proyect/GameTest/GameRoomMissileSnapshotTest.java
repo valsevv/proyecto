@@ -1,28 +1,28 @@
 package com.example.proyect.GameTest;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
 import java.util.List;
 import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
 import com.example.proyect.game.GameRoom;
 import com.example.proyect.game.PlayerState;
-import com.example.proyect.game.units.drone.AerialDrone;
 import com.example.proyect.game.units.drone.Drone;
+import com.example.proyect.game.units.drone.NavalDrone;
 
 class GameRoomMissileSnapshotTest {
 
     @Test
-    void shouldPersistAndRestoreAerialDroneMissilesInSnapshot() {
+        void shouldPersistAndRestoreNavalDroneMissilesInSnapshot() {
         GameRoom room = new GameRoom("room-test");
         PlayerState player = room.addPlayer("session-1");
+                room.createDronesForSide(player.getPlayerIndex(), "Naval");
         Drone drone = player.getDrones().get(0);
-        assertTrue(drone instanceof AerialDrone);
+                assertTrue(drone instanceof NavalDrone);
 
-        ((AerialDrone) drone).setMissiles(1);
+                ((NavalDrone) drone).setMissiles(1);
 
         Map<String, Object> snapshot = room.toStateMap();
 
@@ -43,14 +43,14 @@ class GameRoomMissileSnapshotTest {
                 "players", List.of(
                         Map.of(
                                 "playerIndex", 0,
-                                "side", "Aereo",
+                                "side", "Naval",
                                 "drones", List.of(
                                         Map.of(
                                                 "x", 10.0,
                                                 "y", 10.0,
                                                 "health", 100,
                                                 "alive", true,
-                                                "droneType", "Aereo",
+                                                "droneType", "Naval",
                                                 "missiles", 1
                                         )
                                 )
@@ -60,7 +60,7 @@ class GameRoomMissileSnapshotTest {
 
         GameRoom restored = GameRoom.fromStateMap("room-restored", restoreSnapshot);
         Drone restoredDrone = restored.getPlayerByIndex(0).getDrones().get(0);
-        assertTrue(restoredDrone instanceof AerialDrone);
-        assertEquals(1, ((AerialDrone) restoredDrone).getMissiles());
+                assertTrue(restoredDrone instanceof NavalDrone);
+                assertEquals(1, ((NavalDrone) restoredDrone).getMissiles());
     }
 }

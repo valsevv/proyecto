@@ -57,6 +57,10 @@ public class GameController {
     @Value("${game.missile.damage-percent-on-naval:0.5}")
     private double missileDamagePercentOnNaval;
 
+    // Must match frontend HexGrid size (front/scenes/MainScene.js -> new HexGrid(this, 35, ...))
+    private static final double HEX_SIZE_PX = 35.0;
+    private static final double HEX_WIDTH_PX = Math.sqrt(3.0) * HEX_SIZE_PX;
+
     private final LobbyService lobbyService;
 
     private final GameService gameService;
@@ -619,8 +623,8 @@ public class GameController {
         double lineX = manualLineX != null ? manualLineX : (targetDrone != null ? targetDrone.getPosition().getX() : 0.0);
         double lineY = manualLineY != null ? manualLineY : (targetDrone != null ? targetDrone.getPosition().getY() : 0.0);
 
-        if (attackerDrone instanceof NavalDrone && targetDrone != null) {
-            double targetDistance = distanceBetween(
+        if (attackerDrone instanceof AerialDrone && targetDrone != null) {
+            double targetDistance = hexDistanceBetween(
                 attackerDrone.getPosition().getX(),
                 attackerDrone.getPosition().getY(),
                 targetDrone.getPosition().getX(),
@@ -630,7 +634,7 @@ public class GameController {
                 return GameResult.error("Attacker has no weapon configured");
             }
             if (targetDistance > attackerDrone.getWeapon().getRange()) {
-                return GameResult.error("Target out of naval attack range");
+                return GameResult.error("Target out of aerial attack range");
             }
         }
 
@@ -726,12 +730,12 @@ public class GameController {
             return GameResult.error("Cannot attack with a destroyed drone");
         }
 
-        if (attackerDrone instanceof AerialDrone aerialDrone && !aerialDrone.hasMissiles()) {
-            return GameResult.error("No missiles remaining for this aerial drone");
+        if (attackerDrone instanceof NavalDrone navalDrone && !navalDrone.hasMissiles()) {
+            return GameResult.error("No missiles remaining for this naval drone");
         }
 
-        if (attackerDrone instanceof NavalDrone && manualBlindShot) {
-            return GameResult.error("Naval drone attack requires selecting an enemy drone");
+        if (attackerDrone instanceof AerialDrone && manualBlindShot) {
+            return GameResult.error("Aerial drone attack requires selecting an enemy drone");
         }
 
         if (!manualBlindShot && !targetDrone.isAlive()) {
@@ -760,21 +764,26 @@ public class GameController {
             return new AttackResolution(0, false);
         }
 
-        if (!(attackerDrone instanceof AerialDrone aerialDrone)) {
+        if (!(attackerDrone instanceof NavalDrone navalDrone)) {
             return new AttackResolution(attackerDrone.getWeapon().getDamage(), true);
         }
 
-        if (!(aerialDrone.getWeapon() instanceof MissileWeapon missileWeapon)) {
+        if (!(navalDrone.getWeapon() instanceof MissileWeapon missileWeapon)) {
             return new AttackResolution(attackerDrone.getWeapon().getDamage(), true);
         }
 
-        if (!aerialDrone.hasMissiles()) {
+        if (!navalDrone.hasMissiles()) {
             return new AttackResolution(0, false);
         }
 
-        double traveledDistance = distanceBetween(attackerDrone.getPosition().getX(), attackerDrone.getPosition().getY(), lineX, lineY);
+        double traveledDistance = hexDistanceBetween(
+            attackerDrone.getPosition().getX(),
+            attackerDrone.getPosition().getY(),
+            lineX,
+            lineY
+        );
         if (!missileWeapon.canReach(traveledDistance) || traveledDistance > missileMaxDistance) {
-            aerialDrone.consumeMissile();
+            navalDrone.consumeMissile();
             return new AttackResolution(0, false);
         }
 
@@ -787,7 +796,7 @@ public class GameController {
         }
 
         boolean hit = Math.random() <= effectiveAccuracy;
-        aerialDrone.consumeMissile();
+        navalDrone.consumeMissile();
         if (!hit) {
             return new AttackResolution(0, false);
         }
@@ -804,6 +813,18 @@ public class GameController {
         double dx = x1 - x2;
         double dy = y1 - y2;
         return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    /**
+     * Converts pixel distance into an approximate hex distance.
+     * Mirrors front/utils/HexGrid.js getHexDistance() (pixelDist / (sqrt(3) * size)).
+     */
+    private double hexDistanceBetween(double x1, double y1, double x2, double y2) {
+        double pixelDistance = distanceBetween(x1, y1, x2, y2);
+        if (HEX_WIDTH_PX <= 0) {
+            return pixelDistance;
+        }
+        return pixelDistance / HEX_WIDTH_PX;
     }
 
     private int getAttackActionCost(Drone attackerDrone) {
