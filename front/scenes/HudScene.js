@@ -342,15 +342,15 @@ export default class HudScene extends Phaser.Scene {
             this.droneInfoText.setText('Selecciona un dron o portadrones');
         }
 
-        const allDrones = mainScene.getAllDrones();
-        if (!allDrones.length) return;
+        const visibleUnits = mainScene.getVisibleUnitsForMinimap();
+        if (!visibleUnits.length) return;
 
-        const tracked = allDrones.map(({ drone, playerIndex }) => ({
-            x: drone.sprite.x,
-            y: drone.sprite.y,
-            color: mainScene.selectedDrone === drone
+        const tracked = visibleUnits.map((unit) => ({
+            x: unit.x,
+            y: unit.y,
+            color: unit.isSelected
                 ? 0xffff00
-                : TEAM_COLORS[playerIndex]
+                : TEAM_COLORS[unit.playerIndex]
         }));
 
         this.minimap.update(mainScene.cameras.main, tracked);

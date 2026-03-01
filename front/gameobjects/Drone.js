@@ -94,7 +94,10 @@ export default class Drone {
         this.isTargetable = false;
 
         // Make drone clickable
-        this.sprite.setInteractive({ useHandCursor: true, pixelPerfect: true, alphaTolerance: 1 });
+        // Use a normal hit area instead of pixel-perfect clicks.
+        // Pixel-perfect became unreliable for some drone sprites (especially aerial),
+        // making attacks feel "bugged" because clicks were frequently ignored.
+        this.sprite.setInteractive({ useHandCursor: true });
         this.sprite.on('pointerdown', (pointer) => {
             pointer.event.stopPropagation();
             scene.onDroneClicked(this);
