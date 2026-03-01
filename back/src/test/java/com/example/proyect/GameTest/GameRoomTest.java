@@ -150,6 +150,25 @@ class GameRoomTest {
         assertEquals(4, player.getDrones().get(0).getVisionRange()); // Aerial vision range
     }
 
+
+    @Test
+    void shouldSpawnPlayersOnOppositeSidesWithinMapBounds() {
+        GameRoom room = new GameRoom("room-spawn");
+        PlayerState p0 = room.addPlayer("session-1");
+        PlayerState p1 = room.addPlayer("session-2");
+
+        Drone p0Drone = p0.getDrones().get(0);
+        Drone p1Drone = p1.getDrones().get(0);
+
+        assertTrue(p0Drone.getPosition().getX() < 1000);
+        assertTrue(p1Drone.getPosition().getX() > 2000);
+
+        assertTrue(p0Drone.getPosition().getY() >= 220);
+        assertTrue(p0Drone.getPosition().getY() <= 2180);
+        assertTrue(p1Drone.getPosition().getY() >= 220);
+        assertTrue(p1Drone.getPosition().getY() <= 2180);
+    }
+
     @Test
     void shouldStartGame() {
         GameRoom room = new GameRoom("room-start");

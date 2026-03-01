@@ -7,6 +7,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,14 +40,19 @@ public class GameRoom {
     public static final int IDLE_FUEL_COST = 1;
     //  frontend tracks per-drone limits
 
-    // Carrier anchor positions (left side vs right side of the map)
-    private static final double[] START_P0 = {300, 900};
-    private static final double[] START_P1 = {2100, 900};
+    // Map dimensions used by spawning logic (must match frontend world size)
+    private static final double WORLD_WIDTH = 3200.0;
+    private static final double WORLD_HEIGHT = 2400.0;
+
+    // Carrier spawn constraints: random Y, opposite map sides on X.
+    private static final double CARRIER_EDGE_MARGIN = 320.0;
+    private static final double CARRIER_SPAWN_Y_MARGIN = 240.0;
 
     private final List<PlayerState> players = new ArrayList<>();
     
     // Side selection state (Naval or Aereo)
     private final Map<Integer, String> playerSides = new HashMap<>();
+    private final Map<Integer, HexCoord> playerSpawnAnchors = new HashMap<>();
 
     // Turn state
     private boolean gameStarted = false;
@@ -135,9 +141,9 @@ public class GameRoom {
 
 
     private HexCoord getDroneSpawnPosition(int playerIndex, int droneIndex, int droneCount) {
-        double[] start = playerIndex == 0 ? START_P0 : START_P1;
+        HexCoord carrierSpawn = playerSpawnAnchors.computeIfAbsent(playerIndex, this::getCarrierSpawnPosition);
         if (droneCount <= 1) {
-            return new HexCoord(start[0], start[1]);
+            return new HexCoord(carrierSpawn.getX(), carrierSpawn.getY());
         }
 
         int ringIndex = droneIndex / 6;
@@ -145,8 +151,20 @@ public class GameRoom {
         double ringRadius = 16.0 * (ringIndex + 1);
         double angle = (Math.PI * 2.0 * slotInRing) / 6.0;
 
-        double x = start[0] + (Math.cos(angle) * ringRadius);
-        double y = start[1] + (Math.sin(angle) * ringRadius);
+        double x = carrierSpawn.getX() + (Math.cos(angle) * ringRadius);
+        double y = carrierSpawn.getY() + (Math.sin(angle) * ringRadius);
+        return new HexCoord(x, y);
+    }
+
+    private HexCoord getCarrierSpawnPosition(int playerIndex) {
+        double minY = CARRIER_SPAWN_Y_MARGIN;
+        double maxY = Math.max(minY, WORLD_HEIGHT - CARRIER_SPAWN_Y_MARGIN);
+        double y = ThreadLocalRandom.current().nextDouble(minY, maxY + 1.0);
+
+        double leftX = CARRIER_EDGE_MARGIN;
+        double rightX = Math.max(CARRIER_EDGE_MARGIN, WORLD_WIDTH - CARRIER_EDGE_MARGIN);
+
+        double x = playerIndex == 0 ? leftX : rightX;
         return new HexCoord(x, y);
     }
 
@@ -168,6 +186,7 @@ public class GameRoom {
             PlayerState p = it.next();
             if (p.getSessionId().equals(sessionId)) {
                 it.remove();
+                playerSpawnAnchors.remove(p.getPlayerIndex());
                 return p;
             }
         }
