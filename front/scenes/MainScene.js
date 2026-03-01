@@ -148,10 +148,16 @@ export default class MainScene extends Phaser.Scene {
 
             if (this.actionMode === MODE_ATTACK && this.selectedDrone) {
                 // Naval = missile: allow manual aiming to any hex.
-                // Aereo = bomb: requires clicking a target drone (no blind shot on empty space).
                 if (this.selectedDrone.droneType === 'Naval') {
                     this.setManualAttackLine(nearest);
                     this.executeManualAttack();
+                } else {
+                    // Aereo = bomb: allow selecting a hex and resolve to the nearest visible
+                    // enemy drone on that hex (or very close to it).
+                    const targetDrone = this.findEnemyTargetAtHex(nearest);
+                    if (targetDrone) {
+                        this.executeAttack(targetDrone);
+                    }
                 }
                 return;
             }
@@ -1020,6 +1026,47 @@ export default class MainScene extends Phaser.Scene {
             this.manualTargetHex.x,
             this.manualTargetHex.y
         );
+    }
+
+    /**
+     * Returns the nearest visible enemy drone to the clicked hex, if it is close enough
+     * and inside aerial weapon range.
+     */
+    findEnemyTargetAtHex(hexCenter) {
+        if (!hexCenter || !this.selectedDrone || this.selectedDrone.droneType !== 'Aereo') return null;
+
+        const enemyIndex = Network.playerIndex === 0 ? 1 : 0;
+        const enemies = (this.drones[enemyIndex] || []).filter((drone) => {
+            if (!drone?.isAlive()) return false;
+            if (!this.isDroneVisibleToLocal(drone)) return false;
+
+            const attackDistance = this.hexGrid.getHexDistance(
+                this.selectedDrone.sprite.x,
+                this.selectedDrone.sprite.y,
+                drone.sprite.x,
+                drone.sprite.y
+            );
+            return attackDistance <= (this.selectedDrone.attackRange ?? 0);
+        });
+
+        if (!enemies.length) return null;
+
+        let closestEnemy = null;
+        let closestDistancePx = Number.POSITIVE_INFINITY;
+        for (const enemy of enemies) {
+            const dx = hexCenter.x - enemy.sprite.x;
+            const dy = hexCenter.y - enemy.sprite.y;
+            const distancePx = Math.sqrt(dx * dx + dy * dy);
+
+            if (distancePx < closestDistancePx) {
+                closestDistancePx = distancePx;
+                closestEnemy = enemy;
+            }
+        }
+
+        // Require the clicked hex to be reasonably close to the target's hex center.
+        const maxSnapDistance = this.hexGrid.size * 0.9;
+        return closestDistancePx <= maxSnapDistance ? closestEnemy : null;
     }
 
     setManualAttackLine(hexCenter) {
