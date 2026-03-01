@@ -1,3 +1,5 @@
+const DRONE_MOVE_DURATION_MS = 1200;
+
 export default class Drone {
     /**
      * @param {Phaser.Scene} scene
@@ -257,7 +259,7 @@ export default class Drone {
             targets: [this.sprite, this.ring, this.targetRing],
             x: x,
             y: y,
-            duration: 3000,
+            duration: DRONE_MOVE_DURATION_MS,
             ease: 'Power2',
             onComplete: () => {
                 this.setDirection(0); // volver a estático al terminar
@@ -277,7 +279,7 @@ export default class Drone {
             targets: this.healthBarBg,
             x: x,
             y: y - this.healthBarOffsetY,
-            duration: 3000,
+            duration: DRONE_MOVE_DURATION_MS,
             ease: 'Power2',
             onComplete: () => {
                 this.moveTweenHealthBg = null;
@@ -288,7 +290,7 @@ export default class Drone {
             targets: this.healthBar,
             x: x - this.healthBarOffsetX,
             y: y - this.healthBarOffsetY,
-            duration: 3000,
+            duration: DRONE_MOVE_DURATION_MS,
             ease: 'Power2',
             onComplete: () => {
                 this.moveTweenHealth = null;
