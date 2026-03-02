@@ -57,6 +57,9 @@ public class GameController {
     @Value("${game.missile.damage-percent-on-naval:0.5}")
     private double missileDamagePercentOnNaval;
 
+    @Value("${game.aerial-attack-fuel-cost:2}")
+    private int aerialAttackFuelCost;
+
     // Must match frontend HexGrid size (front/scenes/MainScene.js -> new HexGrid(this, 35, ...))
     private static final double HEX_SIZE_PX = 35.0;
     private static final double HEX_WIDTH_PX = Math.sqrt(3.0) * HEX_SIZE_PX;
@@ -591,7 +594,8 @@ public class GameController {
 
     public GameResult processAttack(String sessionId, int attackerIndex, 
                                      int targetPlayerIndex, int targetDroneIndex,
-                                     Double manualLineX, Double manualLineY) {
+                                     Double manualLineX, Double manualLineY,
+                                     Double destinationX, Double destinationY, String targetType) {
 
         GameRoom room = getRoomForSession(sessionId);
         if (room == null) {
@@ -606,8 +610,9 @@ public class GameController {
         Drone attackerDrone = room.getDrone(attacker.getPlayerIndex(), attackerIndex);
         Drone targetDrone = targetDroneIndex >= 0 ? room.getDrone(targetPlayerIndex, targetDroneIndex) : null;
         boolean manualBlindShot = targetDroneIndex < 0;
+        boolean carrierTarget = "carrier".equalsIgnoreCase(targetType);
                                         
-        GameResult droneValidation = validateDrones(attacker, attackerDrone, targetDrone, targetPlayerIndex, manualBlindShot);
+        GameResult droneValidation = validateDrones(attacker, attackerDrone, targetDrone, targetPlayerIndex, manualBlindShot, carrierTarget);
         log.info("[GameController] ->  droneValidation {}", droneValidation);
         if (droneValidation != null) return droneValidation;
 
@@ -617,28 +622,47 @@ public class GameController {
         }
         
         if (manualBlindShot && (manualLineX == null || manualLineY == null)) {
-            return GameResult.error("Manual missile shot requires target coordinates");
+            return GameResult.error("Manual shot requires target coordinates");
         }
 
         double lineX = manualLineX != null ? manualLineX : (targetDrone != null ? targetDrone.getPosition().getX() : 0.0);
         double lineY = manualLineY != null ? manualLineY : (targetDrone != null ? targetDrone.getPosition().getY() : 0.0);
 
-        if (attackerDrone instanceof AerialDrone && targetDrone != null) {
-            double targetDistance = hexDistanceBetween(
-                attackerDrone.getPosition().getX(),
-                attackerDrone.getPosition().getY(),
-                targetDrone.getPosition().getX(),
-                targetDrone.getPosition().getY()
-            );
+        if (attackerDrone instanceof AerialDrone) {
             if (attackerDrone.getWeapon() == null) {
                 return GameResult.error("Attacker has no weapon configured");
             }
+            double targetX = targetDrone != null ? targetDrone.getPosition().getX() : lineX;
+            double targetY = targetDrone != null ? targetDrone.getPosition().getY() : lineY;
+            double targetDistance = hexDistanceBetween(
+                attackerDrone.getPosition().getX(),
+                attackerDrone.getPosition().getY(),
+                targetX,
+                targetY
+            );
             if (targetDistance > attackerDrone.getWeapon().getRange()) {
                 return GameResult.error("Target out of aerial attack range");
             }
         }
 
         HexCoord attackerFinalPosition = attackerDrone.getPosition();
+
+        if (attackerDrone instanceof AerialDrone) {
+            if (destinationX == null || destinationY == null) {
+                return GameResult.error("Aerial attack requires destination coordinates");
+            }
+            HexCoord requestedDestination = new HexCoord(destinationX, destinationY);
+            HexCoord finalDestination = resolveAerialFinalPosition(room, requestedDestination, attackerDrone);
+            attackerDrone.setPosition(finalDestination);
+            if (aerialAttackFuelCost > 0) {
+                attackerDrone.consumeFuel(aerialAttackFuelCost);
+                if (attackerDrone.getFuel() <= 0) {
+                    attackerDrone.setCurrentHp(0);
+                    attackerDrone.receiveDamage(1);
+                }
+            }
+            attackerFinalPosition = finalDestination;
+        }
         if (attackerDrone instanceof NavalDrone && targetDrone != null) {
             attackerFinalPosition = getNavalAttackPosition(targetDrone);
             attackerDrone.setPosition(attackerFinalPosition);
@@ -710,7 +734,7 @@ public class GameController {
     }
 
     private GameResult validateDrones(PlayerState attacker, Drone attackerDrone,
-            Drone targetDrone,int targetPlayerIndex, boolean manualBlindShot) {
+            Drone targetDrone,int targetPlayerIndex, boolean manualBlindShot, boolean carrierTarget) {
                 
     log.info("[GameController] -> begin validateDrones, attacker {}, attackerDrone {}", attacker, attackerDrone);
     
@@ -734,8 +758,8 @@ public class GameController {
             return GameResult.error("No missiles remaining for this naval drone");
         }
 
-        if (attackerDrone instanceof AerialDrone && manualBlindShot) {
-            return GameResult.error("Aerial drone attack requires selecting an enemy drone");
+        if (attackerDrone instanceof AerialDrone && manualBlindShot && !carrierTarget) {
+            return GameResult.error("Aerial drone attack requires selecting an enemy unit");
         }
 
         if (!manualBlindShot && !targetDrone.isAlive()) {
@@ -745,6 +769,31 @@ public class GameController {
         log.info("[GameController] -> End validateDrones");
         
         return null;
+    }
+
+
+    private HexCoord resolveAerialFinalPosition(GameRoom room, HexCoord requestedDestination, Drone attackerDrone) {
+        if (!room.isPositionOccupied(requestedDestination, attackerDrone)) {
+            return requestedDestination;
+        }
+
+        double step = HEX_WIDTH_PX;
+        double[][] offsets = {
+            {step, 0}, {-step, 0},
+            {step / 2.0, (Math.sqrt(3.0) / 2.0) * step},
+            {-step / 2.0, (Math.sqrt(3.0) / 2.0) * step},
+            {step / 2.0, -(Math.sqrt(3.0) / 2.0) * step},
+            {-step / 2.0, -(Math.sqrt(3.0) / 2.0) * step}
+        };
+
+        for (double[] offset : offsets) {
+            HexCoord candidate = new HexCoord(requestedDestination.getX() + offset[0], requestedDestination.getY() + offset[1]);
+            if (!room.isPositionOccupied(candidate, attackerDrone)) {
+                return candidate;
+            }
+        }
+
+        return attackerDrone.getPosition();
     }
 
     private GameResult finalizeTurn(GameRoom room, Packet packet) {
