@@ -677,7 +677,8 @@ public class GameController {
                 0, targetDrone != null ? targetDrone.getCurrentHp() : 0, false,
                 lineX, lineY,
                 room.getActionsRemaining(),
-                attackerFinalPosition.getX(), attackerFinalPosition.getY()
+                attackerFinalPosition.getX(), attackerFinalPosition.getY(),
+                attackerDrone.getCurrentHp(), !attackerDrone.isAlive()
             );
             return finalizeTurn(room, missPacket);
         }
@@ -702,7 +703,8 @@ public class GameController {
             damage, targetDrone != null ? targetDrone.getCurrentHp() : 0, true,
             lineX, lineY,
             room.getActionsRemaining(),
-            attackerFinalPosition.getX(), attackerFinalPosition.getY()
+            attackerFinalPosition.getX(), attackerFinalPosition.getY(),
+            attackerDrone.getCurrentHp(), !attackerDrone.isAlive()
         );
 
         // Check game over

@@ -148,6 +148,11 @@ class NetworkManager {
             console.log('[net] Updated from gameStart - actionsRemaining:', this.actionsRemaining);
         }
 
+        if (msg.type === 'attackResult') {
+            console.log(`[FRONTEND][RECEIVE] ⚔️ attackResult - Target=${msg.targetPlayer}/${msg.targetDrone} damage=${msg.damage} remainingHealth=${msg.remainingHealth} hit=${msg.hit}`);
+            console.log(`[FRONTEND][RECEIVE] ⚔️ attackResult - Attacker=${msg.attackerPlayer}/${msg.attackerDrone} attackerHealth=${msg.attackerRemainingHealth} attackerDestroyed=${msg.attackerDestroyed}`);
+        }
+
         console.log('[net] Firing handler for:', msg.type);
         this._fire(msg.type, msg);
         console.log('[net] Handler fired');
