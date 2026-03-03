@@ -16,6 +16,8 @@ export default class HudScene extends Phaser.Scene {
         this.actionsRemaining = 0;
         this.actionsPerTurn = 10;
         this.selectionData = null;
+        /** Phaser objects comprising the deploy panel */
+        this.deployPanelElements = [];
     }
 
     create() {        
@@ -45,7 +47,7 @@ export default class HudScene extends Phaser.Scene {
         this.turnText = this.add.text(this.scale.width / 2, 20, 'Conectando...', {
             fontSize: '20px',
             fill: '#ffffff',
-            backgroundColor: '#000000aa',
+            backgroundColor: '#000000db',
             padding: { x: 12, y: 6 }
         }).setOrigin(0.5, 0);
 
@@ -53,7 +55,7 @@ export default class HudScene extends Phaser.Scene {
         this.droneInfoText = this.add.text(this.scale.width / 2, 55, '', {
             fontSize: '14px',
             fill: '#cccccc',
-            backgroundColor: '#000000aa',
+            backgroundColor: '#000000bb',
         }).setOrigin(0.5, 0);
 
         this.fuelListText = this.add.text(20, 20, '', {
@@ -75,6 +77,8 @@ export default class HudScene extends Phaser.Scene {
         mainScene.events.on('actionsUpdated', this.onActionsUpdated, this);
         mainScene.events.on('attackModeEnded', this.deselectAttackButton, this);
         mainScene.events.on('selectionChanged', this.onSelectionChanged, this);
+        mainScene.events.on('deployPanelOpen', this.onDeployPanelOpen, this);
+        mainScene.events.on('deployPanelClose', this.onDeployPanelClose, this);
 
         // Attack side-view events
         this._onAttackAnimStart = (payload) => this.sideImpactView?.onAttackStart(payload);
@@ -118,6 +122,7 @@ export default class HudScene extends Phaser.Scene {
         this.grayColor = 0x555555;
         this.attackActiveColor = 0xaa3333;
         this.endTurnActiveColor = 0x336699;
+        this.recallActiveColor = 0x226622;
 
         // Attack button state
         this.attackSelected = false;
@@ -150,8 +155,27 @@ export default class HudScene extends Phaser.Scene {
             }
         });
 
+        // Recall (Replegar) button
+        const recallX = startX + btnWidth + gap;
+        this.recallBtnBg = this.add.graphics();
+        this.drawRoundedButton(this.recallBtnBg, recallX - btnWidth / 2, y - btnHeight / 2, btnWidth, btnHeight, btnRadius, this.grayColor);
+
+        this.recallBtnText = this.add.text(recallX, y, '🔄 Replegar', {
+            fontSize: '16px',
+            fill: '#ffffff'
+        }).setOrigin(0.5);
+
+        this.recallBtn = this.add.rectangle(recallX, y, btnWidth, btnHeight, 0x000000, 0.001)
+            .setInteractive({ useHandCursor: true });
+
+        this.recallBtn.on('pointerdown', () => {
+            const mainScene = this.scene.get('MainScene');
+            if (!mainScene?.canRecallSelectedDrone?.()) return;
+            mainScene.recallSelectedDrone();
+        });
+
         // End Turn button background
-        const endTurnX = startX + btnWidth + gap;
+        const endTurnX = recallX + btnWidth + gap;
         this.endTurnBtnBg = this.add.graphics();
         this.drawRoundedButton(this.endTurnBtnBg, endTurnX - btnWidth / 2, y - btnHeight / 2, btnWidth, btnHeight, btnRadius, this.endTurnActiveColor);
 
@@ -210,11 +234,12 @@ export default class HudScene extends Phaser.Scene {
             btnHeight: 40,
             gap: 10
         };
-        const totalWidth = btnWidth * 2 + gap;
+        const totalWidth = btnWidth * 3 + gap * 2;
         const startX = (this.scale.width - totalWidth) / 2 + btnWidth / 2;
-        const endTurnX = startX + btnWidth + gap;
+        const recallX = startX + btnWidth + gap;
+        const endTurnX = recallX + btnWidth + gap;
         const y = this.scale.height - margin - btnHeight / 2;
-        return { startX, endTurnX, y, btnWidth, btnHeight };
+        return { startX, recallX, endTurnX, y, btnWidth, btnHeight };
     }
 
     layoutActionButtons() {
@@ -224,6 +249,10 @@ export default class HudScene extends Phaser.Scene {
 
         this.attackBtn.setPosition(layout.startX, layout.y);
         this.attackBtnText.setPosition(layout.startX, layout.y);
+        if (this.recallBtn) {
+            this.recallBtn.setPosition(layout.recallX, layout.y);
+            this.recallBtnText.setPosition(layout.recallX, layout.y);
+        }
         this.endTurnBtn.setPosition(layout.endTurnX, layout.y);
         this.endTurnBtnText.setPosition(layout.endTurnX, layout.y);
 
@@ -268,7 +297,9 @@ export default class HudScene extends Phaser.Scene {
         // Check if selected drone can attack
         const mainScene = this.scene.get('MainScene');
         const selectedDrone = mainScene?.selectedDrone;
-        const hasAmmoForAttack = !selectedDrone || selectedDrone.droneType !== 'Naval' || selectedDrone.canUseMissileAttack();
+        const hasAmmoForAttack = !selectedDrone
+            ? true
+            : ((selectedDrone.missiles ?? 0) > 0) && (selectedDrone.droneType !== 'Naval' || selectedDrone.canUseMissileAttack());
         const canAttack = selectedDrone && !selectedDrone.hasAttacked && hasAmmoForAttack;
 
         // Update attack button color and alpha
@@ -308,11 +339,170 @@ export default class HudScene extends Phaser.Scene {
             btnRadius,
             this.endTurnActiveColor
         );
+
+        // Recall button — enabled only when selected drone is deployed and within 2 hexes of carrier
+        if (this.recallBtnBg) {
+            const canRecall = !!(mainScene?.canRecallSelectedDrone?.());
+            const recallColor = canRecall ? this.recallActiveColor : this.grayColor;
+            const recallAlpha = canRecall ? 1 : 0.4;
+            const recallX = layout.recallX ?? (startX + btnWidth + (this.actionBtnConfig?.gap ?? 10));
+            this.drawRoundedButton(
+                this.recallBtnBg,
+                recallX - btnWidth / 2,
+                y - btnHeight / 2,
+                btnWidth,
+                btnHeight,
+                btnRadius,
+                recallColor,
+                recallAlpha
+            );
+            if (this.recallBtnText) this.recallBtnText.setAlpha(recallAlpha);
+        }
     }
 
     deselectAttackButton() {
         this.attackSelected = false;
         this.updateButtonStates();
+    }
+
+    /**
+     * Received when MainScene wants to show the deploy panel.
+     * data = { carrier, drones: [{ droneIndex, fuel, maxFuel, missiles, droneType }] }
+     */
+    onDeployPanelOpen(data) {
+        this.onDeployPanelClose(); // clear any existing panel first
+
+        const { drones } = data;
+        if (!drones || drones.length === 0) return;
+
+        const mainScene = this.scene.get('MainScene');
+
+        // Layout constants
+        const panelX = 20;
+        const panelY = 60;
+        const panelW = 330;
+        const rowH = 36;
+        const padding = 10;
+        const titleH = 32;
+        const btnW = 90;
+        const btnH = 26;
+        const panelH = padding + titleH + drones.length * rowH + padding;
+
+        const els = this.deployPanelElements;
+
+        // Panel background
+        const bg = this.add.graphics();
+        bg.fillStyle(0x0d1b2a, 0.93);
+        bg.fillRoundedRect(panelX, panelY, panelW, panelH, 10);
+        bg.lineStyle(1, 0x3a7bd5, 0.8);
+        bg.strokeRoundedRect(panelX, panelY, panelW, panelH, 10);
+        bg.setDepth(200);
+        els.push(bg);
+
+        // Title
+        const title = this.add.text(
+            panelX + panelW / 2,
+            panelY + padding,
+            '🚁 Desplegar Drones',
+            { fontSize: '14px', fill: '#7ecfff', fontStyle: 'bold' }
+        ).setOrigin(0.5, 0).setDepth(201);
+        els.push(title);
+
+        // Close (✕) button in title bar
+        const closeBg = this.add.graphics();
+        closeBg.fillStyle(0x553333, 1);
+        closeBg.fillRoundedRect(panelX + panelW - 28, panelY + 7, 20, 20, 4);
+        closeBg.setDepth(201);
+        els.push(closeBg);
+
+        const closeText = this.add.text(panelX + panelW - 18, panelY + 17, '✕', {
+            fontSize: '12px', fill: '#ffaaaa'
+        }).setOrigin(0.5).setDepth(202);
+        els.push(closeText);
+
+        const closeHit = this.add.rectangle(panelX + panelW - 18, panelY + 17, 22, 22, 0x000000, 0.001)
+            .setInteractive({ useHandCursor: true }).setDepth(203);
+        closeHit.on('pointerdown', (ptr) => {
+            ptr.event.stopPropagation();
+            mainScene.events.emit('deployPanelClose');
+        });
+        els.push(closeHit);
+
+        // Drone rows
+        for (let i = 0; i < drones.length; i++) {
+            const d = drones[i];
+            const rowY = panelY + padding + titleH + i * rowH;
+
+            // Row separator (except first)
+            if (i > 0) {
+                const sep = this.add.graphics();
+                sep.lineStyle(1, 0x2a4a6a, 0.6);
+                sep.beginPath();
+                sep.moveTo(panelX + padding, rowY);
+                sep.lineTo(panelX + panelW - padding, rowY);
+                sep.strokePath();
+                sep.setDepth(201);
+                els.push(sep);
+            }
+
+            // Info text
+            const ammoStr = d.droneType === 'Naval' ? `  Mis: ${d.missiles ?? 0}` : '';
+            const infoLabel = this.add.text(
+                panelX + padding,
+                rowY + rowH / 2,
+                `#${d.droneIndex + 1}  Comb: ${d.fuel}/${d.maxFuel}${ammoStr}`,
+                { fontSize: '12px', fill: '#dddddd' }
+            ).setOrigin(0, 0.5).setDepth(201);
+            els.push(infoLabel);
+
+            // Deploy button background
+            const btnX = panelX + panelW - padding - btnW;
+            const btnY = rowY + (rowH - btnH) / 2;
+            const btnBg = this.add.graphics();
+            btnBg.fillStyle(0x1a7a40, 1);
+            btnBg.fillRoundedRect(btnX, btnY, btnW, btnH, 6);
+            btnBg.setDepth(201);
+            els.push(btnBg);
+
+            const btnLabel = this.add.text(btnX + btnW / 2, rowY + rowH / 2, 'Desplegar', {
+                fontSize: '12px', fill: '#ffffff'
+            }).setOrigin(0.5).setDepth(202);
+            els.push(btnLabel);
+
+            // Capture droneIndex in closure
+            const droneIdx = d.droneIndex;
+            const hit = this.add.rectangle(btnX + btnW / 2, rowY + rowH / 2, btnW, btnH, 0x000000, 0.001)
+                .setInteractive({ useHandCursor: true }).setDepth(203);
+            hit.on('pointerdown', (ptr) => {
+                ptr.event.stopPropagation();
+                mainScene.deployDroneFromPanel(droneIdx);
+            });
+            hit.on('pointerover', () => {
+                btnBg.clear();
+                btnBg.fillStyle(0x27ae60, 1);
+                btnBg.fillRoundedRect(btnX, btnY, btnW, btnH, 6);
+            });
+            hit.on('pointerout', () => {
+                btnBg.clear();
+                btnBg.fillStyle(0x1a7a40, 1);
+                btnBg.fillRoundedRect(btnX, btnY, btnW, btnH, 6);
+            });
+            els.push(hit);
+        }
+
+        // Hide fuel list while panel is open to avoid overlap
+        if (this.fuelListText) this.fuelListText.setVisible(false);
+    }
+
+    /** Remove the deploy panel from the screen. */
+    onDeployPanelClose() {
+        for (const el of this.deployPanelElements) {
+            if (el && el.active !== false) {
+                el.destroy();
+            }
+        }
+        this.deployPanelElements = [];
+        if (this.fuelListText) this.fuelListText.setVisible(true);
     }
 
 
@@ -360,6 +550,11 @@ export default class HudScene extends Phaser.Scene {
         this.attackBtn.setVisible(visible);
         this.attackBtnBg.setVisible(visible);
         this.attackBtnText.setVisible(visible);
+        if (this.recallBtn) {
+            this.recallBtn.setVisible(visible);
+            this.recallBtnBg.setVisible(visible);
+            this.recallBtnText.setVisible(visible);
+        }
         this.endTurnBtn.setVisible(visible);
         this.endTurnBtnBg.setVisible(visible);
         this.endTurnBtnText.setVisible(visible);
@@ -389,14 +584,23 @@ export default class HudScene extends Phaser.Scene {
         // Update selected unit info
         if (this.isMyTurn && mainScene.selectedDrone) {
             const drone = mainScene.selectedDrone;
-            const canAttack = !drone.hasAttacked;
+            const hasAmmoForAttack = (drone.missiles ?? 0) > 0 && (drone.droneType !== 'Naval' || drone.canUseMissileAttack());
+            const canAttack = !drone.hasAttacked && hasAmmoForAttack;
             const droneNumber = mainScene.myDrones.indexOf(drone) + 1;
-            const parts = [`Dron seleccionado: #${droneNumber}`, 'Puede moverse'];
+            const ammo = typeof drone.missiles === 'number' ? drone.missiles : 0;
+            const parts = [`Dron seleccionado: #${droneNumber}`, 'Puede moverse', `Munición: ${ammo}`];
             if (canAttack) parts.push('Puede atacar');
             this.droneInfoText.setText(parts.join('  |  '));
         } else if (this.isMyTurn && mainScene.selectedCarrier) {
             const maxMove = mainScene.selectedCarrier.maxMoveDistance;
-            this.droneInfoText.setText(`Portadrones seleccionado  |  Movimiento máx: ${maxMove} casillas`);
+            const undeployedCount = (mainScene.myDrones || []).filter(d => !d.deployed && d.isAlive()).length;
+            if (undeployedCount > 0) {
+                this.droneInfoText.setText(
+                    `Portadrones seleccionado  |  ${undeployedCount} dron(es) por desplegar  |  Mov. máx: ${maxMove}`
+                );
+            } else {
+                this.droneInfoText.setText(`Portadrones seleccionado  |  Movimiento máx: ${maxMove} casillas`);
+            }
         } else if (this.isMyTurn) {
             this.droneInfoText.setText('Selecciona un dron o portadrones');
         }
@@ -414,12 +618,27 @@ export default class HudScene extends Phaser.Scene {
 
         this.minimap.update(mainScene.cameras.main, tracked);
 
-        const myAliveDrones = (mainScene.myDrones || []).filter((drone) => drone.isAlive());
-        if (myAliveDrones.length) {
-            const fuelLines = myAliveDrones.map((drone, idx) => `Dron ${idx + 1}: ${drone.fuel}/${drone.maxFuel}`);
-            this.fuelListText.setText(['Combustible', ...fuelLines].join('\n'));
-        } else {
-            this.fuelListText.setText('Combustible\nSin drones activos');
+        // Only show deployed drones in the fuel list
+        const myAliveDrones = (mainScene.myDrones || []).filter((drone) => drone.isAlive() && drone.deployed);
+        const allMyDrones = (mainScene.myDrones || []).filter((drone) => drone.isAlive());
+        const undeployedCount = allMyDrones.length - myAliveDrones.length;
+
+        if (this.deployPanelElements.length === 0) {
+            // Panel is closed – show fuel list
+            if (myAliveDrones.length) {
+                const fuelLines = myAliveDrones.map((drone, idx) => {
+                    const realIdx = mainScene.myDrones.indexOf(drone);
+                    return `Dron ${realIdx + 1}: ${drone.fuel}/${drone.maxFuel}`;
+                });
+                const header = undeployedCount > 0
+                    ? `Combustible  (${undeployedCount} en hangar)`
+                    : 'Combustible';
+                this.fuelListText.setText([header, ...fuelLines].join('\n'));
+            } else if (undeployedCount > 0) {
+                this.fuelListText.setText(`Combustible\n${undeployedCount} dron(es) en hangar`);
+            } else {
+                this.fuelListText.setText('Combustible\nSin drones activos');
+            }
         }
 
     }

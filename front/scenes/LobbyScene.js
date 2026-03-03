@@ -14,9 +14,16 @@ export default class LobbyScene extends Phaser.Scene {
         this.load.image('dron_bomba_0', 'assets/dron_bomba/dron_bomba_0.png');
         this.load.image('dron_misil_0', 'assets/dron_misil/dron_misil_0.png');
         this.load.image('mar', 'assets/mar.png');
+        this.load.audio('bg_music', 'assets/ocean_30s_loop.mp3');
     }
 
     create() {
+        // Start background music loop (persists across scene transitions)
+        if (!this.sound.get('bg_music')) {
+            const bgMusic = this.sound.add('bg_music', { loop: true, volume: 0.2 });
+            bgMusic.play();
+        }
+
         // Background
         const bg = this.add.image(VIEW_WIDTH / 2, VIEW_HEIGHT / 2, 'mar');
         bg.setDisplaySize(VIEW_WIDTH, VIEW_HEIGHT);

@@ -78,6 +78,10 @@ class NetworkManager {
         this.send({ type: 'attack', attackerIndex, targetPlayer, targetDrone, lineX, lineY, destinationX, destinationY, targetType });
     }
 
+    requestRecall(droneIndex) {
+        this.send({ type: 'recall', droneIndex });
+    }
+
     endTurn() {
         this.send({ type: 'endTurn' });
     }

@@ -44,6 +44,9 @@ export default class MainScene extends Phaser.Scene {
         this.playerSides = {};
         this.localSide = 'Aereo';
 
+        // Carrier for which the deploy panel is currently open
+        this.deployPanelCarrier = null;
+
         // Vision ranges (in hexes). Defaults are overridden by server gameState when available.
         this.navalVisionRange = NAVAL_VISION_RANGE;
         this.aereoVisionRange = AEREO_VISION_RANGE;
@@ -87,11 +90,21 @@ export default class MainScene extends Phaser.Scene {
         // Explosion (used by the side impact view for bomb/missile impacts)
         this.load.image('explosion', 'assets/explosion.png');
         this.load.audio('explosion', 'assets/explosion.flac');
-        this.load.audio('missile_launch', 'assets/dron_misil/missile_launch.wav');
+        this.load.audio('missile_launch', 'assets/dron_misil/missile_alarm_2.ogg');
+
+        // Background music & selection sounds
+        this.load.audio('battle_theme', 'assets/battleTheme.mp3');
+        this.load.audio('porta_drones_sound', 'assets/porta_drones_sound.mp3');
+        this.load.audio('dron_sound', 'assets/dron_sound.wav');
     }
 
 
     create(data) {
+        // Battle theme — plays alongside the ocean loop started by LobbyScene
+        if (!this.sound.get('battle_theme')) {
+            this.sound.add('battle_theme', { loop: true, volume: 0.35 }).play();
+        }
+
         // Tile the background to cover the whole world
         const bg = this.add.tileSprite(0, 0, WORLD_WIDTH, WORLD_HEIGHT, 'mar');
         bg.setOrigin(0, 0);
@@ -279,7 +292,7 @@ export default class MainScene extends Phaser.Scene {
         const sources = [];
         const myDrones = this.drones[Network.playerIndex] || [];
         for (const d of myDrones) {
-            if (d?.isAlive() && d.sprite) sources.push(d.sprite);
+            if (d?.isAlive() && d.sprite && d.deployed) sources.push(d.sprite);
         }
         const myCarrier = this.carriers?.[Network.playerIndex];
         if (myCarrier?.sprite) sources.push(myCarrier.sprite);
@@ -345,6 +358,8 @@ export default class MainScene extends Phaser.Scene {
             this.actionMode = MODE_MOVE;
             this.clearTargetHighlights();
             this.clearSelections();
+            this.deployPanelCarrier = null;
+            this.events.emit('deployPanelClose');
 
             // Reset per-drone attack state for new turn
             if (this.isMyTurn) {
@@ -372,6 +387,12 @@ export default class MainScene extends Phaser.Scene {
             const drone = this.drones[msg.playerIndex]?.[msg.droneIndex];
             if (!drone) {
                 return;
+            }
+
+            // First move WITH position data = drone being deployed from its carrier.
+            // Fuel-only updates (no x/y) from idle consumption must NOT trigger deployment.
+            if (!drone.deployed && typeof msg.x === 'number' && typeof msg.y === 'number') {
+                drone.deployed = true;
             }
 
             if (typeof msg.x === 'number' && typeof msg.y === 'number') {
@@ -472,8 +493,13 @@ export default class MainScene extends Phaser.Scene {
             // Mark attacker as having attacked
             if (attackerDrone && msg.attackerPlayer === Network.playerIndex) {
                 attackerDrone.hasAttacked = true;
-                if (attackerDrone.droneType === 'Naval') {
-                    attackerDrone.consumeMissile();
+                if (typeof msg.attackerAmmo === 'number') {
+                    attackerDrone.missiles = msg.attackerAmmo;
+                } else {
+                    // Back-compat: old server didn't send ammo remaining.
+                    if (typeof attackerDrone.consumeMissile === 'function') {
+                        attackerDrone.consumeMissile();
+                    }
                 }
                 const nextActions = typeof msg.actionsRemaining === 'number'
                     ? msg.actionsRemaining
@@ -507,6 +533,40 @@ export default class MainScene extends Phaser.Scene {
         Network.on('gameSaved', (msg) => {
             alert('Partida guardada correctamente');
             window.location.href = '/menu';
+        });
+
+        Network.on('droneRecalled', (msg) => {
+            const { playerIndex, droneIndex, fuel, maxFuel, missiles, actionsRemaining } = msg;
+            const drone = this.drones[playerIndex]?.[droneIndex];
+            if (!drone) return;
+
+            // Unset deployed state and restore resources
+            drone.deployed = false;
+            if (typeof fuel === 'number') drone.fuel = fuel;
+            if (typeof maxFuel === 'number') drone.maxFuel = maxFuel;
+            if (typeof missiles === 'number') drone.missiles = missiles;
+
+            // Hide the drone visually (it is now inside the carrier)
+            drone.setLocalVisibility(false);
+            drone.deselect();
+
+            // If this was our selected drone, deselect it
+            if (playerIndex === Network.playerIndex && this.selectedDrone === drone) {
+                this.clearSelections();
+                this.events.emit('selectionChanged', { type: null });
+            }
+
+            // Sync our local actions counter
+            if (playerIndex === Network.playerIndex && typeof actionsRemaining === 'number') {
+                Network.actionsRemaining = actionsRemaining;
+                this.events.emit('actionsUpdated', {
+                    actionsRemaining,
+                    actionsPerTurn: this.actionsPerTurn
+                });
+            }
+
+            this.updateVision();
+            this.events.emit('fuelUpdated');
         });
         
         // Note: Connection and join are handled by LobbyScene
@@ -623,13 +683,34 @@ export default class MainScene extends Phaser.Scene {
                 });
                 drone.playerIndex = player.playerIndex;
                 drone.droneIndex = this.drones[player.playerIndex].length;
+
+                // Restore deployed state from saved game.
+                // Drones that were already on the battlefield must be shown immediately,
+                // but only if they are still alive (health > 0).
+                if (d.deployed === true) {
+                    drone.deployed = true;
+                    if (drone.isAlive()) {
+                        // Make Phaser objects visible (they start hidden in the Drone constructor)
+                        if (drone.sprite) drone.sprite.setVisible(true);
+                        if (drone.healthBarBg) drone.healthBarBg.setVisible(true);
+                        if (drone.healthBar) drone.healthBar.setVisible(true);
+                    } else {
+                        // Mark as destroyed so it is excluded from all game logic
+                        drone.destroyed = true;
+                    }
+                }
+
                 this.drones[player.playerIndex].push(drone);
             }
 
             if (isLocal) {
                 this.myDrones = this.drones[player.playerIndex];
-                const first = this.myDrones[0];
-                this.cameras.main.centerOn(first.sprite.x, first.sprite.y);
+                // Center on first deployed drone, or on the carrier if none are deployed yet
+                const firstDeployed = this.myDrones.find(d => d.deployed && d.isAlive());
+                const focusSprite = firstDeployed?.sprite ?? this.carriers[player.playerIndex]?.sprite;
+                if (focusSprite) {
+                    this.cameras.main.centerOn(focusSprite.x, focusSprite.y);
+                }
             }
         }
 
@@ -640,6 +721,24 @@ export default class MainScene extends Phaser.Scene {
     onCarrierClicked(carrier) {
         if (!carrier?.isLocal) return;
         this.selectCarrier(carrier);
+
+        // Show deploy panel if it's our turn and there are drones waiting to be deployed
+        if (this.isMyTurn && this.selectedCarrier === carrier) {
+            const undeployed = (this.myDrones || []).filter(d => !d.deployed && d.isAlive());
+            if (undeployed.length > 0) {
+                this.deployPanelCarrier = carrier;
+                this.events.emit('deployPanelOpen', {
+                    carrier,
+                    drones: undeployed.map(d => ({
+                        droneIndex: this.myDrones.indexOf(d),
+                        fuel: d.fuel,
+                        maxFuel: d.maxFuel,
+                        missiles: d.missiles,
+                        droneType: d.droneType
+                    }))
+                });
+            }
+        }
     }
 
     selectCarrier(carrier) {
@@ -657,10 +756,13 @@ export default class MainScene extends Phaser.Scene {
         }
 
         if (this.selectedCarrier === carrier) {
+            this._stopSelectionSound();
             this.selectedCarrier.ring.setVisible(false);
             this.selectedCarrier.sprite.clearTint();
             this.stopCarrierPulse(this.selectedCarrier);
             this.selectedCarrier = null;
+            this.deployPanelCarrier = null;
+            this.events.emit('deployPanelClose');
             this.events.emit('selectionChanged', { type: null });
             return;
         }
@@ -670,6 +772,7 @@ export default class MainScene extends Phaser.Scene {
         carrier.ring.setPosition(carrier.sprite.x, carrier.sprite.y);
         carrier.sprite.setTint(0xfff176);
         this.startCarrierPulse(carrier);
+        this._playSelectionSound('porta_drones_sound', 0.5);
         this.actionMode = MODE_MOVE;
         this.clearTargetHighlights();
         this.events.emit('selectionChanged', {
@@ -759,6 +862,68 @@ export default class MainScene extends Phaser.Scene {
         }
     }
 
+    /**
+     * Called from HudScene when the player clicks 'Desplegar' on a drone.
+     * Finds a valid deploy position near the carrier and sends a move request.
+     */
+    deployDroneFromPanel(droneIndex) {
+        if (!this.isMyTurn) return;
+        if ((Network.actionsRemaining ?? 0) <= 0) {
+            console.warn('[Deploy] No actions remaining');
+            return;
+        }
+
+        const drone = this.myDrones[droneIndex];
+        if (!drone || drone.deployed || !drone.isAlive()) return;
+
+        const carrier = this.deployPanelCarrier || this.selectedCarrier;
+        if (!carrier) return;
+
+        const pos = this.getDeployPosition(carrier);
+        if (!pos) {
+            console.warn('[Deploy] No free position found near carrier');
+            return;
+        }
+
+        if (typeof drone.queueMoveLock === 'function') {
+            drone.queueMoveLock();
+        }
+
+        Network.requestMove(droneIndex, pos.x, pos.y);
+
+        // Close the panel; player can re-click carrier to deploy next drone
+        this.deployPanelCarrier = null;
+        this.events.emit('deployPanelClose');
+    }
+
+    /**
+     * Finds the nearest free hex position 2 hexes above or below the given carrier.
+     * Returns null if no valid position is found.
+     */
+    getDeployPosition(carrier) {
+        const cx = carrier.sprite.x;
+        const cy = carrier.sprite.y;
+        // Height between adjacent hex rows (pointy-top hexes, size = this.hexGrid.size)
+        const rowH = 2 * this.hexGrid.size * 0.75;
+
+        // Priority: 2 above, 2 below, then 1 / 3 rows in each direction
+        const offsets = [-2, 2, -3, 3, -1, 1, -4, 4];
+        for (const offset of offsets) {
+            const candY = cy + offset * rowH;
+            const snapped = this.hexGrid.getNearestCenter(cx, candY);
+            if (!snapped) continue;
+
+            // Must not land on the carrier's own hex
+            const distToCarrier = Math.sqrt((snapped.x - cx) ** 2 + (snapped.y - cy) ** 2);
+            if (distToCarrier < 30) continue;
+
+            if (!this.isPositionOccupied(snapped.x, snapped.y, 15)) {
+                return snapped;
+            }
+        }
+        return null;
+    }
+
     /** Called when any drone is clicked */
     onDroneClicked(drone) {
         if (this.actionMode === MODE_ATTACK) {
@@ -806,6 +971,7 @@ export default class MainScene extends Phaser.Scene {
         }
 
         if (this.selectedDrone === drone) {
+            this._stopSelectionSound();
             this.selectedDrone = null;
             this.actionMode = MODE_MOVE;
             this.clearTargetHighlights();
@@ -817,6 +983,7 @@ export default class MainScene extends Phaser.Scene {
         this.selectedDrone = drone;
         drone.select();
         drone.sprite.setTint(0xfff176);
+        this._playSelectionSound('dron_sound', 0.1);
 
         const droneNumber = this.myDrones.indexOf(drone) + 1;
         this.events.emit('selectionChanged', {
@@ -835,6 +1002,8 @@ export default class MainScene extends Phaser.Scene {
         if (!this.isMyTurn || !this.selectedDrone) return;
         if (this.selectedDrone.hasAttacked) return; // Already attacked this turn
         if (this.selectedDrone.isBusy && this.selectedDrone.isBusy()) return;
+        const ammo = this.selectedDrone.missiles ?? 0;
+        if (ammo <= 0) return;
         if (this.selectedDrone.droneType === 'Naval' && !this.selectedDrone.canUseMissileAttack()) return;
 
         this.actionMode = MODE_ATTACK;
@@ -865,7 +1034,7 @@ export default class MainScene extends Phaser.Scene {
         const enemyIndex = Network.playerIndex === 0 ? 1 : 0;
         const enemies = this.drones[enemyIndex] || [];
         for (const drone of enemies) {
-            if (!drone.isAlive() || !this.isDroneVisibleToLocal(drone)) continue;
+            if (!drone.isAlive() || !drone.deployed || !this.isDroneVisibleToLocal(drone)) continue;
 
             // Bomb drone: only allow clicking targets within weapon range.
             if (this.selectedDrone?.droneType === 'Aereo') {
@@ -909,7 +1078,7 @@ export default class MainScene extends Phaser.Scene {
         const sources = [];
         const myDrones = this.drones[Network.playerIndex] || [];
         for (const d of myDrones) {
-            if (d?.isAlive() && d.sprite) sources.push(d.sprite);
+            if (d?.isAlive() && d.sprite && d.deployed) sources.push(d.sprite);
         }
 
         const myCarrier = this.carriers?.[Network.playerIndex];
@@ -941,7 +1110,7 @@ export default class MainScene extends Phaser.Scene {
         const sources = [];
         const myDrones = this.drones[Network.playerIndex] || [];
         for (const d of myDrones) {
-            if (d?.isAlive() && d.sprite) sources.push(d.sprite);
+            if (d?.isAlive() && d.sprite && d.deployed) sources.push(d.sprite);
         }
 
         const myCarrier = this.carriers?.[Network.playerIndex];
@@ -976,6 +1145,7 @@ export default class MainScene extends Phaser.Scene {
             for (const pi in this.drones) {
                 for (const drone of this.drones[pi]) {
                     if (!drone?.isAlive() || !drone.sprite) continue;
+                    if (!drone.deployed) continue; // Undeployed drones are inside the carrier, not on the map
                     if (ignoreUnit && ignoreUnit === drone) continue; // Skip the moving unit
                     const dx = drone.sprite.x - x;
                     const dy = drone.sprite.y - y;
@@ -1062,6 +1232,12 @@ export default class MainScene extends Phaser.Scene {
             console.log('[MainScene] executeAttack early return: drone is busy');
             return;
         }
+
+        const ammo = this.selectedDrone.missiles ?? 0;
+        if (ammo <= 0) {
+            console.log('[MainScene] executeAttack early return: no ammo');
+            return;
+        }
         
         if (this.selectedDrone.droneType === 'Naval' && !this.selectedDrone.canUseMissileAttack()) {
             console.log('[MainScene] executeAttack early return: Naval drone no missiles');
@@ -1124,6 +1300,8 @@ export default class MainScene extends Phaser.Scene {
         if (this.selectedDrone.isBusy && this.selectedDrone.isBusy()) return;
         // Only missile drones can do blind/manual shots.
         if (this.selectedDrone.droneType !== 'Naval') return;
+        const ammo = this.selectedDrone.missiles ?? 0;
+        if (ammo <= 0) return;
         if (this.selectedDrone.droneType === 'Naval' && !this.selectedDrone.canUseMissileAttack()) return;
 
         const attackerIndex = this.myDrones.indexOf(this.selectedDrone);
@@ -1154,10 +1332,10 @@ export default class MainScene extends Phaser.Scene {
             return null;
         }
 
-        const enemyIndex = Network.playerIndex === 0 ? 1 : 0;
+        const enemyIndex = Network.playerIndex === 0 ? 1 : 0; 
     
         const enemies = (this.drones[enemyIndex] || []).filter((drone) => {
-            if (!drone?.isAlive()) return false;
+            if (!drone?.isAlive() || !drone.deployed) return false;
             if (!this.isDroneVisibleToLocal(drone)) return false;
 
             const attackDistance = this.hexGrid.getHexDistance(
@@ -1347,7 +1525,53 @@ export default class MainScene extends Phaser.Scene {
             this.selectedCarrier = null;
         }
 
+        this._stopSelectionSound();
+        this.deployPanelCarrier = null;
+        this.events.emit('deployPanelClose');
         this.events.emit('selectionChanged', { type: null });
+    }
+
+    /** Start a looping selection sound, stopping any previously playing one. */
+    _playSelectionSound(key, volume) {
+        this._stopSelectionSound();
+        if (this.sound.get(key)?.isPlaying) return; // guard against re-entry
+        this._selectionSound = this.sound.add(key, { loop: true,  volume });
+        this._selectionSound.play();
+    }
+
+    /** Stop and discard the current selection loop sound. */
+    _stopSelectionSound() {
+        if (this._selectionSound) {
+            this._selectionSound.stop();
+            this._selectionSound.destroy();
+            this._selectionSound = null;
+        }
+    }
+
+    /** Recall the currently selected deployed drone back to its carrier — called from HUD */
+    recallSelectedDrone() {
+        if (!this.canRecallSelectedDrone()) return;
+        const droneIndex = this.myDrones.indexOf(this.selectedDrone);
+        if (droneIndex === -1) return;
+        Network.requestRecall(droneIndex);
+    }
+
+    /**
+     * Returns true if the currently selected drone can be recalled:
+     * it must be deployed, it's our turn, actions remain, and the drone
+     * must be within 2 hexes of the player's carrier.
+     */
+    canRecallSelectedDrone() {
+        if (!this.isMyTurn || !this.selectedDrone) return false;
+        if (!this.selectedDrone.deployed) return false;
+        if ((Network.actionsRemaining ?? 0) <= 0) return false;
+        const carrier = this.carriers[Network.playerIndex];
+        if (!carrier?.sprite) return false;
+        const dist = this.hexGrid.getHexDistance(
+            this.selectedDrone.sprite.x, this.selectedDrone.sprite.y,
+            carrier.sprite.x, carrier.sprite.y
+        );
+        return dist <= 2;
     }
 
     /** End turn early - called from HUD */
@@ -1370,7 +1594,7 @@ export default class MainScene extends Phaser.Scene {
         // Drones
         for (const pi in this.drones) {
             for (const drone of this.drones[pi]) {
-                if (drone.isAlive()) {
+                if (drone.isAlive() && drone.deployed) {
                     const playerIndex = parseInt(pi);
                     if (playerIndex === Network.playerIndex || this.isDroneVisibleToLocal(drone)) {
                         all.push({

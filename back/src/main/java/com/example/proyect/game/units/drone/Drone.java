@@ -1,7 +1,7 @@
 package com.example.proyect.game.units.drone;
 
-import com.example.proyect.game.units.weapons.Weapon;
 import com.example.proyect.game.units.Unit;
+import com.example.proyect.game.units.weapons.Weapon;
 
 public abstract class Drone extends Unit {
 
@@ -9,6 +9,8 @@ public abstract class Drone extends Unit {
     private Weapon weapon;
     private int maxFuel = 10;
     private int fuel = 10;
+    /** true = the drone has been deployed onto the battlefield; false = still inside its carrier */
+    private boolean deployed = false;
 
     public Drone() {
         super();
@@ -66,5 +68,13 @@ public abstract class Drone extends Unit {
             return;
         }
         fuel = Math.max(0, fuel - amount);
+    }
+
+    public boolean isDeployed() {
+        return deployed;
+    }
+
+    public void setDeployed(boolean deployed) {
+        this.deployed = deployed;
     }
 }

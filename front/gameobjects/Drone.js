@@ -42,6 +42,9 @@ export default class Drone {
         this.healthBarOffsetY = 16;
         this.healthBarOffsetX = 12;
 
+        // Deployment state: false = hidden inside carrier, true = on the battlefield
+        this.deployed = false;
+
         // Turn action tracking (reset each turn)
         this.hasMoved = false;
         this.hasAttacked = false;
@@ -114,6 +117,11 @@ export default class Drone {
         });
 
         this.syncUIPositions();
+
+        // All drones start hidden inside their carrier until explicitly deployed
+        this.sprite.setVisible(false);
+        this.healthBarBg.setVisible(false);
+        this.healthBar.setVisible(false);
     }
 
     isBusy() {
@@ -225,8 +233,8 @@ export default class Drone {
     setTargetable(show) {
         this.syncUIPositions();
         this.isTargetable = !!show;
-        // Only show target ring if this drone is currently visible to the local player.
-        this.targetRing.setVisible(this.isTargetable && this.isVisibleToLocal);
+        // Only show target ring if visible AND already deployed on the battlefield
+        this.targetRing.setVisible(this.isTargetable && this.isVisibleToLocal && this.deployed);
     }
 
     /**
@@ -236,7 +244,8 @@ export default class Drone {
      */
     setLocalVisibility(isVisible) {
         this.isVisibleToLocal = !!isVisible;
-        const v = this.isVisibleToLocal;
+        // Undeployed drones are always hidden regardless of vision
+        const v = this.isVisibleToLocal && this.deployed;
         if (this.sprite) this.sprite.setVisible(v);
         if (this.healthBarBg) this.healthBarBg.setVisible(v);
         if (this.healthBar) this.healthBar.setVisible(v);

@@ -158,7 +158,8 @@ public class Packet {
                                        double lineX, double lineY,
                                        int actionsRemaining,
                                        double attackerX, double attackerY,
-                                       int attackerRemainingHealth, boolean attackerDestroyed) {
+                                       int attackerRemainingHealth, boolean attackerDestroyed,
+                                       int attackerAmmo) {
         Map<String, Object> payload = new HashMap<>();
         payload.put("attackerPlayer", attackerPlayer);
         payload.put("attackerDrone", attackerDrone);
@@ -174,7 +175,19 @@ public class Packet {
         payload.put("attackerY", attackerY);
         payload.put("attackerRemainingHealth", attackerRemainingHealth);
         payload.put("attackerDestroyed", attackerDestroyed);
+        payload.put("attackerAmmo", attackerAmmo);
         return new Packet(PacketType.ATTACK_RESULT, payload);
+    }
+
+    public static Packet droneRecalled(int playerIndex, int droneIndex, int fuel, int maxFuel, int missiles, int actionsRemaining) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("playerIndex", playerIndex);
+        payload.put("droneIndex", droneIndex);
+        payload.put("fuel", fuel);
+        payload.put("maxFuel", maxFuel);
+        payload.put("missiles", missiles);
+        payload.put("actionsRemaining", actionsRemaining);
+        return new Packet(PacketType.DRONE_RECALLED, payload);
     }
 
     public static Packet playerLeft(int playerIndex) {

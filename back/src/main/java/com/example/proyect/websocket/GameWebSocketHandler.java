@@ -107,6 +107,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             case END_TURN    -> handleEndTurn(session);
             case SAVE_AND_EXIT -> handleSaveAndExit(session);
             case LOAD_GAME -> handleLoadGame(session, packet);
+            case RECALL      -> handleRecall(session, packet);
             default          -> sendError(session, "Unknown message type");
         }
     }
@@ -302,6 +303,27 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
+
+    private void handleRecall(WebSocketSession session, Packet packet) throws IOException {
+        int droneIndex = packet.getInt("droneIndex");
+
+        log.info("[WS] handleRecall: droneIndex={}", droneIndex);
+
+        GameResult result = gameController.processRecall(session.getId(), droneIndex);
+
+        if (!result.isSuccess()) {
+            send(session, result.getPacket());
+            return;
+        }
+
+        // Broadcast the recall to both players in the room
+        broadcastToRoom(session.getId(), result.getPacket());
+
+        if (result.isTurnEnded()) {
+            Packet turnStart = Packet.turnStart(result.getNextPlayer(), result.getActionsRemaining());
+            broadcastToRoom(session.getId(), turnStart);
+        }
+    }
 
     private void handleEndTurn(WebSocketSession session) throws IOException {
         GameResult result = gameController.endTurn(session.getId());

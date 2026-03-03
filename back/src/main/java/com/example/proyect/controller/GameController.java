@@ -669,6 +669,7 @@ public class GameController {
         }
 
         AttackResolution attackResolution = resolveAttack(attackerDrone, targetDrone, lineX, lineY);
+        int attackerAmmo = getAttackerAmmoForPacket(attackerDrone);
         if (!attackResolution.hit()) {
             room.useActions(actionCost);
             Packet missPacket = Packet.attackResult(
@@ -678,7 +679,8 @@ public class GameController {
                 lineX, lineY,
                 room.getActionsRemaining(),
                 attackerFinalPosition.getX(), attackerFinalPosition.getY(),
-                attackerDrone.getCurrentHp(), !attackerDrone.isAlive()
+                attackerDrone.getCurrentHp(), !attackerDrone.isAlive(),
+                attackerAmmo
             );
             return finalizeTurn(room, missPacket);
         }
@@ -704,7 +706,8 @@ public class GameController {
             lineX, lineY,
             room.getActionsRemaining(),
             attackerFinalPosition.getX(), attackerFinalPosition.getY(),
-            attackerDrone.getCurrentHp(), !attackerDrone.isAlive()
+            attackerDrone.getCurrentHp(), !attackerDrone.isAlive(),
+            attackerAmmo
         );
 
         // Check game over
@@ -758,6 +761,15 @@ public class GameController {
 
         if (attackerDrone instanceof NavalDrone navalDrone && !navalDrone.hasMissiles()) {
             return GameResult.error("No missiles remaining for this naval drone");
+        }
+
+        if (attackerDrone instanceof AerialDrone) {
+            if (attackerDrone.getWeapon() == null) {
+                return GameResult.error("Attacker has no weapon configured");
+            }
+            if (!attackerDrone.getWeapon().hasAmmo()) {
+                return GameResult.error("No ammo remaining for this aerial drone");
+            }
         }
 
         if (attackerDrone instanceof AerialDrone && manualBlindShot && !carrierTarget) {
@@ -816,6 +828,10 @@ public class GameController {
         }
 
         if (!(attackerDrone instanceof NavalDrone navalDrone)) {
+            if (!attackerDrone.getWeapon().hasAmmo()) {
+                return new AttackResolution(0, false);
+            }
+            attackerDrone.getWeapon().consumeAmmo(1);
             return new AttackResolution(attackerDrone.getWeapon().getDamage(), true);
         }
 
@@ -892,6 +908,16 @@ public class GameController {
     private record AttackResolution(int damage, boolean hit) {
     }
 
+    private int getAttackerAmmoForPacket(Drone attackerDrone) {
+        if (attackerDrone instanceof NavalDrone nd) {
+            return nd.getMissiles();
+        }
+        if (attackerDrone != null && attackerDrone.getWeapon() != null) {
+            return attackerDrone.getWeapon().getAmmo();
+        }
+        return 0;
+    }
+
 //Las 3 funciones anteriores se separan para bajar la complejidad ciclomatica
 
 
@@ -934,6 +960,54 @@ public class GameController {
         return GameResult.ok(Packet.of(turnPacket.getType(), payload));
     }
 
+
+    /**
+     * Process a recall action — pulls a deployed drone back into its carrier,
+     * restoring the drone's fuel and missiles.
+     */
+    public GameResult processRecall(String sessionId, int droneIndex) {
+        GameRoom room = getRoomForSession(sessionId);
+        if (room == null) {
+            return GameResult.error("You are not in a game room");
+        }
+
+        PlayerState player = room.getPlayerBySession(sessionId);
+        if (player == null) {
+            return GameResult.error("You are not in the game");
+        }
+
+        if (!room.isPlayerTurn(sessionId)) {
+            return GameResult.error("Not your turn");
+        }
+
+        Drone drone = room.getDrone(player.getPlayerIndex(), droneIndex);
+        if (drone == null) {
+            return GameResult.error("Invalid drone index");
+        }
+        if (!drone.isAlive()) {
+            return GameResult.error("Cannot recall a destroyed drone");
+        }
+        if (!drone.isDeployed()) {
+            return GameResult.error("Drone is already in the hangar");
+        }
+
+        if (!room.recallDrone(sessionId, droneIndex)) {
+            return GameResult.error("Cannot recall drone");
+        }
+
+        room.useAction();
+
+        int missiles = drone instanceof NavalDrone nd ? nd.getMissiles() : 0;
+        Packet recallPacket = Packet.droneRecalled(
+            player.getPlayerIndex(), droneIndex,
+            drone.getFuel(), drone.getMaxFuel(), missiles,
+            room.getActionsRemaining()
+        );
+
+        log.info("Player {} recalled drone {} in room {}", player.getPlayerIndex(), droneIndex, room.getRoomId());
+
+        return finalizeTurn(room, recallPacket);
+    }
 
     public Map<String, Object> getGameState(String sessionId) {
         GameRoom room = getRoomForSession(sessionId);

@@ -212,6 +212,12 @@ public class GameRoom {
         }
 
         drone.setPosition(targetPos);
+        // First successful move = drone is deployed onto the battlefield.
+        // Restore full fuel first so hangar wait time doesn't penalise the player.
+        if (!drone.isDeployed()) {
+            drone.setDeployed(true);
+            drone.setFuel(drone.getMaxFuel());
+        }
         consumeMovementFuel(drone);
         return true;
     }
@@ -238,7 +244,8 @@ public class GameRoom {
         List<Drone> drones = activePlayer.getDrones();
         for (int i = 0; i < drones.size(); i++) {
             Drone drone = drones.get(i);
-            if (!drone.isAlive()) {
+            // Only consume idle fuel for drones that are deployed on the battlefield
+            if (!drone.isAlive() || !drone.isDeployed()) {
                 continue;
             }
             drone.consumeFuel(IDLE_FUEL_COST);
@@ -256,6 +263,27 @@ public class GameRoom {
         }
         drone.setCurrentHp(0);
         drone.receiveDamage(1);
+    }
+
+    /**
+     * Recall a deployed drone back to its carrier, restoring fuel and missiles.
+     * Returns true if the recall was valid and applied.
+     */
+    public synchronized boolean recallDrone(String sessionId, int droneIndex) {
+        PlayerState player = getPlayerBySession(sessionId);
+        if (player == null) return false;
+        if (droneIndex < 0 || droneIndex >= player.getDrones().size()) return false;
+
+        Drone drone = player.getDrones().get(droneIndex);
+        if (!drone.isAlive()) return false;
+        if (!drone.isDeployed()) return false; // already in hangar
+
+        drone.setDeployed(false);
+        drone.setFuel(drone.getMaxFuel());
+        if (drone instanceof NavalDrone navalDrone) {
+            navalDrone.setMissiles(NavalDrone.DEFAULT_MISSILES);
+        }
+        return true;
     }
 
 
@@ -479,8 +507,13 @@ public class GameRoom {
                 dm.put("maxFuel", d.getMaxFuel());
                 // Add drone type for frontend rendering
                 dm.put("droneType", d instanceof NavalDrone ? "Naval" : "Aereo");
+                dm.put("deployed", d.isDeployed());
                 if (d instanceof NavalDrone navalDrone) {
                     dm.put("missiles", navalDrone.getMissiles());
+                } else {
+                    // Aerial drones use weapon ammo (bombs). Expose it as 'missiles' for a single
+                    // generic "munición" field in the frontend.
+                    dm.put("missiles", d.getWeapon() != null ? d.getWeapon().getAmmo() : 0);
                 }
                 droneMaps.add(dm);
             }
@@ -607,6 +640,12 @@ public class GameRoom {
                 if (drone instanceof NavalDrone navalDrone) {
                     int missiles = getOptionalNonNegativeIntField(rawDrone, "missiles", NavalDrone.DEFAULT_MISSILES);
                     navalDrone.setMissiles(missiles);
+                } else {
+                    // Restore aerial drone weapon ammo (saved as 'missiles' for frontend/back-compat).
+                    if (drone.getWeapon() != null) {
+                        int ammo = getOptionalNonNegativeIntField(rawDrone, "missiles", drone.getWeapon().getAmmo());
+                        drone.getWeapon().setAmmo(ammo);
+                    }
                 }
 
                 drone.setCurrentHp(health);
@@ -614,6 +653,13 @@ public class GameRoom {
                     drone.setCurrentHp(0);
                     drone.receiveDamage(1);
                 }
+
+                // Restore deployed state (default false for backward-compat with old saves)
+                Object deployedObj = rawDrone.get("deployed");
+                if (deployedObj instanceof Boolean deployedBool) {
+                    drone.setDeployed(deployedBool);
+                }
+
                 drones.add(drone);
             }
             

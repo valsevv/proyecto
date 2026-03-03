@@ -32,6 +32,8 @@ class GameRoomMissileSnapshotTest {
         List<Map<String, Object>> drones = (List<Map<String, Object>>) players.get(0).get("drones");
 
         assertEquals(1, drones.get(0).get("missiles"));
+        // deployed field must be present in serialized state
+        assertEquals(Boolean.FALSE, drones.get(0).get("deployed"));
 
         Map<String, Object> restoreSnapshot = Map.of(
                 "gameStarted", false,
@@ -51,7 +53,8 @@ class GameRoomMissileSnapshotTest {
                                                 "health", 100,
                                                 "alive", true,
                                                 "droneType", "Naval",
-                                                "missiles", 1
+                                                "missiles", 1,
+                                                "deployed", true
                                         )
                                 )
                         )
@@ -62,5 +65,28 @@ class GameRoomMissileSnapshotTest {
         Drone restoredDrone = restored.getPlayerByIndex(0).getDrones().get(0);
                 assertTrue(restoredDrone instanceof NavalDrone);
                 assertEquals(1, ((NavalDrone) restoredDrone).getMissiles());
+                assertTrue(restoredDrone.isDeployed(), "deployed=true in snapshot must be restored correctly");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void shouldSerializeDeployedFlagAfterNavalDroneMove() {
+        GameRoom room = new GameRoom("room-naval-deploy");
+        PlayerState player = room.addPlayer("session-1");
+        room.createDronesForSide(player.getPlayerIndex(), "Naval");
+
+        // Deploy one drone
+        room.moveDrone("session-1", 0, 600, 600);
+
+        Map<String, Object> snapshot = room.toStateMap();
+        List<Map<String, Object>> players =
+            (List<Map<String, Object>>) snapshot.get("players");
+        List<Map<String, Object>> drones =
+            (List<Map<String, Object>>) players.get(0).get("drones");
+
+        assertEquals(Boolean.TRUE, drones.get(0).get("deployed"),
+            "Drone moved must serialize as deployed=true");
+        assertEquals(Boolean.FALSE, drones.get(1).get("deployed"),
+            "Drone not moved must serialize as deployed=false");
     }
 }

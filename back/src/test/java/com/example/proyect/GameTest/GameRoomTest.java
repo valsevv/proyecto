@@ -1,14 +1,14 @@
 package com.example.proyect.GameTest;
 
+import java.util.List;
+import java.util.Map;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api. Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api. Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-
-import java.util.List;
-
 import org.junit.jupiter.api.Test;
 
 import com.example.proyect.game.GameRoom;
@@ -198,6 +198,39 @@ class GameRoomTest {
         assertEquals(100, drone.getPosition().getX(), 0.01);
         assertEquals(200, drone.getPosition().getY(), 0.01);
         assertEquals(initialFuel - 1, drone.getFuel()); // Fuel consumed
+        assertTrue(drone.isDeployed()); // First move marks drone as deployed
+    }
+
+    @Test
+    void shouldNotBeDeployedBeforeFirstMove() {
+        GameRoom room = new GameRoom("room-undeployed");
+        PlayerState player = room.addPlayer("session-1");
+
+        Drone drone = player.getDrones().get(0);
+
+        assertFalse(drone.isDeployed());
+    }
+
+    @Test
+    void shouldRemainDeployedAfterSubsequentMoves() {
+        GameRoom room = new GameRoom("room-deployed-persist");
+        PlayerState player = room.addPlayer("session-1");
+
+        room.moveDrone("session-1", 0, 100, 200);
+        room.moveDrone("session-1", 0, 300, 400);
+
+        assertTrue(player.getDrones().get(0).isDeployed());
+    }
+
+    @Test
+    void shouldAllDronesStartUndeployedWhenSideSelected() {
+        GameRoom room = new GameRoom("room-side-undeployed");
+        PlayerState player = room.addPlayer("session-1");
+        room.createDronesForSide(0, "Naval");
+
+        for (Drone d : player.getDrones()) {
+            assertFalse(d.isDeployed(), "All new drones must start undeployed");
+        }
     }
 
     @Test
@@ -232,6 +265,7 @@ class GameRoomTest {
 
         PlayerState currentPlayer = room.getPlayerByIndex(0);
         Drone drone = currentPlayer.getDrones().get(0);
+        drone.setDeployed(true);
         int initialFuel = drone.getFuel();
 
         List<Integer> destroyed = room.consumeIdleFuelForCurrentPlayer();
@@ -249,6 +283,7 @@ class GameRoomTest {
 
         PlayerState currentPlayer = room.getPlayerByIndex(0);
         Drone drone = currentPlayer.getDrones().get(0);
+        drone.setDeployed(true);
         drone.setFuel(1); // Set to minimum
 
         List<Integer> destroyed = room.consumeIdleFuelForCurrentPlayer();
@@ -400,5 +435,27 @@ class GameRoomTest {
         @SuppressWarnings("unchecked")
         List<Object> playersList = (List<Object>) stateMap.get("players");
         assertEquals(2, playersList.size());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void shouldSerializeDeployedFlagInStateMap() {
+        GameRoom room = new GameRoom("room-deployed-serial");
+        room.addPlayer("session-1");
+        room.createDronesForSide(0, "Naval");
+
+        // Move the first drone so it becomes deployed
+        room.moveDrone("session-1", 0, 500, 500);
+
+        var stateMap = room.toStateMap();
+        List<Map<String, Object>> players =
+            (List<Map<String, Object>>) stateMap.get("players");
+        List<Map<String, Object>> drones =
+            (List<Map<String, Object>>) players.get(0).get("drones");
+
+        assertEquals(Boolean.TRUE, drones.get(0).get("deployed"),
+            "Moved drone must be serialized as deployed=true");
+        assertEquals(Boolean.FALSE, drones.get(1).get("deployed"),
+            "Unmoved drone must be serialized as deployed=false");
     }
 }

@@ -12,6 +12,7 @@ public enum PacketType {
     END_TURN("endTurn"),
     SAVE_AND_EXIT("saveAndExit"),
     LOAD_GAME("loadGame"),
+    RECALL("recall"),
 
     // Server -> Client (Outbound)
     WELCOME("welcome"),
@@ -25,6 +26,7 @@ public enum PacketType {
     GAME_SAVED("gameSaved"),
     GAME_LOADED("gameLoaded"),
     LOBBY_CREATED("lobbyCreated"),
+    DRONE_RECALLED("droneRecalled"),
     ERROR("error");
 
     private final String value;

@@ -3,7 +3,8 @@ export default class SideImpactView {
         this.scene = scene;
         this.width = width;
         this.height = height;
-        this.groundY = this.height / 2 - 28;
+        this.groundY = 30 ; 
+   
 
         this.container = scene.add.container(x, y);
         this.container.setDepth(2000);
@@ -185,7 +186,7 @@ export default class SideImpactView {
             this._trailGfx.moveTo(startX, startY);
             this._trailGfx.lineTo(endX, endY);
             this._trailGfx.strokePath();
-            this.scene.sound.play('missile_launch', { volume: 0.35 });
+            this.scene.sound.play('missile_launch', { volume: 0.5 });
             return;
         }
 
@@ -223,13 +224,13 @@ export default class SideImpactView {
         this._explosionImg.setDisplaySize(95, 95);
         this._explosionImg.setAlpha(0.95);
         this.content.add(this._explosionImg);
-        this.scene.sound.play('explosion', { volume: 0.35 });
+        this.scene.sound.play('explosion', { volume: 0.50 });
 
         this.scene.tweens.add({
             targets: this._explosionImg,
             alpha: 0,
             scale: 0.5,
-            duration: 1420,
+            duration: 1920,
             ease: 'Quad.easeOut',
             onComplete: () => {
                 if (this._explosionImg) {

@@ -1,13 +1,12 @@
 package com.example.proyect.GameTest;
 
+import java.util.List;
+import java.util.Map;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-
-import java.util.List;
-import java.util.Map;
-
 import org.junit.jupiter.api.Test;
 
 import com.example.proyect.game.GameRoom;
@@ -17,235 +16,323 @@ import com.example.proyect.game.units.drone.NavalDrone;
 
 class GameRoomSnapshotTest {
 
-@Test
-void shouldRestorePlayersDronesAndTurnStateFromSnapshot() {
-Map<String, Object> snapshot = Map.of(
-"gameStarted", true,
-"currentTurn", 1,
-"actionsPerTurn", 30,
-"aerialVisionRange", 8,
-"navalVisionRange", 5,
-"actionsRemaining", 23,
-"players", List.of(
-Map.of(
-"playerIndex", 0,
-"side", "Naval",
-"drones", List.of(
-Map.of("x", 10.0, "y", 11.0, "health", 80, "alive", true, "droneType", "Naval"),
-Map.of("x", 12.0, "y", 13.0, "health", 0, "alive", false, "droneType", "Naval")
-)
-),
-Map.of(
-"playerIndex", 1,
-"side", "Aereo",
-"drones", List.of(
-Map.of("x", 20.0, "y", 21.0, "health", 100, "alive", true, "droneType", "Aereo")
-)
-)
-)
-);
+    @Test
+    void shouldRestorePlayersDronesAndTurnStateFromSnapshot() {
+        Map<String, Object> snapshot = Map.of(
+                "gameStarted", true,
+                "currentTurn", 1,
+                "actionsPerTurn", 30,
+                "aerialVisionRange", 8,
+                "navalVisionRange", 5,
+                "actionsRemaining", 23,
+                "players", List.of(
+                        Map.of(
+                                "playerIndex", 0,
+                                "side", "Naval",
+                                "drones", List.of(
+                                        Map.of("x", 10.0, "y", 11.0, "health", 80, "alive", true, "droneType", "Naval"),
+                                        Map.of("x", 12.0, "y", 13.0, "health", 0, "alive", false, "droneType", "Naval")
+                                )
+                        ),
+                        Map.of(
+                                "playerIndex", 1,
+                                "side", "Aereo",
+                                "drones", List.of(
+                                        Map.of("x", 20.0, "y", 21.0, "health", 100, "alive", true, "droneType", "Aereo")
+                                )
+                        )
+                )
+        );
 
-GameRoom room = GameRoom.fromStateMap("room-1", snapshot);
+        GameRoom room = GameRoom.fromStateMap("room-1", snapshot);
 
-assertTrue(room.isGameStarted());
-assertEquals(1, room.getCurrentTurn());
-assertEquals(30, room.getActionsPerTurn());
-assertEquals(8, room.getAerialVisionRange());
-assertEquals(5, room.getNavalVisionRange());
-assertEquals(23, room.getActionsRemaining());
+        assertTrue(room.isGameStarted());
+        assertEquals(1, room.getCurrentTurn());
+        assertEquals(30, room.getActionsPerTurn());
+        assertEquals(8, room.getAerialVisionRange());
+        assertEquals(5, room.getNavalVisionRange());
+        assertEquals(23, room.getActionsRemaining());
 
-PlayerState p0 = room.getPlayerByIndex(0);
-assertEquals("Naval", p0.getSide());
-assertTrue(p0.getDrones().get(0) instanceof NavalDrone);
-assertEquals(80, p0.getDrones().get(0).getCurrentHp());
-assertTrue(p0.getDrones().get(0).isAlive());
-assertFalse(p0.getDrones().get(1).isAlive());
+        PlayerState p0 = room.getPlayerByIndex(0);
+        assertEquals("Naval", p0.getSide());
+        assertTrue(p0.getDrones().get(0) instanceof NavalDrone);
+        assertEquals(80, p0.getDrones().get(0).getCurrentHp());
+        assertTrue(p0.getDrones().get(0).isAlive());
+        assertFalse(p0.getDrones().get(1).isAlive());
 
-PlayerState p1 = room.getPlayerByIndex(1);
-assertEquals("Aereo", p1.getSide());
-assertTrue(p1.getDrones().get(0) instanceof AerialDrone);
-}
+        PlayerState p1 = room.getPlayerByIndex(1);
+        assertEquals("Aereo", p1.getSide());
+        assertTrue(p1.getDrones().get(0) instanceof AerialDrone);
+    }
 
-@Test
-void shouldFailWhenSnapshotMissesRequiredFields() {
-Map<String, Object> invalidSnapshot = Map.of(
-"gameStarted", true,
-"currentTurn", 0,
-"actionsRemaining", 1,
-"players", List.of(
-Map.of(
-"playerIndex", 0,
-"side", "Naval",
-"drones", List.of(
-Map.of("x", 10.0, "y", 11.0, "health", 80, "droneType", "Naval")
-)
-)
-)
-);
+    @Test
+    void shouldFailWhenSnapshotMissesRequiredFields() {
+        Map<String, Object> invalidSnapshot = Map.of(
+                "gameStarted", true,
+                "currentTurn", 0,
+                "actionsRemaining", 1,
+                "players", List.of(
+                        Map.of(
+                                "playerIndex", 0,
+                                "side", "Naval",
+                                "drones", List.of(
+                                        Map.of("x", 10.0, "y", 11.0, "health", 80, "droneType", "Naval")
+                                )
+                        )
+                )
+        );
 
-assertThrows(IllegalArgumentException.class, () -> GameRoom.fromStateMap("room-2", invalidSnapshot));
-}
+        assertThrows(IllegalArgumentException.class, () -> GameRoom.fromStateMap("room-2", invalidSnapshot));
+    }
 
-@Test
-void shouldFailWhenTurnOrPlayerCountIsInconsistent() {
-Map<String, Object> invalidSnapshot = Map.of(
-"gameStarted", true,
-"currentTurn", 1,
-"actionsRemaining", 1,
-"players", List.of(
-Map.of(
-"playerIndex", 0,
-"side", "Aereo",
-"drones", List.of(
-Map.of("x", 1.0, "y", 2.0, "health", 50, "alive", true, "droneType", "Aereo")
-)
-)
-)
-);
+    @Test
+    void shouldFailWhenTurnOrPlayerCountIsInconsistent() {
+        Map<String, Object> invalidSnapshot = Map.of(
+                "gameStarted", true,
+                "currentTurn", 1,
+                "actionsRemaining", 1,
+                "players", List.of(
+                        Map.of(
+                                "playerIndex", 0,
+                                "side", "Aereo",
+                                "drones", List.of(
+                                        Map.of("x", 1.0, "y", 2.0, "health", 50, "alive", true, "droneType", "Aereo")
+                                )
+                        )
+                )
+        );
 
-assertThrows(IllegalArgumentException.class, () -> GameRoom.fromStateMap("room-3", invalidSnapshot));
-}
+        assertThrows(IllegalArgumentException.class, () -> GameRoom.fromStateMap("room-3", invalidSnapshot));
+    }
 
-@Test
-void shouldUseDefaultActionsPerTurnWhenSnapshotDoesNotIncludeIt() {
-Map<String, Object> snapshot = Map.of(
-"gameStarted", true,
-"currentTurn", 0,
-"actionsRemaining", 10,
-"players", List.of(
-Map.of(
-"playerIndex", 0,
-"side", "Aereo",
-"drones", List.of(
-Map.of("x", 1.0, "y", 2.0, "health", 50, "alive", true, "droneType", "Aereo")
-)
-),
-Map.of(
-"playerIndex", 1,
-"side", "Naval",
-"drones", List.of(
-Map.of("x", 3.0, "y", 4.0, "health", 60, "alive", true, "droneType", "Naval")
-)
-)
-)
-);
+    @Test
+    void shouldUseDefaultActionsPerTurnWhenSnapshotDoesNotIncludeIt() {
+        Map<String, Object> snapshot = Map.of(
+                "gameStarted", true,
+                "currentTurn", 0,
+                "actionsRemaining", 10,
+                "players", List.of(
+                        Map.of(
+                                "playerIndex", 0,
+                                "side", "Aereo",
+                                "drones", List.of(
+                                        Map.of("x", 1.0, "y", 2.0, "health", 50, "alive", true, "droneType", "Aereo")
+                                )
+                        ),
+                        Map.of(
+                                "playerIndex", 1,
+                                "side", "Naval",
+                                "drones", List.of(
+                                        Map.of("x", 3.0, "y", 4.0, "health", 60, "alive", true, "droneType", "Naval")
+                                )
+                        )
+                )
+        );
 
-GameRoom room = GameRoom.fromStateMap("room-4", snapshot);
+        GameRoom room = GameRoom.fromStateMap("room-4", snapshot);
 
-assertEquals(10, room.getActionsPerTurn());
-assertEquals(4, room.getAerialVisionRange());
-assertEquals(3, room.getNavalVisionRange());
-assertEquals(10, room.getActionsRemaining());
-}
+        assertEquals(10, room.getActionsPerTurn());
+        assertEquals(4, room.getAerialVisionRange());
+        assertEquals(3, room.getNavalVisionRange());
+        assertEquals(10, room.getActionsRemaining());
+    }
 
-@Test
-void shouldFailWhenActionsRemainingIsAboveActionsPerTurn() {
-Map<String, Object> invalidSnapshot = Map.of(
-"gameStarted", true,
-"currentTurn", 0,
-"actionsPerTurn", 5,
-"actionsRemaining", 6,
-"players", List.of(
-Map.of(
-"playerIndex", 0,
-"side", "Aereo",
-"drones", List.of(
-Map.of("x", 1.0, "y", 2.0, "health", 50, "alive", true, "droneType", "Aereo")
-)
-),
-Map.of(
-"playerIndex", 1,
-"side", "Naval",
-"drones", List.of(
-Map.of("x", 3.0, "y", 4.0, "health", 60, "alive", true, "droneType", "Naval")
-)
-)
-)
-);
+    @Test
+    void shouldFailWhenActionsRemainingIsAboveActionsPerTurn() {
+        Map<String, Object> invalidSnapshot = Map.of(
+                "gameStarted", true,
+                "currentTurn", 0,
+                "actionsPerTurn", 5,
+                "actionsRemaining", 6,
+                "players", List.of(
+                        Map.of(
+                                "playerIndex", 0,
+                                "side", "Aereo",
+                                "drones", List.of(
+                                        Map.of("x", 1.0, "y", 2.0, "health", 50, "alive", true, "droneType", "Aereo")
+                                )
+                        ),
+                        Map.of(
+                                "playerIndex", 1,
+                                "side", "Naval",
+                                "drones", List.of(
+                                        Map.of("x", 3.0, "y", 4.0, "health", 60, "alive", true, "droneType", "Naval")
+                                )
+                        )
+                )
+        );
 
-assertThrows(IllegalArgumentException.class, () -> GameRoom.fromStateMap("room-5", invalidSnapshot));
-}
+        assertThrows(IllegalArgumentException.class, () -> GameRoom.fromStateMap("room-5", invalidSnapshot));
+    }
 
+    @Test
+    void shouldFailWhenVisionRangesAreNegative() {
+        Map<String, Object> invalidSnapshot = Map.of(
+                "gameStarted", true,
+                "currentTurn", 0,
+                "actionsPerTurn", 10,
+                "aerialVisionRange", -1,
+                "navalVisionRange", 3,
+                "actionsRemaining", 5,
+                "players", List.of(
+                        Map.of(
+                                "playerIndex", 0,
+                                "side", "Aereo",
+                                "drones", List.of(
+                                        Map.of("x", 1.0, "y", 2.0, "health", 50, "alive", true, "droneType", "Aereo")
+                                )
+                        ),
+                        Map.of(
+                                "playerIndex", 1,
+                                "side", "Naval",
+                                "drones", List.of(
+                                        Map.of("x", 3.0, "y", 4.0, "health", 60, "alive", true, "droneType", "Naval")
+                                )
+                        )
+                )
+        );
 
-@Test
-void shouldFailWhenVisionRangesAreNegative() {
-Map<String, Object> invalidSnapshot = Map.of(
-"gameStarted", true,
-"currentTurn", 0,
-"actionsPerTurn", 10,
-"aerialVisionRange", -1,
-"navalVisionRange", 3,
-"actionsRemaining", 5,
-"players", List.of(
-Map.of(
-"playerIndex", 0,
-"side", "Aereo",
-"drones", List.of(
-Map.of("x", 1.0, "y", 2.0, "health", 50, "alive", true, "droneType", "Aereo")
-)
-),
-Map.of(
-"playerIndex", 1,
-"side", "Naval",
-"drones", List.of(
-Map.of("x", 3.0, "y", 4.0, "health", 60, "alive", true, "droneType", "Naval")
-)
-)
-)
-);
+        assertThrows(IllegalArgumentException.class, () -> GameRoom.fromStateMap("room-6", invalidSnapshot));
+    }
 
-assertThrows(IllegalArgumentException.class, () -> GameRoom.fromStateMap("room-6", invalidSnapshot));
-}
+    @Test
+    void shouldCopyVisionAndActionsConfigOnRestoreFrom() {
+        GameRoom target = new GameRoom("target", 10, 4, 3);
+        GameRoom source = new GameRoom("source", 15, 7, 2);
 
+        target.restoreFrom(source);
 
-@Test
-void shouldCopyVisionAndActionsConfigOnRestoreFrom() {
-GameRoom target = new GameRoom("target", 10, 4, 3);
-GameRoom source = new GameRoom("source", 15, 7, 2);
+        assertEquals(15, target.getActionsPerTurn());
+        assertEquals(7, target.getAerialVisionRange());
+        assertEquals(2, target.getNavalVisionRange());
+    }
 
-target.restoreFrom(source);
+    @Test
+    void shouldDestroyDroneWhenMovementConsumesLastFuel() {
+        GameRoom room = new GameRoom("fuel-move-room");
+        PlayerState player = room.addPlayer("session-0");
 
-assertEquals(15, target.getActionsPerTurn());
-assertEquals(7, target.getAerialVisionRange());
-assertEquals(2, target.getNavalVisionRange());
-}
+        assertTrue(room.moveDrone("session-0", 0, 400, 400));
 
-@Test
-void shouldDestroyDroneWhenMovementConsumesLastFuel() {
-GameRoom room = new GameRoom("fuel-move-room");
-PlayerState player = room.addPlayer("session-0");
+        var drone = player.getDrones().get(0);
+        assertTrue(drone.isDeployed()); // Movement must deploy the drone
+        drone.setFuel(1);
 
-assertTrue(room.moveDrone("session-0", 0, 400, 400));
+        boolean moved = room.moveDrone("session-0", 0, 410, 410);
 
-var drone = player.getDrones().get(0);
-drone.setFuel(1);
+        assertTrue(moved);
+        assertEquals(0, drone.getFuel());
+        assertEquals(0, drone.getCurrentHp());
+        assertFalse(drone.isAlive());
+    }
 
-boolean moved = room.moveDrone("session-0", 0, 410, 410);
+    @Test
+    void shouldDestroyDroneWhenIdleConsumptionReachesZeroFuel() {
+        GameRoom room = new GameRoom("fuel-idle-room");
+        room.addPlayer("session-0");
+        room.addPlayer("session-1");
+        room.startGame();
 
-assertTrue(moved);
-assertEquals(0, drone.getFuel());
-assertEquals(0, drone.getCurrentHp());
-assertFalse(drone.isAlive());
-}
+        PlayerState currentPlayer = room.getPlayerByIndex(room.getCurrentTurn());
+        var drone = currentPlayer.getDrones().get(0);
+        drone.setDeployed(true);
+        drone.setFuel(1);
 
-@Test
-void shouldDestroyDroneWhenIdleConsumptionReachesZeroFuel() {
-GameRoom room = new GameRoom("fuel-idle-room");
-room.addPlayer("session-0");
-room.addPlayer("session-1");
-room.startGame();
+        List<Integer> destroyed = room.consumeIdleFuelForCurrentPlayer();
 
-PlayerState currentPlayer = room.getPlayerByIndex(room.getCurrentTurn());
-var drone = currentPlayer.getDrones().get(0);
-drone.setFuel(1);
+        assertTrue(destroyed.contains(0));
+        assertEquals(0, drone.getFuel());
+        assertEquals(0, drone.getCurrentHp());
+        assertFalse(drone.isAlive());
+    }
 
-List<Integer> destroyed = room.consumeIdleFuelForCurrentPlayer();
+    @Test
+    void shouldPersistAndRestoreDeployedStateInSnapshot() {
+        GameRoom room = new GameRoom("room-deployed-roundtrip");
+        room.addPlayer("session-1");
+        room.addPlayer("session-2");
+        room.createDronesForSide(0, "Naval");
+        room.createDronesForSide(1, "Aereo");
+        room.startGame();
 
-assertTrue(destroyed.contains(0));
-assertEquals(0, drone.getFuel());
-assertEquals(0, drone.getCurrentHp());
-assertFalse(drone.isAlive());
-}
+// Deploy the first drone of player 0
+        room.moveDrone("session-1", 0, 500, 500);
 
+        var snapshot = room.toStateMap();
+        GameRoom restored = GameRoom.fromStateMap("room-deployed-restored", snapshot);
+
+        PlayerState p0 = restored.getPlayerByIndex(0);
+        assertTrue(p0.getDrones().get(0).isDeployed(),
+                "Drone that was moved must be restored as deployed=true");
+        assertFalse(p0.getDrones().get(1).isDeployed(),
+                "Drone that was never moved must be restored as deployed=false");
+    }
+
+    @Test
+    void shouldDefaultDeployedToFalseWhenFieldMissingFromSnapshot() {
+// Old saves do not include the "deployed" key – must silently default to false
+        Map<String, Object> snapshot = Map.of(
+                "gameStarted", true,
+                "currentTurn", 0,
+                "actionsPerTurn", 10,
+                "actionsRemaining", 10,
+                "players", List.of(
+                        Map.of(
+                                "playerIndex", 0,
+                                "side", "Naval",
+                                "drones", List.of(
+                                        Map.of("x", 10.0, "y", 11.0, "health", 80, "alive", true, "droneType", "Naval")
+                                )
+                        ),
+                        Map.of(
+                                "playerIndex", 1,
+                                "side", "Aereo",
+                                "drones", List.of(
+                                        Map.of("x", 20.0, "y", 21.0, "health", 100, "alive", true, "droneType", "Aereo")
+                                )
+                        )
+                )
+        );
+
+        GameRoom room = GameRoom.fromStateMap("room-old-save", snapshot);
+
+        assertFalse(room.getPlayerByIndex(0).getDrones().get(0).isDeployed(),
+                "Drone without deployed field in snapshot must default to false");
+        assertFalse(room.getPlayerByIndex(1).getDrones().get(0).isDeployed(),
+                "Drone without deployed field in snapshot must default to false");
+    }
+
+    @Test
+    void shouldRestoreExplicitDeployedTrueFromSnapshot() {
+        Map<String, Object> snapshot = Map.of(
+                "gameStarted", true,
+                "currentTurn", 0,
+                "actionsPerTurn", 10,
+                "actionsRemaining", 5,
+                "players", List.of(
+                        Map.of(
+                                "playerIndex", 0,
+                                "side", "Aereo",
+                                "drones", List.of(
+                                        Map.of("x", 100.0, "y", 200.0, "health", 90, "alive", true, "droneType", "Aereo", "deployed", true),
+                                        Map.of("x", 110.0, "y", 210.0, "health", 100, "alive", true, "droneType", "Aereo", "deployed", false)
+                                )
+                        ),
+                        Map.of(
+                                "playerIndex", 1,
+                                "side", "Naval",
+                                "drones", List.of(
+                                        Map.of("x", 2000.0, "y", 200.0, "health", 80, "alive", true, "droneType", "Naval", "deployed", true)
+                                )
+                        )
+                )
+        );
+
+        GameRoom room = GameRoom.fromStateMap("room-explicit-deployed", snapshot);
+
+        assertTrue(room.getPlayerByIndex(0).getDrones().get(0).isDeployed());
+        assertFalse(room.getPlayerByIndex(0).getDrones().get(1).isDeployed());
+        assertTrue(room.getPlayerByIndex(1).getDrones().get(0).isDeployed());
+    }
 
 }
