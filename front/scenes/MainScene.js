@@ -475,6 +475,10 @@ export default class MainScene extends Phaser.Scene {
             if (targetDrone && hit) {
                 targetDrone.takeDamage(msg.damage, msg.remainingHealth);
             }
+
+            if (!hit && msg.attackerPlayer === Network.playerIndex) {
+                this.showCombatMessage('El ataque fallo');
+            }
             // Mark attacker as having attacked
             if (attackerDrone && msg.attackerPlayer === Network.playerIndex) {
                 attackerDrone.hasAttacked = true;
@@ -794,15 +798,18 @@ export default class MainScene extends Phaser.Scene {
                     this.executeAttack(drone);
                     return;
                 }
+                const targetHex = this.hexGrid?.getNearestCenter(drone.sprite.x, drone.sprite.y) || {
+                    x: drone.sprite.x,
+                    y: drone.sprite.y
+                };
+                this.manualTargetHex = targetHex;
                 this.pendingAerialTarget = {
                     targetType: 'drone',
                     playerIndex: drone.playerIndex,
                     droneIndex: drone.droneIndex,
                     sprite: drone.sprite
                 };
-                if (this.manualTargetHex) {
-                    this.executeAttack(this.pendingAerialTarget);
-                }
+                this.executeAttack(this.pendingAerialTarget);
             }
             return;
         }
