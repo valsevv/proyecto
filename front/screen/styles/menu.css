@@ -1,3 +1,15 @@
+body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: 'Orbitron', sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: clamp(8px, 2.5vw, 24px);
+    color: #7ef9ff;
+    font-size: clamp(14px, 2.6vw, 16px);
+}
+
 body::before {
     content: "";
     position: fixed;
@@ -33,13 +45,10 @@ body::after {
 /* ===== MENU FUTURISTA ESTILO HUD ===== */
 
 .menu-container {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 420px;
+    position: relative;
+    width: min(94vw, 420px);
 
-    padding: 40px 35px;
+    padding: clamp(14px, 3.6vw, 28px) clamp(14px, 3.6vw, 26px);
     border-radius: 10px;
 
     background: rgba(5, 20, 40, 0.75);
@@ -51,6 +60,8 @@ body::after {
         inset 0 0 15px rgba(0,255,255,0.3);
 
     color: #7ef9ff;
+    max-height: 90vh;
+    overflow-y: auto;
 }
 
 /* Esquinas tipo marco HUD */
@@ -58,30 +69,30 @@ body::after {
 .menu-container::after {
     content: "";
     position: absolute;
-    width: 40px;
-    height: 40px;
+    width: 32px;
+    height: 32px;
     border: 3px solid #00f7ff;
 }
 
 .menu-container::before {
-    top: -15px;
-    left: -15px;
+    top: -12px;
+    left: -12px;
     border-right: none;
     border-bottom: none;
 }
 
 .menu-container::after {
-    bottom: -15px;
-    right: -15px;
+    bottom: -12px;
+    right: -12px;
     border-left: none;
     border-top: none;
 }
 
 .menu-container h1 {
     text-align: center;
-    margin-bottom: 35px;
-    font-size: 28px;
-    letter-spacing: 2px;
+    margin-bottom: clamp(16px, 4vw, 28px);
+    font-size: clamp(18px, 4.8vw, 26px);
+    letter-spacing: 1.5px;
 
     color: #7ef9ff;
     text-shadow:
@@ -93,16 +104,16 @@ body::after {
 
 .menu-btn {
     width: 100%;
-    padding: 14px;
-    margin-bottom: 18px;
+    padding: clamp(9px, 2.8vw, 12px);
+    margin-bottom: 14px;
 
     background: transparent;
     border: 2px solid rgba(0,180,255,0.7);
     border-radius: 4px;
 
     color: #7ef9ff;
-    font-size: 16px;
-    letter-spacing: 1px;
+    font-size: clamp(12px, 3vw, 15px);
+    letter-spacing: 0.4px;
 
     cursor: pointer;
     transition: all 0.25s ease;
@@ -135,4 +146,37 @@ body::after {
 
 #logoutBtn:hover {
     border-color: #ff0000
+}
+
+@media (max-width: 520px) {
+    .menu-container {
+        border-width: 1px;
+    }
+
+    #musicToggleBtn,
+    #logoutBtn {
+        width: 100%;
+        float: none;
+    }
+
+    .menu-btn {
+        margin-bottom: 12px;
+    }
+}
+
+@media (max-width: 380px) {
+    .menu-container {
+        padding: 12px 12px 14px;
+    }
+
+    .menu-container::before,
+    .menu-container::after {
+        width: 24px;
+        height: 24px;
+        border-width: 2px;
+    }
+
+    .menu-container h1 {
+        letter-spacing: 1px;
+    }
 }

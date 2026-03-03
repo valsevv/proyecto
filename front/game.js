@@ -7,6 +7,12 @@ const config = {
     type: Phaser.AUTO,
     width: VIEW_WIDTH,
     height: VIEW_HEIGHT,
+    scale: {
+        mode: Phaser.Scale.RESIZE,
+        autoCenter: Phaser.Scale.CENTER_BOTH,
+        width: VIEW_WIDTH,
+        height: VIEW_HEIGHT
+    },
     scene: [LobbyScene, MainScene, HudScene]
 };
 

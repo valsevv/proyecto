@@ -96,6 +96,8 @@ export default class HudScene extends Phaser.Scene {
             if (this.sideImpactView) {
                 this.sideImpactView.reposition(margin + sideViewW / 2, h - reservedBottom - sideViewH / 2);
             }
+            this.layoutActionButtons();
+            this.layoutSaveButton();
         });
 
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -114,8 +116,10 @@ export default class HudScene extends Phaser.Scene {
         const btnWidth = 120;
         const btnHeight = 40;
         const btnRadius = 20;
-        const startX = margin + btnWidth / 2;
-        const y = this.scale.height - margin - btnHeight / 2;
+        const gap = 10;
+        this.actionBtnConfig = { margin, btnWidth, btnHeight, btnRadius, gap };
+        this.saveBtnConfig = { margin, btnWidth, btnHeight, btnRadius };
+        const { startX, y } = this.getActionButtonLayout();
 
         // Colors
         this.grayColor = 0x555555;
@@ -154,7 +158,7 @@ export default class HudScene extends Phaser.Scene {
         });
 
         // End Turn button background
-        const endTurnX = startX + btnWidth + 10;
+        const endTurnX = startX + btnWidth + gap;
         this.endTurnBtnBg = this.add.graphics();
         this.drawRoundedButton(this.endTurnBtnBg, endTurnX - btnWidth / 2, y - btnHeight / 2, btnWidth, btnHeight, btnRadius, this.endTurnActiveColor);
 
@@ -198,8 +202,63 @@ export default class HudScene extends Phaser.Scene {
         // Save button hidden until game starts
         this.setSaveButtonVisible(false);
 
+        // Initial layout
+        this.layoutActionButtons();
+        this.layoutSaveButton();
+
         // Initially hidden
         this.setButtonsVisible(false);
+    }
+
+    getActionButtonLayout() {
+        const { margin, btnWidth, btnHeight, gap } = this.actionBtnConfig || {
+            margin: 20,
+            btnWidth: 120,
+            btnHeight: 40,
+            gap: 10
+        };
+        const totalWidth = btnWidth * 2 + gap;
+        const startX = (this.scale.width - totalWidth) / 2 + btnWidth / 2;
+        const endTurnX = startX + btnWidth + gap;
+        const y = this.scale.height - margin - btnHeight / 2;
+        return { startX, endTurnX, y, btnWidth, btnHeight };
+    }
+
+    layoutActionButtons() {
+        if (!this.attackBtn || !this.endTurnBtn) return;
+        const layout = this.getActionButtonLayout();
+        this.actionBtnLayout = layout;
+
+        this.attackBtn.setPosition(layout.startX, layout.y);
+        this.attackBtnText.setPosition(layout.startX, layout.y);
+        this.endTurnBtn.setPosition(layout.endTurnX, layout.y);
+        this.endTurnBtnText.setPosition(layout.endTurnX, layout.y);
+
+        this.updateButtonStates();
+    }
+
+    layoutSaveButton() {
+        if (!this.saveExitBtn) return;
+        const { margin, btnWidth, btnHeight, btnRadius } = this.saveBtnConfig || {
+            margin: 20,
+            btnWidth: 120,
+            btnHeight: 40,
+            btnRadius: 20
+        };
+        const saveExitX = this.scale.width - margin - btnWidth / 2;
+        const saveExitY = margin + btnHeight / 2;
+
+        this.drawRoundedButton(
+            this.saveExitBtnBg,
+            saveExitX - btnWidth / 2,
+            saveExitY - btnHeight / 2,
+            btnWidth,
+            btnHeight,
+            btnRadius,
+            this.saveExitActiveColor
+        );
+        this.saveExitBtn.setPosition(saveExitX, saveExitY);
+        this.saveExitBtnText.setPosition(saveExitX, saveExitY);
     }
 
     drawRoundedButton(graphics, x, y, width, height, radius, color, alpha = 1) {
@@ -209,12 +268,9 @@ export default class HudScene extends Phaser.Scene {
     }
 
     updateButtonStates() {
-        const btnWidth = 120;
-        const btnHeight = 40;
-        const btnRadius = 20;
-        const margin = 20;
-        const startX = margin;
-        const y = this.scale.height - margin - btnHeight;
+        const layout = this.actionBtnLayout || this.getActionButtonLayout();
+        const { startX, endTurnX, y, btnWidth, btnHeight } = layout;
+        const btnRadius = this.actionBtnConfig?.btnRadius ?? 20;
 
         // Check if selected drone can attack
         const mainScene = this.scene.get('MainScene');
@@ -237,12 +293,28 @@ export default class HudScene extends Phaser.Scene {
             attackAlpha = 1;
             textAlpha = 1;
         }
-        this.drawRoundedButton(this.attackBtnBg, startX, y, btnWidth, btnHeight, btnRadius, attackColor, attackAlpha);
+        this.drawRoundedButton(
+            this.attackBtnBg,
+            startX - btnWidth / 2,
+            y - btnHeight / 2,
+            btnWidth,
+            btnHeight,
+            btnRadius,
+            attackColor,
+            attackAlpha
+        );
         this.attackBtnText.setAlpha(textAlpha);
 
         // End turn is always blue
-        const endTurnX = startX + btnWidth + 10;
-        this.drawRoundedButton(this.endTurnBtnBg, endTurnX, y, btnWidth, btnHeight, btnRadius, this.endTurnActiveColor);
+        this.drawRoundedButton(
+            this.endTurnBtnBg,
+            endTurnX - btnWidth / 2,
+            y - btnHeight / 2,
+            btnWidth,
+            btnHeight,
+            btnRadius,
+            this.endTurnActiveColor
+        );
     }
 
     deselectAttackButton() {
