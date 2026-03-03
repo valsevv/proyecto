@@ -92,10 +92,6 @@ export default class MainScene extends Phaser.Scene {
 
 
     create(data) {
-        console.log('[MainScene] === CREATE CALLED ===');
-        console.log('[MainScene] Scene data received:', data);
-        console.log('[MainScene] Has gameState?:', !!data?.gameState);
-        
         // Tile the background to cover the whole world
         const bg = this.add.tileSprite(0, 0, WORLD_WIDTH, WORLD_HEIGHT, 'mar');
         bg.setOrigin(0, 0);
@@ -161,8 +157,6 @@ export default class MainScene extends Phaser.Scene {
             const nearest = this.hexGrid.getNearestCenter(pointer.worldX, pointer.worldY);
 
             if (this.actionMode === MODE_ATTACK && this.selectedDrone) {
-                console.log('[MainScene] === ATTACK MODE CLICK ===');
-                console.log('[MainScene] Selected drone type:', this.selectedDrone.droneType);
                 // Naval = missile: allow manual aiming to any hex.
                 if (this.selectedDrone.droneType === 'Naval') {
                     console.log('[MainScene] Naval attack path');
@@ -253,9 +247,7 @@ export default class MainScene extends Phaser.Scene {
         this.setupNetwork();
         
         // Launch the HUD scene FIRST so it can receive events
-        console.log('[MainScene] === LAUNCHING HUD SCENE ===');
         this.scene.launch('HudScene');
-        console.log('[MainScene] === HUD SCENE LAUNCHED (booting...) ===');
         
         // Small delay to ensure HudScene finishes its create() method
         // and sets up event listeners before we emit events
@@ -298,29 +290,18 @@ export default class MainScene extends Phaser.Scene {
     }
     
     initializeGameState(data) {
-        console.log('[MainScene] === INITIALIZING GAME STATE ===');
         
         // If we have initial game state from LobbyScene, create drones immediately
-        console.log('[MainScene] === CHECKING FOR INITIAL GAME STATE ===');
-        console.log('[MainScene] data:', data);
-        console.log('[MainScene] data.gameState:', data?.gameState);
         
         if (data && data.gameState) {
-            console.log('[MainScene] === CREATING DRONES FROM INITIAL STATE ===');
-            console.log('[MainScene] Game state:', data.gameState);
             this.createDronesFromState(data.gameState);
             
-            console.log('[MainScene] === EMITTING gameStarted EVENT ===');
             this.events.emit('gameStarted');
-            console.log('[MainScene] === DRONES CREATED AND gameStarted EMITTED ===');
             
             // CRITICAL: Manually trigger turnStart since the server's turnStart message
             // arrives BEFORE this scene is ready to receive it
-            console.log('[MainScene] === MANUALLY TRIGGERING INITIAL TURN ===');
             const initialTurn = data.gameState.currentTurn;
             const initialActions = data.gameState.actionsRemaining;
-            console.log('[MainScene] Initial turn player:', initialTurn);
-            console.log('[MainScene] Initial actions:', initialActions);
             
             this.isMyTurn = (initialTurn === Network.playerIndex);
             this.actionMode = MODE_MOVE;
@@ -340,11 +321,9 @@ export default class MainScene extends Phaser.Scene {
             });
 
             // Notify HUD
-            console.log('[MainScene] === EMITTING turnChanged EVENT ===');
             this.events.emit('turnChanged', {
                 isMyTurn: this.isMyTurn
             });
-            console.log('[MainScene] === INITIAL TURN STATE SET - isMyTurn:', this.isMyTurn, '===');
         } else {
             console.error('[MainScene] === NO INITIAL GAME STATE PROVIDED! ===');
             console.error('[MainScene] This is a bug - game should not start without state');
@@ -434,16 +413,12 @@ export default class MainScene extends Phaser.Scene {
         });
 
         Network.on('attackResult', (msg) => {
-            console.log('[MainScene] === ATTACK RESULT ===', msg);
             const targetDrone = this.drones[msg.targetPlayer]?.[msg.targetDrone];
             const hit = msg.hit !== false;
             const attackerDrone = this.drones[msg.attackerPlayer]?.[msg.attackerDrone];
             const attackerSide = this.playerSides[msg.attackerPlayer];
             const isNavalAttacker = attackerSide === 'Naval' || attackerDrone?.droneType === 'Naval';
             const isAereoAttacker = attackerSide === 'Aereo' || attackerDrone?.droneType === 'Aereo';
-
-            console.log('[MainScene] Attacker:', { isAereoAttacker, isNavalAttacker, droneType: attackerDrone?.droneType });
-            console.log('[MainScene] Target drone found?', !!targetDrone);
 
             if (attackerDrone && typeof attackerDrone.clearAttackLock === 'function') {
                 attackerDrone.clearAttackLock();
@@ -453,7 +428,6 @@ export default class MainScene extends Phaser.Scene {
                 if (isAereoAttacker) {
                     // Animación especial para dron bomba
                     const impactTarget = targetDrone?.sprite || { x: msg.lineX, y: msg.lineY };
-                    console.log('[MainScene] Playing Aereo (bomb) attack animation');
                     attackerDrone.aereoDronAttack(
                         impactTarget.x,
                         impactTarget.y,
@@ -463,17 +437,33 @@ export default class MainScene extends Phaser.Scene {
                     );
                 } else if (isNavalAttacker) {
                     // Animación especial para dron misil
-                    console.log('[MainScene] Playing Naval (missile) attack animation');
                     const targetPos = targetDrone?.sprite || { x: msg.lineX, y: msg.lineY };
                     attackerDrone.launchMissile(targetPos.x, targetPos.y, targetDrone ?? null);
                 } else if (targetDrone) {
-                    console.log('[MainScene] Playing default attack animation');
                     this.playMissileShot(attackerDrone, targetDrone, hit, msg.lineX, msg.lineY);
                 }
             }
 
             if (targetDrone && hit) {
                 targetDrone.takeDamage(msg.damage, msg.remainingHealth);
+            }
+
+            // Handle attacker death (e.g., from fuel consumption during aerial attack)
+            if (attackerDrone && msg.attackerDestroyed && attackerDrone.isAlive()) {
+                if (this.selectedDrone === attackerDrone) {
+                    this.selectedDrone.deselect();
+                    this.selectedDrone = null;
+                    this.clearTargetHighlights();
+                    this.actionMode = MODE_MOVE;
+                    this.events.emit('selectionChanged', { type: null });
+                }
+                attackerDrone.destroy();
+            } else if (attackerDrone && msg.attackerRemainingHealth !== undefined) {
+                // Sync attacker health even if not destroyed
+                if (attackerDrone.health !== msg.attackerRemainingHealth) {
+                    attackerDrone.health = msg.attackerRemainingHealth;
+                    attackerDrone.updateHealthBar();
+                }
             }
 
             if (!hit && msg.attackerPlayer === Network.playerIndex) {
@@ -515,8 +505,6 @@ export default class MainScene extends Phaser.Scene {
 
         // Handle game saved - redirect to menu
         Network.on('gameSaved', (msg) => {
-            console.log('[MainScene] === GAME SAVED ===');
-            console.log('[MainScene] Game ID:', msg.gameId);
             alert('Partida guardada correctamente');
             window.location.href = '/menu';
         });
@@ -601,12 +589,6 @@ export default class MainScene extends Phaser.Scene {
     }
 
     createDronesFromState(state) {
-        console.log('[MainScene] === createDronesFromState CALLED ===');
-        console.log('[MainScene] State:', state);
-        console.log('[MainScene] Players in state:', state?.players);
-        console.log('[MainScene] Current turn:', state?.currentTurn);
-        console.log('[MainScene] My player index:', Network.playerIndex);
-
         if (typeof state?.navalVisionRange === 'number') {
             this.navalVisionRange = state.navalVisionRange;
         }
@@ -615,10 +597,6 @@ export default class MainScene extends Phaser.Scene {
         }
         
         for (const player of state.players) {
-            console.log('[MainScene] Processing player', player.playerIndex);
-            console.log('[MainScene] Player side:', player.side);
-            console.log('[MainScene] Player drones:', player.drones?.length);
-            
             const isLocal = (player.playerIndex === Network.playerIndex);
             const color = TEAM_COLORS[player.playerIndex];
             this.drones[player.playerIndex] = [];
@@ -631,7 +609,6 @@ export default class MainScene extends Phaser.Scene {
             for (const d of player.drones) {
                 const hex = this.hexGrid.getNearestCenter(d.x, d.y);
                 const droneType = d.droneType ?? side ?? 'Aereo';
-                console.log('[MainScene] Creating drone at', hex.x, hex.y, 'type:', droneType);
                 
                 const drone = new Drone(this, hex.x, hex.y, color, isLocal, {
                     health: d.health,
@@ -650,17 +627,11 @@ export default class MainScene extends Phaser.Scene {
             }
 
             if (isLocal) {
-                console.log('[MainScene] These are MY drones');
                 this.myDrones = this.drones[player.playerIndex];
                 const first = this.myDrones[0];
                 this.cameras.main.centerOn(first.sprite.x, first.sprite.y);
-                console.log('[MainScene] Camera centered on my first drone');
             }
         }
-        
-        console.log('[MainScene] === DRONE CREATION COMPLETE ===');
-        console.log('[MainScene] Total players:', Object.keys(this.drones).length);
-        console.log('[MainScene] My drones:', this.myDrones?.length);
 
         this.updateVision();
     }
@@ -1077,11 +1048,6 @@ export default class MainScene extends Phaser.Scene {
     }
 
     executeAttack(targetUnit) {
-        console.log('[MainScene] === executeAttack CALLED ===');
-        console.log('[MainScene] selectedDrone:', this.selectedDrone?.droneType);
-        console.log('[MainScene] targetUnit:', targetUnit?.targetType || targetUnit?.droneType);
-        console.log('[MainScene] isMyTurn:', this.isMyTurn);
-        
         if (!this.selectedDrone || !this.isMyTurn) {
             console.log('[MainScene] executeAttack early return: no selectedDrone or not myTurn');
             return;
@@ -1103,7 +1069,6 @@ export default class MainScene extends Phaser.Scene {
         }
 
         const attackerIndex = this.myDrones.indexOf(this.selectedDrone);
-        console.log('[MainScene] attackerIndex:', attackerIndex);
         if (attackerIndex < 0) {
             console.log('[MainScene] executeAttack early return: attackerIndex < 0');
             return;
@@ -1184,20 +1149,14 @@ export default class MainScene extends Phaser.Scene {
      * and inside aerial weapon range.
      */
     findEnemyUnitAtHex(hexCenter) {
-        console.log('[MainScene] === findEnemyTargetAtHex CALLED ===');
-        console.log('[MainScene] hexCenter:', hexCenter);
-        console.log('[MainScene] selectedDrone:', this.selectedDrone?.droneType);
         if (!hexCenter || !this.selectedDrone || this.selectedDrone.droneType !== 'Aereo') {
             console.log('[MainScene] Early return: no hexCenter or not Aereo');
             return null;
         }
 
         const enemyIndex = Network.playerIndex === 0 ? 1 : 0;
-        console.log('[MainScene] Looking for enemies in index:', enemyIndex);
-        console.log('[MainScene] Total enemies in that index:', (this.drones[enemyIndex] || []).length);
-        
+    
         const enemies = (this.drones[enemyIndex] || []).filter((drone) => {
-            console.log('[MainScene] Checking drone:', drone.droneType, 'alive?', drone?.isAlive(), 'visible?', this.isDroneVisibleToLocal(drone));
             if (!drone?.isAlive()) return false;
             if (!this.isDroneVisibleToLocal(drone)) return false;
 
@@ -1207,11 +1166,8 @@ export default class MainScene extends Phaser.Scene {
                 drone.sprite.x,
                 drone.sprite.y
             );
-            console.log('[MainScene] Attack distance:', attackDistance, 'range:', this.selectedDrone.attackRange);
             return attackDistance <= (this.selectedDrone.attackRange ?? 0);
         });
-
-        console.log('[MainScene] Found enemies:', enemies.length);
 
         const enemyCarrier = this.findEnemyCarrierAtHex(hexCenter);
         if (enemyCarrier) {
