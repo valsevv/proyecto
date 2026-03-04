@@ -346,6 +346,36 @@ class GameRoomTest {
         assertEquals(0, room.getCurrentTurn());
     }
 
+
+    @Test
+    void shouldSetCarrierHealthBySelectedSide() {
+        GameRoom room = new GameRoom("room-carrier-side");
+        room.addPlayer("session-1");
+        room.addPlayer("session-2");
+
+        room.createDronesForSide(0, "Aereo");
+        room.createDronesForSide(1, "Naval");
+
+        assertEquals(6, room.getCarrierHealth(0));
+        assertEquals(3, room.getCarrierHealth(1));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void shouldSerializeCarrierMaxHealthBySide() {
+        GameRoom room = new GameRoom("room-carrier-max-health");
+        room.addPlayer("session-1");
+        room.addPlayer("session-2");
+        room.createDronesForSide(0, "Aereo");
+        room.createDronesForSide(1, "Naval");
+
+        Map<String, Object> stateMap = room.toStateMap();
+        List<Map<String, Object>> players = (List<Map<String, Object>>) stateMap.get("players");
+
+        assertEquals(6, players.get(0).get("carrierMaxHealth"));
+        assertEquals(3, players.get(1).get("carrierMaxHealth"));
+    }
+
     @Test
     void shouldDamageAndDestroyCarrierAfterConfiguredHits() {
         GameRoom room = new GameRoom("room-carrier", 10, 4, 3, 5);
