@@ -40,6 +40,13 @@ class GameRoomTest {
     }
 
     @Test
+    void shouldCreateGameRoomWithCustomCarrierHitsToDestroy() {
+        GameRoom room = new GameRoom("custom-carrier", 20, 5, 4, 7);
+
+        assertEquals(7, room.getCarrierHitsToDestroy());
+    }
+
+    @Test
     void shouldRejectInvalidActionsPerTurn() {
         assertThrows(IllegalArgumentException.class, () ->
             new GameRoom("invalid", 0)
@@ -340,6 +347,35 @@ class GameRoomTest {
     }
 
     @Test
+    void shouldDamageAndDestroyCarrierAfterConfiguredHits() {
+        GameRoom room = new GameRoom("room-carrier", 10, 4, 3, 5);
+        room.addPlayer("session-1");
+        room.addPlayer("session-2");
+
+        assertEquals(5, room.getCarrierHealth(1));
+        room.damageCarrier(1, 4);
+        assertEquals(1, room.getCarrierHealth(1));
+        assertFalse(room.isCarrierDestroyed(1));
+
+        room.damageCarrier(1, 1);
+        assertEquals(0, room.getCarrierHealth(1));
+        assertTrue(room.isCarrierDestroyed(1));
+    }
+
+    @Test
+    void shouldNotRecallDroneWhenCarrierDestroyed() {
+        GameRoom room = new GameRoom("room-carrier-recall", 10, 4, 3, 1);
+        room.addPlayer("session-1");
+        room.addPlayer("session-2");
+
+        room.moveDrone("session-1", 0, 100, 200);
+        room.damageCarrier(0, 1);
+
+        assertTrue(room.isCarrierDestroyed(0));
+        assertFalse(room.recallDrone("session-1", 0));
+    }
+
+    @Test
     void shouldGetPlayerByIndex() {
         GameRoom room = new GameRoom("room-index");
         room.addPlayer("session-1");
@@ -430,6 +466,7 @@ class GameRoomTest {
         assertEquals(15, stateMap.get("actionsPerTurn"));
         assertEquals(5, stateMap.get("aerialVisionRange"));
         assertEquals(4, stateMap.get("navalVisionRange"));
+        assertEquals(5, stateMap.get("carrierHitsToDestroy"));
         assertEquals(15, stateMap.get("actionsRemaining"));
 
         @SuppressWarnings("unchecked")

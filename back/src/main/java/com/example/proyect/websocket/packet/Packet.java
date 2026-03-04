@@ -159,7 +159,8 @@ public class Packet {
                                        int actionsRemaining,
                                        double attackerX, double attackerY,
                                        int attackerRemainingHealth, boolean attackerDestroyed,
-                                       int attackerAmmo) {
+                                       int attackerAmmo,
+                                       int targetCarrierHealth, boolean targetCarrierDestroyed) {
         Map<String, Object> payload = new HashMap<>();
         payload.put("attackerPlayer", attackerPlayer);
         payload.put("attackerDrone", attackerDrone);
@@ -176,6 +177,8 @@ public class Packet {
         payload.put("attackerRemainingHealth", attackerRemainingHealth);
         payload.put("attackerDestroyed", attackerDestroyed);
         payload.put("attackerAmmo", attackerAmmo);
+        payload.put("targetCarrierHealth", targetCarrierHealth);
+        payload.put("targetCarrierDestroyed", targetCarrierDestroyed);
         return new Packet(PacketType.ATTACK_RESULT, payload);
     }
 

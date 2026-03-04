@@ -60,6 +60,9 @@ public class GameController {
     @Value("${game.aerial-attack-fuel-cost:2}")
     private int aerialAttackFuelCost;
 
+    @Value("${game.carrier-hits-to-destroy:5}")
+    private int carrierHitsToDestroy;
+
     // Must match frontend HexGrid size (front/scenes/MainScene.js -> new HexGrid(this, 35, ...))
     private static final double HEX_SIZE_PX = 35.0;
     private static final double HEX_WIDTH_PX = Math.sqrt(3.0) * HEX_SIZE_PX;
@@ -107,7 +110,7 @@ public class GameController {
         return rooms.computeIfAbsent(
             lobby.getLobbyId(),
             id -> {
-                GameRoom newRoom = new GameRoom(id, actionsPerTurn, aerialVisionRange, navalVisionRange);
+                GameRoom newRoom = new GameRoom(id, actionsPerTurn, aerialVisionRange, navalVisionRange, carrierHitsToDestroy);
                 log.info("Created game room {} from lobby {}", id, lobby.getLobbyId());
                 return newRoom;
             }
@@ -612,7 +615,7 @@ public class GameController {
         boolean manualBlindShot = targetDroneIndex < 0;
         boolean carrierTarget = "carrier".equalsIgnoreCase(targetType);
                                         
-        GameResult droneValidation = validateDrones(attacker, attackerDrone, targetDrone, targetPlayerIndex, manualBlindShot, carrierTarget);
+        GameResult droneValidation = validateDrones(room, attacker, attackerDrone, targetDrone, targetPlayerIndex, manualBlindShot, carrierTarget);
         log.info("[GameController] ->  droneValidation {}", droneValidation);
         if (droneValidation != null) return droneValidation;
 
@@ -680,14 +683,22 @@ public class GameController {
                 room.getActionsRemaining(),
                 attackerFinalPosition.getX(), attackerFinalPosition.getY(),
                 attackerDrone.getCurrentHp(), !attackerDrone.isAlive(),
-                attackerAmmo
+                attackerAmmo,
+                room.getCarrierHealth(targetPlayerIndex),
+                room.isCarrierDestroyed(targetPlayerIndex)
             );
             return finalizeTurn(room, missPacket);
         }
 
+        int targetCarrierHealth = room.getCarrierHealth(targetPlayerIndex);
+        boolean targetCarrierDestroyed = room.isCarrierDestroyed(targetPlayerIndex);
+
         // Aplica el daño
         int damage = attackResolution.damage();
-        if (targetDrone != null) {
+        if (carrierTarget) {
+            targetCarrierHealth = room.damageCarrier(targetPlayerIndex, 1);
+            targetCarrierDestroyed = targetCarrierHealth <= 0;
+        } else if (targetDrone != null) {
             targetDrone.receiveDamage(damage);
         }
 
@@ -707,7 +718,9 @@ public class GameController {
             room.getActionsRemaining(),
             attackerFinalPosition.getX(), attackerFinalPosition.getY(),
             attackerDrone.getCurrentHp(), !attackerDrone.isAlive(),
-            attackerAmmo
+            attackerAmmo,
+            targetCarrierHealth,
+            targetCarrierDestroyed
         );
 
         // Check game over
@@ -738,7 +751,7 @@ public class GameController {
         return null;
     }
 
-    private GameResult validateDrones(PlayerState attacker, Drone attackerDrone,
+    private GameResult validateDrones(GameRoom room, PlayerState attacker, Drone attackerDrone,
             Drone targetDrone,int targetPlayerIndex, boolean manualBlindShot, boolean carrierTarget) {
                 
     log.info("[GameController] -> begin validateDrones, attacker {}, attackerDrone {}", attacker, attackerDrone);
@@ -774,6 +787,22 @@ public class GameController {
 
         if (attackerDrone instanceof AerialDrone && manualBlindShot && !carrierTarget) {
             return GameResult.error("Aerial drone attack requires selecting an enemy unit");
+        }
+
+        if (carrierTarget && !manualBlindShot) {
+            return GameResult.error("Carrier attacks must target the enemy carrier");
+        }
+
+        if (carrierTarget && targetDrone != null) {
+            return GameResult.error("Carrier attacks cannot target drones");
+        }
+
+        if (carrierTarget && attackerDrone instanceof NavalDrone) {
+            return GameResult.error("Naval drones cannot attack carriers");
+        }
+
+        if (carrierTarget && room.isCarrierDestroyed(targetPlayerIndex)) {
+            return GameResult.error("Target carrier is already destroyed");
         }
 
         if (!manualBlindShot && !targetDrone.isAlive()) {

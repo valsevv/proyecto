@@ -35,6 +35,7 @@ public class GameRoom {
     public static final int DEFAULT_ACTIONS_PER_TURN = 10;
     public static final int DEFAULT_AERIAL_VISION_RANGE = 4;
     public static final int DEFAULT_NAVAL_VISION_RANGE = 3;
+    public static final int DEFAULT_CARRIER_HITS_TO_DESTROY = 5;
 
     public static final int MOVEMENT_FUEL_COST = 1;
     public static final int IDLE_FUEL_COST = 1;
@@ -60,17 +61,23 @@ public class GameRoom {
     private int actionsPerTurn;
     private int aerialVisionRange;
     private int navalVisionRange;
+    private int carrierHitsToDestroy;
     private int actionsRemaining;
+    private final Map<Integer, Integer> carrierHealthByPlayer = new HashMap<>();
 
     public GameRoom(String roomId) {
-        this(roomId, DEFAULT_ACTIONS_PER_TURN, DEFAULT_AERIAL_VISION_RANGE, DEFAULT_NAVAL_VISION_RANGE);
+        this(roomId, DEFAULT_ACTIONS_PER_TURN, DEFAULT_AERIAL_VISION_RANGE, DEFAULT_NAVAL_VISION_RANGE, DEFAULT_CARRIER_HITS_TO_DESTROY);
     }
 
     public GameRoom(String roomId, int actionsPerTurn) {
-        this(roomId, actionsPerTurn, DEFAULT_AERIAL_VISION_RANGE, DEFAULT_NAVAL_VISION_RANGE);
+        this(roomId, actionsPerTurn, DEFAULT_AERIAL_VISION_RANGE, DEFAULT_NAVAL_VISION_RANGE, DEFAULT_CARRIER_HITS_TO_DESTROY);
     }
 
     public GameRoom(String roomId, int actionsPerTurn, int aerialVisionRange, int navalVisionRange) {
+        this(roomId, actionsPerTurn, aerialVisionRange, navalVisionRange, DEFAULT_CARRIER_HITS_TO_DESTROY);
+    }
+
+    public GameRoom(String roomId, int actionsPerTurn, int aerialVisionRange, int navalVisionRange, int carrierHitsToDestroy) {
         this.roomId = roomId;
         if (actionsPerTurn <= 0) {
             throw new IllegalArgumentException("actionsPerTurn must be > 0");
@@ -81,9 +88,13 @@ public class GameRoom {
         if (navalVisionRange < 0) {
             throw new IllegalArgumentException("navalVisionRange must be >= 0");
         }
+        if (carrierHitsToDestroy <= 0) {
+            throw new IllegalArgumentException("carrierHitsToDestroy must be > 0");
+        }
         this.actionsPerTurn = actionsPerTurn;
         this.aerialVisionRange = aerialVisionRange;
         this.navalVisionRange = navalVisionRange;
+        this.carrierHitsToDestroy = carrierHitsToDestroy;
         this.actionsRemaining = actionsPerTurn;
     }
 
@@ -109,7 +120,12 @@ public class GameRoom {
 
         PlayerState player = new PlayerState( sessionId, index, drones);
         players.add(player);
+        initializeCarrierForPlayer(index);
         return player;
+    }
+
+    private void initializeCarrierForPlayer(int playerIndex) {
+        carrierHealthByPlayer.put(playerIndex, carrierHitsToDestroy);
     }
     
     /*
@@ -187,6 +203,7 @@ public class GameRoom {
             if (p.getSessionId().equals(sessionId)) {
                 it.remove();
                 playerSpawnAnchors.remove(p.getPlayerIndex());
+                carrierHealthByPlayer.remove(p.getPlayerIndex());
                 return p;
             }
         }
@@ -277,6 +294,7 @@ public class GameRoom {
         Drone drone = player.getDrones().get(droneIndex);
         if (!drone.isAlive()) return false;
         if (!drone.isDeployed()) return false; // already in hangar
+        if (isCarrierDestroyed(player.getPlayerIndex())) return false;
 
         drone.setDeployed(false);
         drone.setFuel(drone.getMaxFuel());
@@ -325,9 +343,29 @@ public class GameRoom {
     public synchronized void reset() {
         players.clear();
         playerSides.clear();
+        carrierHealthByPlayer.clear();
         gameStarted = false;
         currentTurn = 0;
         actionsRemaining = actionsPerTurn;
+    }
+
+    public synchronized int damageCarrier(int playerIndex, int attacks) {
+        int currentHealth = carrierHealthByPlayer.getOrDefault(playerIndex, carrierHitsToDestroy);
+        int updatedHealth = Math.max(0, currentHealth - Math.max(0, attacks));
+        carrierHealthByPlayer.put(playerIndex, updatedHealth);
+        return updatedHealth;
+    }
+
+    public synchronized int getCarrierHealth(int playerIndex) {
+        return carrierHealthByPlayer.getOrDefault(playerIndex, carrierHitsToDestroy);
+    }
+
+    public synchronized int getCarrierHitsToDestroy() {
+        return carrierHitsToDestroy;
+    }
+
+    public synchronized boolean isCarrierDestroyed(int playerIndex) {
+        return getCarrierHealth(playerIndex) <= 0;
     }
 
     // ========== Turn Management ==========
@@ -491,6 +529,9 @@ public class GameRoom {
             Map<String, Object> pm = new LinkedHashMap<>();
             pm.put("playerIndex", p.getPlayerIndex());
             pm.put("side", p.getSide());
+            pm.put("carrierHealth", getCarrierHealth(p.getPlayerIndex()));
+            pm.put("carrierMaxHealth", carrierHitsToDestroy);
+            pm.put("carrierDestroyed", isCarrierDestroyed(p.getPlayerIndex()));
             log.info("Saving player {} side={}", p.getPlayerIndex(), p.getSide());
             List<Map<String, Object>> droneMaps = new ArrayList<>();
             for (Drone d : p.getDrones()) {
@@ -528,6 +569,7 @@ public class GameRoom {
         state.put("actionsPerTurn", actionsPerTurn);
         state.put("aerialVisionRange", aerialVisionRange);
         state.put("navalVisionRange", navalVisionRange);
+        state.put("carrierHitsToDestroy", carrierHitsToDestroy);
         state.put("gameStarted", gameStarted);
         
         log.info("[GameRoom] -> End toStateMap");
@@ -557,6 +599,7 @@ public class GameRoom {
         int actionsPerTurn = getOptionalPositiveIntField(stateMap, "actionsPerTurn", DEFAULT_ACTIONS_PER_TURN);
         int aerialVisionRange = getOptionalNonNegativeIntField(stateMap, "aerialVisionRange", DEFAULT_AERIAL_VISION_RANGE);
         int navalVisionRange = getOptionalNonNegativeIntField(stateMap, "navalVisionRange", DEFAULT_NAVAL_VISION_RANGE);
+        int carrierHitsToDestroy = getOptionalPositiveIntField(stateMap, "carrierHitsToDestroy", DEFAULT_CARRIER_HITS_TO_DESTROY);
         int actionsRemaining = getIntField(stateMap, "actionsRemaining");
         if (actionsRemaining < 0 || actionsRemaining > actionsPerTurn) {
             throw new IllegalArgumentException("actionsRemaining out of range");
@@ -568,7 +611,7 @@ public class GameRoom {
             throw new IllegalArgumentException("started games must have two players");
         }
 
-        GameRoom room = new GameRoom(roomId, actionsPerTurn, aerialVisionRange, navalVisionRange);
+        GameRoom room = new GameRoom(roomId, actionsPerTurn, aerialVisionRange, navalVisionRange, carrierHitsToDestroy);
         room.gameStarted = gameStarted;
         room.currentTurn = currentTurn;
         room.actionsRemaining = actionsRemaining;
@@ -675,6 +718,11 @@ public class GameRoom {
             player.setSide(side);
             room.players.add(player);
             room.playerSides.put(playerIndex, side);
+            int carrierHealth = getOptionalNonNegativeIntField(rawPlayer, "carrierHealth", room.carrierHitsToDestroy);
+            if (carrierHealth > room.carrierHitsToDestroy) {
+                throw new IllegalArgumentException("carrierHealth out of range");
+            }
+            room.carrierHealthByPlayer.put(playerIndex, carrierHealth);
         }
 
         log.info("[GameRoom] -> End fromStateMap");
@@ -762,6 +810,9 @@ public class GameRoom {
         this.aerialVisionRange = source.aerialVisionRange;
         this.navalVisionRange = source.navalVisionRange;
         this.actionsRemaining = source.actionsRemaining;
+        this.carrierHitsToDestroy = source.carrierHitsToDestroy;
+        this.carrierHealthByPlayer.clear();
+        this.carrierHealthByPlayer.putAll(source.carrierHealthByPlayer);
         log.info("[GameRoom] -> End restoreFrom ");
     }
 }
