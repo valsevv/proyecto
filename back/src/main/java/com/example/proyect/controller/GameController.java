@@ -595,6 +595,37 @@ public class GameController {
     }
 
 
+
+    public GameResult processCarrierMove(String sessionId, double x, double y) {
+        GameRoom room = getRoomForSession(sessionId);
+        if (room == null) {
+            return GameResult.error("You are not in a game room");
+        }
+
+        PlayerState player = room.getPlayerBySession(sessionId);
+        if (player == null) {
+            return GameResult.error("You are not in the game");
+        }
+
+        if (!room.isPlayerTurn(sessionId)) {
+            return GameResult.error("Not your turn");
+        }
+
+        if (!room.moveCarrier(sessionId, x, y)) {
+            return GameResult.error("Invalid carrier move");
+        }
+
+        room.useAction();
+        Packet movedPacket = Packet.carrierMoved(player.getPlayerIndex(), x, y, room.getActionsRemaining());
+
+        if (room.getActionsRemaining() <= 0) {
+            room.endTurn();
+            return GameResult.turnEnded(movedPacket, room.getCurrentTurn(), room.getActionsRemaining());
+        }
+
+        return GameResult.withActionsRemaining(movedPacket, room.getActionsRemaining());
+    }
+
     public GameResult processAttack(String sessionId, int attackerIndex, 
                                      int targetPlayerIndex, int targetDroneIndex,
                                      Double manualLineX, Double manualLineY,
