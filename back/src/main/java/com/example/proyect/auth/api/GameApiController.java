@@ -17,6 +17,9 @@ import com.example.proyect.auth.service.UserService;
 import com.example.proyect.persistence.classes.Game;
 import com.example.proyect.persistence.classes.User;
 
+
+//vseverio esta clase gestiona partidas guardadas del usuario autenticado y vlida acceso antes de exponer datos.
+
 @RestController
 @RequestMapping("/api/games")
 public class GameApiController {
@@ -30,7 +33,7 @@ public class GameApiController {
     }
 
     @GetMapping("/saved")
-    public List<SavedGameResponse> getSavedGames(Authentication authentication) {
+    public List<SavedGameResponse> getSavedGames(Authentication authentication) { //obtiene el usuario logueado y devuelve sus partidas pausadas transformadas a un formato resumido para API.
         String username = authentication.getName();
         User currentUser = userService.getByUsername(username);
 

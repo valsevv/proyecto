@@ -10,6 +10,8 @@ import com.example.proyect.persistence.classes.User;
 import com.example.proyect.persistence.repos.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 
+//vseverio Esta clase maneja alta,login y busqueda de usuario con validacion de negocio
+
 @Service
 public class UserService {
 
@@ -19,7 +21,7 @@ public class UserService {
         this.userRepository = userRepository;
     }
 
-    public User register(String username, String email, String rawPassword) {
+    public User register(String username, String email, String rawPassword) { //valida duplicados, hashea y crea usuario en BD
 
         if (userRepository.existsByUsername(username)) {
             throw new UserAlreadyExistsException("El usuario ya existe");
@@ -46,7 +48,7 @@ public class UserService {
         return userRepository.save(user);
     }
 
-    public User login(String username, String rawPassword) {
+    public User login(String username, String rawPassword) { //busca usuario por username, valida contraseña y actualiza fecha de ltimo login
 
         User user = userRepository
                 .findByUsername(username)
@@ -60,13 +62,13 @@ public class UserService {
         return userRepository.save(user);
     }
 
-    public User getByUsername(String username) {
+    public User getByUsername(String username) { //obtiene usuario por nombre y lanza exception si no existe
         return userRepository
                 .findByUsername(username)
                 .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado: " + username));
     }
 
-    public User getById(Long userId) {
+    public User getById(Long userId) { //obtieenr usuario por ID y lanza excepcion si no existe
         return userRepository
                 .findById(userId)
                 .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado con id=" + userId));

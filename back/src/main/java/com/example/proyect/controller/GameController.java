@@ -30,10 +30,7 @@ import com.example.proyect.persistence.classes.GameState;
 import com.example.proyect.persistence.classes.GameStatus;
 import com.example.proyect.websocket.packet.Packet;
 
-/**
- * Game service layer that handles all game logic orchestration.
- * Manages multiple GameRoom instances for concurrent 1v1 matches.
- */
+//vseverio Clase principal controladora de partida en tiempo real, salas, turnos, movimientos, ataques, guardado/cargado y estado por sesion
 @Service
 public class GameController {
 
@@ -70,41 +67,41 @@ public class GameController {
     private final LobbyService lobbyService;
 
     private final GameService gameService;
-    // All game rooms by room ID
+    // todos los rooms x id
     private final Map<String, GameRoom> rooms = new ConcurrentHashMap<>();
     
-    // Track which room each session is in
+    // T trackea en que room esta cada sesion
     private final Map<String, String> sessionToRoom = new ConcurrentHashMap<>();
     
-    // Track userId for each session
+    // Trackea user id por sesion
     private final Map<String, Long> sessionToUserId = new ConcurrentHashMap<>();
     
     //GamesId de la session
     private final Map<Long, Game> games = new ConcurrentHashMap<>();
 
-    // Loaded games tracking (gameId -> roomId)
+    // juegos cargados
     private final Map<Long, String> gameToRoom = new ConcurrentHashMap<>();
     private final Map<String, Long> roomToGame = new ConcurrentHashMap<>();
     private final Map<Long, Lock> gameLocks = new ConcurrentHashMap<>();
 
-    // Sequential room ID counter
+    //
     private final AtomicInteger roomCounter = new AtomicInteger(1);
 
-    public GameController(LobbyService lobbyService, GameService gameService) {
+    public GameController(LobbyService lobbyService, GameService gameService) { //inicializa controlador
         this.lobbyService = lobbyService;
         this.gameService = gameService;
     }
-    public void bindSessionUser(String sessionId, Long userId) {
+    public void bindSessionUser(String sessionId, Long userId) { //vincula sesion websocket con userid para trazabilidad
         if (sessionId != null && userId != null) {
             sessionToUserId.put(sessionId, userId);
         }
     }
     public Long getUserIdBySession(String sessionId) {
         return sessionToUserId.get(sessionId);
-    }
+    } //devuelve userid asociado a una sesion
     
 
-    //Crea el froom apartir del lobby, si ya existe lo retorna
+    //crea el froom apartir del lobby, si ya existe lo retorna
     private GameRoom findOrCreateRoomForLobby(Lobby lobby) {
 
         return rooms.computeIfAbsent(
@@ -118,7 +115,7 @@ public class GameController {
     }
 
 
-    private Game createGameFromLobby(Lobby lobby) {
+    private Game createGameFromLobby(Lobby lobby) { //crea una partida desde un lobby
 
         String lobbyId = lobby.getLobbyId();
 
@@ -151,10 +148,8 @@ public class GameController {
         return newGame;
 }
  
-    /**
-     * Get the room for a given session, or null if not in any room.
-     */
-    private GameRoom getRoomForSession(String sessionId) {
+
+    private GameRoom getRoomForSession(String sessionId) { //obtiene el room de una sesion, o null si no hay rooms
         String roomId = sessionToRoom.get(sessionId);
         if (roomId == null) return null;
         return rooms.get(roomId);
@@ -173,10 +168,7 @@ public class GameController {
         }
     }
 
-    /**
-     * Remove empty rooms to free resources.
-     */
-    private void cleanupEmptyRooms() {
+    private void cleanupEmptyRooms() { //eliminar los rooms que estan vacios
         rooms.entrySet().removeIf(entry -> {
             GameRoom room = entry.getValue();
             if (room.getPlayers().isEmpty()) {
@@ -187,7 +179,7 @@ public class GameController {
         });
     }
 
-   public GameResult joinGame(String sessionId, String lobbyId, Long userId) {
+   public GameResult joinGame(String sessionId, String lobbyId, Long userId) { //mete al jugador en el lobby y devuelve packet de bienvenida
 
         if (sessionToRoom.containsKey(sessionId)) {
             return GameResult.error("Already in a game");
@@ -240,7 +232,7 @@ public class GameController {
         );
 
         // =========================
-        // START GAME WHEN READY
+        // empieza uego si esta pronto
         // =========================
 
         if (room.allPlayersConnected()) {
@@ -292,7 +284,7 @@ public class GameController {
     }
 
    @SuppressWarnings("unchecked")
-    private void loadSavedGameIntoRoom(Long gameId, GameRoom room) {
+    private void loadSavedGameIntoRoom(Long gameId, GameRoom room) { //carga partida en un room
 
         log.info("[GameController] -> begin loadSavedGameIntoRoom ");
         Game game = gameService.getById(gameId);
@@ -321,14 +313,12 @@ public class GameController {
     }   
     
     
-    /**
-     * Handle player side selection.
-     */
-    public GameResult selectSide(String sessionId, String side) {
+
+    public GameResult selectSide(String sessionId, String side) { //manejador de seleccion de lados para jugador
         log.info("[GameController] -> begin selectSide");
         log.info("[GameController] -> selectSide, sessionId {}, side {}", sessionId, side);
         
-        // Validate side
+        // valida lado
         if (!"Naval".equals(side) && !"Aereo".equals(side)) {
             return GameResult.error("Invalid side. Must be 'Naval' or 'Aereo'");
         }
@@ -349,19 +339,19 @@ public class GameController {
         
         int playerIndex = player.getPlayerIndex();
         
-        // Check if this player already selected a side
+        // revisa si el jugador ya eligio lado
         if (room.getPlayerSide(playerIndex) != null) {
             return GameResult.error("You already selected a side");
         }
         
-        // For first player, allow any side
-        // For second player, assign opposite side automatically in the handler
+        // el primer jugador elige
+        // al segundo se le asigna el lado automaticamente
         room.setPlayerSide(playerIndex, side);
         room.createDronesForSide(playerIndex, side);
         
         log.info("Player {} selected side {} in room {}", playerIndex, side, room.getRoomId());
         
-        // Check if both players have selected
+        // esto revisa que ambos jugadores tengan lado
         if (room.bothSidesSelected() && room.isFull()) {
             room.startGame();
             lobbyService.getLobbyById(room.getRoomId()).ifPresent(lobby -> {
@@ -377,10 +367,8 @@ public class GameController {
         return GameResult.ok(Packet.sideChosen(playerIndex, side));
     }
 
-    /**
-     * Remove a player from their game room.
-     */
-    public int removePlayer(String sessionId) {
+
+    public int removePlayer(String sessionId) { //eliminar player de un room
         GameRoom room = getRoomForSession(sessionId);
         if (room == null) {
             return -1;
@@ -395,7 +383,7 @@ public class GameController {
             clearLoadedGameMapping(linkedGameId, room.getRoomId());
             room.reset();
             
-            // Cleanup empty rooms
+            // limpa rooms
             cleanupEmptyRooms();
             
             return removed.getPlayerIndex();
@@ -403,10 +391,7 @@ public class GameController {
         return -1;
     }
 
-    /**
-     * Save current room state to DB and close the game room for all participants.
-     */
-    public GameResult saveAndExit(String sessionId) {
+    public GameResult saveAndExit(String sessionId) { //funcionalidad e guardado y salida en base
 
         log.info("[GameController] -> begin saveAndExit ");
      
@@ -471,7 +456,7 @@ public class GameController {
     }
 
 
-    private GameResult saveAndExitFirstValidation(String sessionId ) {
+    private GameResult saveAndExitFirstValidation(String sessionId ) { //valida antes de guardar
 
         GameRoom room = getRoomForSession(sessionId);
         log.info("[GameController] -> saveAndExitFirstValidation, sessionId {}", sessionId);
@@ -537,10 +522,8 @@ public class GameController {
         return gameId;
     }
 
-    /**
-     * Process a move action.
-     */
-    public GameResult processMove(String sessionId, int droneIndex, double x, double y) {
+
+    public GameResult processMove(String sessionId, int droneIndex, double x, double y) { //procesa un movimiento
         log.info("[GameController] -> processMove sessionId {}, droneIndex {} ", sessionId, droneIndex);
 
         GameRoom room = getRoomForSession(sessionId);
@@ -569,12 +552,12 @@ public class GameController {
             return GameResult.error("Cannot move a destroyed drone");
         }
 
-        // Apply move
+        // aplica movimiento
         if (!room.moveDrone(sessionId, droneIndex, x, y)) {
             return GameResult.error("Invalid move");
         }
 
-        // Consume action
+        // consume accion
         room.useAction();
         
         log.debug("Player {} moved drone {} to ({}, {}) in room {}", 
@@ -583,7 +566,7 @@ public class GameController {
         boolean destroyedByFuel = !drone.isAlive();
         Packet movePacket = Packet.moveDrone(player.getPlayerIndex(), droneIndex, x, y, drone.getFuel(), destroyedByFuel);
         
-        // Check if turn should auto-end
+        // revisa si deberia pasar de turno
         if (room.getActionsRemaining() <= 0) {
             room.endTurn();
             return GameResult.turnEnded(movePacket, room.getCurrentTurn(), room.getActionsRemaining());
@@ -596,7 +579,7 @@ public class GameController {
 
 
 
-    public GameResult processCarrierMove(String sessionId, double x, double y) {
+    public GameResult processCarrierMove(String sessionId, double x, double y) { //procesa movimiento de carrier
         GameRoom room = getRoomForSession(sessionId);
         if (room == null) {
             return GameResult.error("You are not in a game room");
@@ -629,7 +612,7 @@ public class GameController {
     public GameResult processAttack(String sessionId, int attackerIndex, 
                                      int targetPlayerIndex, int targetDroneIndex,
                                      Double manualLineX, Double manualLineY,
-                                     Double destinationX, Double destinationY, String targetType) {
+                                     Double destinationX, Double destinationY, String targetType) { //procesa ataque
 
         GameRoom room = getRoomForSession(sessionId);
         if (room == null) {
@@ -842,7 +825,7 @@ public class GameController {
     }
 
 
-    private HexCoord resolveAerialFinalPosition(GameRoom room, HexCoord requestedDestination, Drone attackerDrone) {
+    private HexCoord resolveAerialFinalPosition(GameRoom room, HexCoord requestedDestination, Drone attackerDrone) { //resuelve la posicion final del dron aereo
         if (!room.isPositionOccupied(requestedDestination, attackerDrone)) {
             return requestedDestination;
         }
@@ -866,7 +849,7 @@ public class GameController {
         return attackerDrone.getPosition();
     }
 
-    private GameResult finalizeTurn(GameRoom room, Packet packet) {
+    private GameResult finalizeTurn(GameRoom room, Packet packet) { //fin de turno
         if (room.getActionsRemaining() <= 0) {
             room.endTurn();
             return GameResult.turnEnded(packet,
@@ -938,11 +921,7 @@ public class GameController {
         return Math.sqrt(dx * dx + dy * dy);
     }
 
-    /**
-     * Converts pixel distance into an approximate hex distance.
-     * Mirrors front/utils/HexGrid.js getHexDistance() (pixelDist / (sqrt(3) * size)).
-     */
-    private double hexDistanceBetween(double x1, double y1, double x2, double y2) {
+    private double hexDistanceBetween(double x1, double y1, double x2, double y2) { //convierte pixels en distancia efectiva
         double pixelDistance = distanceBetween(x1, y1, x2, y2);
         if (HEX_WIDTH_PX <= 0) {
             return pixelDistance;
@@ -1017,11 +996,7 @@ public class GameController {
     }
 
 
-    /**
-     * Process a recall action — pulls a deployed drone back into its carrier,
-     * restoring the drone's fuel and missiles.
-     */
-    public GameResult processRecall(String sessionId, int droneIndex) {
+    public GameResult processRecall(String sessionId, int droneIndex) { //procesa recalls, guarda un dron deplegado, llena de combustible y misiles o bombas
         GameRoom room = getRoomForSession(sessionId);
         if (room == null) {
             return GameResult.error("You are not in a game room");

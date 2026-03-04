@@ -21,6 +21,7 @@ import com.example.proyect.persistence.classes.User;
 
 import jakarta.validation.Valid;
 
+//vseverio Controlador REST que maneja autenticacion en el backend /api/auth y define un endpoint de usuario actual en una clase interna /api/users/me
 
 @RestController
 //@CrossOrigin(origins = "http://127.0.0.1:3000")
@@ -36,7 +37,7 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<AuthResponse> register(@RequestBody @Valid RegisterRequest request) {
+    public ResponseEntity<AuthResponse> register(@RequestBody @Valid RegisterRequest request) { //POST recibe username, email, password, llama a registro, guarda token y devuelve authResponse
         User user = userService.register(
                 request.username(),
                 request.email(),
@@ -45,12 +46,12 @@ public class AuthController {
 
         String token = jwtService.generateToken(user.getUserId(), user.getUsername());
 
-        // Create HttpOnly cookie for JWT
+
         ResponseCookie cookie = ResponseCookie.from("authToken", token)
                 .httpOnly(true)
-                .secure(false) // Set to true in production with HTTPS
+                .secure(false) // En produccion deberia ir TRUE si es HTTPS
                 .path("/")
-                .maxAge(3600) // 1 hour (matches JWT expiration)
+                .maxAge(3600) // 1 hora de duracion
                 .sameSite("Strict")
                 .build();
 
@@ -59,12 +60,12 @@ public class AuthController {
                 .body(new AuthResponse(
                         user.getUserId(),
                         user.getUsername(),
-                        null // No token in response body
+                        null // No hay token en el body de respuesta
                 ));
     }       
 
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@RequestBody @Valid LoginRequest request) {
+    public ResponseEntity<AuthResponse> login(@RequestBody @Valid LoginRequest request) { //recibe username y password, llama a userService.login para valdiar credenciales, si son correctas lo mete en cookie autthoken y devuelve authresponse.
         
         User user = userService.login(
                 request.username(),
@@ -72,13 +73,12 @@ public class AuthController {
         );
 
         String token = jwtService.generateToken(user.getUserId(), user.getUsername());
-        
-        // Create HttpOnly cookie for JWT
+
         ResponseCookie cookie = ResponseCookie.from("authToken", token)
                 .httpOnly(true)
-                .secure(false) // Set to true in production with HTTPS
+                .secure(false) // En produccion deberia ir TRUE si es HTTPS
                 .path("/")
-                .maxAge(3600) // 1 hour (matches JWT expiration)
+                .maxAge(3600) // 1 hora de duracion
                 .sameSite("Strict")
                 .build();
         
@@ -87,17 +87,16 @@ public class AuthController {
                 .body(new AuthResponse(
                         user.getUserId(),
                         user.getUsername(),
-                        null // No token in response body
+                        null
                 ));
     }
-        @GetMapping("/ping")
+        @GetMapping("/ping") //pingea para revisar conexion
         public ResponseEntity<Map<String, String>> ping() {
         return ResponseEntity.ok(Map.of("status", "ok"));
         }
 
-    @PostMapping("/logout")
+    @PostMapping("/logout") //borra la sesion seteando cookie autToken vacia. envia mensaje de respuesta
     public ResponseEntity<Map<String, String>> logout() {
-        // Clear the authentication cookie
         ResponseCookie cookie = ResponseCookie.from("authToken", "")
                 .httpOnly(true)
                 .secure(false)
@@ -111,7 +110,7 @@ public class AuthController {
                 .body(Map.of("message", "Logged out successfully"));
     }
         
-     @RestController
+     @RestController // clase interna que lee cookie de authToken.
         @RequestMapping("/api/users")
                 public class UserMeController {
                         @GetMapping("/me")  

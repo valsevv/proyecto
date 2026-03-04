@@ -1,5 +1,7 @@
 package com.example.proyect.auth;
 
+//se usa en el controlador para respuesta
+
 public class AuthResponse {
 
     public Long userId;

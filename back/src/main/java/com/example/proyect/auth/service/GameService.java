@@ -15,6 +15,8 @@ import com.example.proyect.persistence.repos.GameRepository;
 
 import jakarta.persistence.EntityNotFoundException;
 
+//vseverio Capa logica de negocio, crea guarda consulta y borra partidas, con IDS de acceso
+
 @Service
 @Transactional(readOnly = true)
 public class GameService {
@@ -28,7 +30,7 @@ public class GameService {
     // ---------------- CREATE ----------------
 
     @Transactional
-    public Game createGame(Long player1Id, Long player2Id) {
+    public Game createGame(Long player1Id, Long player2Id) { //crea partida nueva entre 2 usuarios
 
         Objects.requireNonNull(player1Id, "player1 no puede ser null");
         Objects.requireNonNull(player2Id, "player2 no puede ser null");
@@ -40,13 +42,13 @@ public class GameService {
         Game game = new Game();
         game.setPlayer1Id(player1Id);
         game.setPlayer2Id(player2Id);
-        game.setStartedAt(OffsetDateTime.now());
+        game.setStartedAt(OffsetDateTime.now()); //tiempo de comienzo
 
         return gameRepository.save(game);
     }
 
     @Transactional
-    public Game saveGame(Long player1Id, Long player2Id, Game gameToSave) {
+    public Game saveGame(Long player1Id, Long player2Id, Game gameToSave) { //valida jjugadores, partida y persiste el juego
 
         Objects.requireNonNull(player1Id, "player1 no puede ser null");
         Objects.requireNonNull(player2Id, "player2 no puede ser null");
@@ -67,19 +69,19 @@ public class GameService {
     }
     
 
-    public Game getById(Long gameId) {
+    public Game getById(Long gameId) { //busca partida por ID
         return gameRepository.findById(gameId)
                 .orElseThrow(() ->
                         new EntityNotFoundException("No existe partida con id=" + gameId));
     }
 
-    public List<Game> getPausedGamesOfUser(Long userId) {
+    public List<Game> getPausedGamesOfUser(Long userId) { //Devuelve partidas del usuario cuyo estado guardado es Saved
         Objects.requireNonNull(userId, "user no puede ser null");
 
         return gameRepository.findByUserIdAndStateStatus(userId, GameStatus.SAVED.name());
     }
 
-    public boolean canUserAccessGame(Long userId, Game game) {
+    public boolean canUserAccessGame(Long userId, Game game) { //verifica si el usuario participa en la partida
         Objects.requireNonNull(userId, "user no puede ser null");
         Objects.requireNonNull(game, "game no puede ser null");
 
@@ -87,7 +89,7 @@ public class GameService {
     }
 
 
-    public List<Game> getAllGamesOfUser(Long userId) {
+    public List<Game> getAllGamesOfUser(Long userId) { //trae todas las partidas del usuario
         Objects.requireNonNull(userId, "user no puede ser null");
 
         return gameRepository
@@ -96,7 +98,7 @@ public class GameService {
     }
 
 
-    public List<Game> getGamesOfUser(Long userId, int page, int size) {
+    public List<Game> getGamesOfUser(Long userId, int page, int size) { //trae todas las partidas del usuario, pagina
 
         Objects.requireNonNull(userId, "user no puede ser null");
 
@@ -108,7 +110,7 @@ public class GameService {
     }
 
 
-    public long countGamesOfUser(Long userId) {
+    public long countGamesOfUser(Long userId) { //cuenta cantidad de partidas del usuario
         Objects.requireNonNull(userId, "user no puede ser null");
 
         return gameRepository.countByPlayer1IdOrPlayer2Id(userId, userId);
@@ -117,7 +119,7 @@ public class GameService {
 
 
     @Transactional
-    public void deleteGame(Long gameId) {
+    public void deleteGame(Long gameId) { //eliminar partida por ID
         if (!gameRepository.existsById(gameId)) {
             throw new EntityNotFoundException("No existe partida con id=" + gameId);
         }
@@ -127,7 +129,7 @@ public class GameService {
 
 
 
-public boolean existsGameBetweenUsers(Long user1Id, Long user2Id) {
+public boolean existsGameBetweenUsers(Long user1Id, Long user2Id) { //comprueba si ya existe una partida entre 2 usuarios
 
     Objects.requireNonNull(user1Id, "user1 no puede ser null");
     Objects.requireNonNull(user2Id, "user2 no puede ser null");

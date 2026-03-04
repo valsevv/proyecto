@@ -26,11 +26,9 @@ public class RankingService {
         this.userRepository = userRepository;
     }
 
-    /**
-     * Crea un nuevo snapshot de ranking para un usuario.
-     */
+  //vseverio esta clase guarda y consulta el historial de puntajes por usuario
     @Transactional
-    public Ranking createSnapshot(Long userId, int points) {
+    public Ranking createSnapshot(Long userId, int points) { //crea registro de rakning para usuario, si existe
 
         if (!userRepository.existsById(userId)) {
             throw new EntityNotFoundException("No existe usuario con id=" + userId);
@@ -44,36 +42,25 @@ public class RankingService {
         return rankingRepository.save(ranking);
     }
 
-    /**
-     * Devuelve todo el historial de ranking de un usuario.
-     */
+
     @Transactional(readOnly = true)
-    public List<Ranking> getHistoryByUserId(Long userId) {
+    public List<Ranking> getHistoryByUserId(Long userId) { //devuelve todos los snapshots de ranking del usuario
         return rankingRepository.findByUserId(userId);
     }
 
-    /**
-     * Devuelve el mejor puntaje histórico de un usuario.
-     */
     @Transactional(readOnly = true)
-    public Ranking getBestByUserId(Long userId) {
+    public Ranking getBestByUserId(Long userId) { //obtiene mejor puntaje historico del usuario
         return rankingRepository.findByUserId(userId).stream()
                 .max((r1, r2) -> r1.getPoints().compareTo(r2.getPoints()))
                 .orElse(null);
     }
 
-    /**
-     * Devuelve el Top N global.
-     */
-    public List<RankingTopDTO> getTop(int limit) {
+    public List<RankingTopDTO> getTop(int limit) { //trae top N global del ranking con paginacion simple
         return rankingRepository.findTopWithUsername(PageRequest.of(0, limit));
     }
 
-    /**
-     * Borra todo el historial de ranking de un usuario.
-     */
     @Transactional
-    public void deleteByUserId(Long userId) {
+    public void deleteByUserId(Long userId) { //borra registros de ranking de usuario
         List<Ranking> rankings = rankingRepository.findByUserId(userId);
         rankingRepository.deleteAll(rankings);
     }
