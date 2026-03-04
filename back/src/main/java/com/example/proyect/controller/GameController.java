@@ -11,10 +11,10 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import com.example.proyect.VOs.GameResult;
+import com.example.proyect.config.GameProperties;
 import com.example.proyect.auth.service.GameService;
 import com.example.proyect.game.GameRoom;
 import com.example.proyect.game.PlayerState;
@@ -39,34 +39,14 @@ public class GameController {
     private static final int NAVAL_ATTACK_ACTION_COST = 2;
     private static final double NAVAL_ATTACK_VERTICAL_OFFSET = 90.0;
 
-    @Value("${game.actions-per-turn:10}")
-    private int actionsPerTurn;
-
-    @Value("${game.vision-range-aereo:4}")
-    private int aerialVisionRange;
-
-    @Value("${game.vision-range-naval:3}")
-    private int navalVisionRange;
-
-    @Value("${game.missile.max-distance:15}")
-    private int missileMaxDistance;
-
-    @Value("${game.missile.damage-percent-on-naval:0.5}")
-    private double missileDamagePercentOnNaval;
-
-    @Value("${game.aerial-attack-fuel-cost:2}")
-    private int aerialAttackFuelCost;
-
-    @Value("${game.carrier-hits-to-destroy:5}")
-    private int carrierHitsToDestroy;
 
     // Must match frontend HexGrid size (front/scenes/MainScene.js -> new HexGrid(this, 35, ...))
     private static final double HEX_SIZE_PX = 35.0;
     private static final double HEX_WIDTH_PX = Math.sqrt(3.0) * HEX_SIZE_PX;
 
     private final LobbyService lobbyService;
-
     private final GameService gameService;
+    private final GameProperties gameProperties;
     // todos los rooms x id
     private final Map<String, GameRoom> rooms = new ConcurrentHashMap<>();
     
@@ -87,9 +67,10 @@ public class GameController {
     //
     private final AtomicInteger roomCounter = new AtomicInteger(1);
 
-    public GameController(LobbyService lobbyService, GameService gameService) { //inicializa controlador
+    public GameController(LobbyService lobbyService, GameService gameService, GameProperties gameProperties) { //inicializa controlador
         this.lobbyService = lobbyService;
         this.gameService = gameService;
+        this.gameProperties = gameProperties;
     }
     public void bindSessionUser(String sessionId, Long userId) { //vincula sesion websocket con userid para trazabilidad
         if (sessionId != null && userId != null) {
@@ -107,7 +88,15 @@ public class GameController {
         return rooms.computeIfAbsent(
             lobby.getLobbyId(),
             id -> {
-                GameRoom newRoom = new GameRoom(id, actionsPerTurn, aerialVisionRange, navalVisionRange, carrierHitsToDestroy);
+                GameRoom newRoom = new GameRoom(
+                    id,
+                    gameProperties.getTurn().getActionsPerTurn(),
+                    gameProperties.getVision().getAereo(),
+                    gameProperties.getVision().getNaval(),
+                    gameProperties.getCarrier().getHitsToDestroy(),
+                    gameProperties.getCarrier().getAerialHitsToDestroy(),
+                    gameProperties.getCarrier().getNavalHitsToDestroy()
+                );
                 log.info("Created game room {} from lobby {}", id, lobby.getLobbyId());
                 return newRoom;
             }
@@ -671,6 +660,7 @@ public class GameController {
             HexCoord requestedDestination = new HexCoord(destinationX, destinationY);
             HexCoord finalDestination = resolveAerialFinalPosition(room, requestedDestination, attackerDrone);
             attackerDrone.setPosition(finalDestination);
+            int aerialAttackFuelCost = gameProperties.getAttack().getAerialFuelCost();
             if (aerialAttackFuelCost > 0) {
                 attackerDrone.consumeFuel(aerialAttackFuelCost);
                 if (attackerDrone.getFuel() <= 0) {
@@ -888,6 +878,7 @@ public class GameController {
             lineX,
             lineY
         );
+        int missileMaxDistance = gameProperties.getMissile().getMaxDistance();
         if (!missileWeapon.canReach(traveledDistance) || traveledDistance > missileMaxDistance) {
             navalDrone.consumeMissile();
             return new AttackResolution(0, false);
@@ -911,7 +902,7 @@ public class GameController {
             return new AttackResolution(attackerDrone.getWeapon().getDamage(), true);
         }
 
-        int damage = (int) Math.round(navalTarget.getMaxHp() * missileDamagePercentOnNaval);
+        int damage = (int) Math.round(navalTarget.getMaxHp() * gameProperties.getMissile().getDamagePercentOnNaval());
         return new AttackResolution(Math.max(1, damage), true);
     }
 
