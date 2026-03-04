@@ -18,6 +18,7 @@ export default class LobbyScene extends Phaser.Scene {
     }
 
     create() {
+        this.startLobbyTtlTimer();
         // Start background music loop (persists across scene transitions)
         if (!this.sound.get('bg_music')) {
             const bgMusic = this.sound.add('bg_music', { loop: true, volume: 0.2 });
@@ -259,6 +260,7 @@ export default class LobbyScene extends Phaser.Scene {
             }
             
             this.transitioning = true;
+            this.clearLobbyTtlTimer();
             this.statusText.setText('¡Iniciando partida!');
             console.log('[LobbyScene] === STARTING SCENE TRANSITION IN 100ms ===');
             
@@ -273,28 +275,63 @@ export default class LobbyScene extends Phaser.Scene {
         });
 
         Network.on('playerLeft', () => {
-            this.statusText.setText('El oponente se desconectó');
+            if (this.statusText && this.statusText.active && this.statusText.scene) {
+                this.statusText.setText('El oponente se desconectó');
+            }
             this.sideSelected = false;
             this.waitingForOpponent = false;
-            
+
             // Re-enable buttons and reset their appearance
-            if (this.navalButton) {
+            if (this.navalButton && this.navalButton.active) {
                 const navBg = this.navalButton.getAt(0);
-                navBg.setInteractive({ useHandCursor: true });
-                navBg.setFillStyle(0x001122, 0.8);
-                navBg.setStrokeStyle(3, 0x00ffff);
+                if (navBg && navBg.active) {
+                    navBg.setInteractive({ useHandCursor: true });
+                    navBg.setFillStyle(0x001122, 0.8);
+                    navBg.setStrokeStyle(3, 0x00ffff);
+                }
             }
-            if (this.aereoButton) {
+            if (this.aereoButton && this.aereoButton.active) {
                 const aerBg = this.aereoButton.getAt(0);
-                aerBg.setInteractive({ useHandCursor: true });
-                aerBg.setFillStyle(0x001122, 0.8);
-                aerBg.setStrokeStyle(3, 0x00ffff);
+                if (aerBg && aerBg.active) {
+                    aerBg.setInteractive({ useHandCursor: true });
+                    aerBg.setFillStyle(0x001122, 0.8);
+                    aerBg.setStrokeStyle(3, 0x00ffff);
+                }
             }
         });
 
         Network.on('error', (msg) => {
             console.error('[LobbyScene] Server error:', msg.message);
             this.statusText.setText('Error: ' + msg.message);
+            const message = (msg?.message || '').toLowerCase();
+            if (message.includes('expirado') || message.includes('no existe')) {
+                this.redirectLobbyExpired();
+            }
+        });
+    }
+
+    startLobbyTtlTimer() {
+        this.clearLobbyTtlTimer();
+        const ttlMs = 5 * 60 * 1000;
+        this.lobbyTtlTimer = this.time.delayedCall(ttlMs, () => {
+            if (this.transitioning) return;
+            this.redirectLobbyExpired();
+        });
+    }
+
+    clearLobbyTtlTimer() {
+        if (this.lobbyTtlTimer) {
+            this.lobbyTtlTimer.remove(false);
+            this.lobbyTtlTimer = null;
+        }
+    }
+
+    redirectLobbyExpired() {
+        this.clearLobbyTtlTimer();
+        this.statusText.setVisible(true);
+        this.statusText.setText('El lobby expiró. Redirigiendo...');
+        this.time.delayedCall(1200, () => {
+            window.location.href = '/lobby-browser';
         });
     }
 }

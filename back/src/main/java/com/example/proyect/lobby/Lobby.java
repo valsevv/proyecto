@@ -1,5 +1,6 @@
 package com.example.proyect.lobby;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -62,5 +63,10 @@ public class Lobby {
 
     public void markStarted() {
         this.status = LobbyStatus.STARTED;
+    }
+
+    public boolean isExpired(Duration ttl) {
+        if (ttl == null) return false;
+        return createdAt.plus(ttl).isBefore(LocalDateTime.now());
     }
 }

@@ -1,6 +1,14 @@
 import HexGrid from '../utils/HexGrid.js';
 import Drone from '../gameobjects/Drone.js';
 import Network from '../network/NetworkManager.js'
+import { attachNetworkHandlers } from './mainSceneNetwork.js';
+import {
+    getVisionRangeForSide,
+    isDroneVisibleToLocal,
+    isCarrierVisibleToLocal,
+    updateFogOfWar,
+    updateVision
+} from './mainSceneVision.js';
 import { WORLD_WIDTH, WORLD_HEIGHT } from '../shared/constants.js';
 
 const TEAM_COLORS = [0x00ff00, 0xff4444]; // green = player 0, red = player 1
@@ -102,7 +110,7 @@ export default class MainScene extends Phaser.Scene {
     create(data) {
         // Battle theme — plays alongside the ocean loop started by LobbyScene
         if (!this.sound.get('battle_theme')) {
-            this.sound.add('battle_theme', { loop: true, volume: 0.35 }).play();
+            this.sound.add('battle_theme', { loop: true, volume: 0.25 }).play();
         }
 
         // Tile the background to cover the whole world
@@ -274,36 +282,7 @@ export default class MainScene extends Phaser.Scene {
     }
 
     updateFogOfWar() {
-        if (!this.fogRT || !this.hexGrid) return;
-
-        // Fill the whole world with fog
-        this.fogRT.clear();
-        this.fogRT.fill(0x000000, this.fogAlpha);
-
-        const visionRange = this.getVisionRangeForSide(this.localSide);
-        if (!visionRange || visionRange <= 0) {
-            return;
-        }
-
-        // Approximate vision radius in pixels (matches HexGrid.getHexDistance scaling)
-        const hexWidth = Math.sqrt(3) * this.hexGrid.size;
-        const radiusPx = visionRange * hexWidth;
-
-        this.fogEraser.clear();
-        this.fogEraser.fillStyle(0xffffff, 1);
-        this.fogEraser.fillCircle(0, 0, radiusPx);
-
-        const sources = [];
-        const myDrones = this.drones[Network.playerIndex] || [];
-        for (const d of myDrones) {
-            if (d?.isAlive() && d.sprite && d.deployed) sources.push(d.sprite);
-        }
-        const myCarrier = this.carriers?.[Network.playerIndex];
-        if (myCarrier?.sprite) sources.push(myCarrier.sprite);
-
-        for (const s of sources) {
-            this.fogRT.erase(this.fogEraser, s.x, s.y);
-        }
+        updateFogOfWar(this);
     }
     
     initializeGameState(data) {
@@ -350,264 +329,31 @@ export default class MainScene extends Phaser.Scene {
     }
 
     setupNetwork() {
-        // Remove auto-connect logic - that's handled by LobbyScene
-        // Note: Don't register 'gameStart' handler here as it conflicts with LobbyScene's handler
-        // The initial game state is received via scene data from LobbyScene
-        
-        Network.on('turnStart', (msg) => {
-            if (this.gameFinished) {
+        attachNetworkHandlers(this, { modeMove: MODE_MOVE });
+    }
+
+    //Se agrega esta cola para destuir al dron luego e la accion que haga, si se mueve o ataca consuma su combustible luego de la accion
+    queueDroneDestroyAfterAction(drone, destroyFn) {
+        if (!drone || typeof destroyFn !== 'function') return;
+        if (drone._pendingDestroyAfterAction) return;
+        drone._pendingDestroyAfterAction = true;
+
+        const tryDestroy = () => {
+            if (!drone || drone.destroyed) {
+                drone._pendingDestroyAfterAction = false;
                 return;
             }
-            this.isMyTurn = (msg.activePlayer === Network.playerIndex);
-            this.actionMode = MODE_MOVE;
-            this.clearTargetHighlights();
-            this.clearSelections();
-            this.deployPanelCarrier = null;
-            this.events.emit('deployPanelClose');
-
-            // Reset per-drone attack state for new turn
-            if (this.isMyTurn) {
-                for (const drone of this.myDrones) {
-                    drone.hasAttacked = false;
-                }
-            }
-
-            this.actionsPerTurn = msg.actionsPerTurn ?? this.actionsPerTurn;
-            this.events.emit('actionsUpdated', {
-                actionsRemaining: msg.actionsRemaining,
-                actionsPerTurn: this.actionsPerTurn
-            });
-
-            // Notify HUD
-            this.events.emit('turnChanged', {
-                isMyTurn: this.isMyTurn
-            });
-
-            this.updateVision();
-            this.checkDrawByNoDrones();
-        });
-
-        Network.on('moveDrone', (msg) => {
-            const drone = this.drones[msg.playerIndex]?.[msg.droneIndex];
-            if (!drone) {
+            if (!drone.isMoving && !drone.isAttacking) {
+                drone._pendingDestroyAfterAction = false;
+                destroyFn();
+                this.updateVision();
+                this.checkDrawByNoDrones();
                 return;
             }
+            this.time.delayedCall(100, tryDestroy);
+        };
 
-            // First move WITH position data = drone being deployed from its carrier.
-            // Fuel-only updates (no x/y) from idle consumption must NOT trigger deployment.
-            if (!drone.deployed && typeof msg.x === 'number' && typeof msg.y === 'number') {
-                drone.deployed = true;
-            }
-
-            if (typeof msg.x === 'number' && typeof msg.y === 'number') {
-                drone.moveTo(msg.x, msg.y);
-            }
-
-            if (typeof msg.remainingFuel === 'number') {
-                drone.setFuel(msg.remainingFuel);
-            }
-
-            const destroyedByFuel = msg.destroyedByFuel || msg.remainingFuel === 0;
-            if (destroyedByFuel && drone.isAlive()) {
-                if (this.selectedDrone === drone) {
-                    this.selectedDrone.deselect();
-                    this.selectedDrone.sprite.clearTint();
-                    this.selectedDrone = null;
-                    this.clearTargetHighlights();
-                    this.actionMode = MODE_MOVE;
-                    this.events.emit('selectionChanged', { type: null });
-                }
-                drone.sinkAndDestroy();
-            }
-
-            if (msg.playerIndex === Network.playerIndex && typeof msg.x === 'number' && typeof msg.y === 'number') {
-                this.hexHighlight.clear();
-                const nextActions = Math.max(0, (Network.actionsRemaining ?? 0) - 1);
-                Network.actionsRemaining = nextActions;
-                this.events.emit('actionsUpdated', {
-                    actionsRemaining: nextActions,
-                    actionsPerTurn: this.actionsPerTurn
-                });
-            }
-
-            this.events.emit('fuelUpdated');
-
-            // Movement can affect what is visible.
-            this.updateVision();
-            this.checkDrawByNoDrones();
-        });
-
-        Network.on('carrierMoved', (msg) => {
-            const carrier = this.carriers[msg.playerIndex];
-            if (!carrier || typeof msg.x !== 'number' || typeof msg.y !== 'number') return;
-            this.moveCarrier(carrier, msg.x, msg.y);
-
-            if (typeof msg.actionsRemaining === 'number') {
-                Network.actionsRemaining = msg.actionsRemaining;
-                this.events.emit('actionsUpdated', {
-                    actionsRemaining: msg.actionsRemaining,
-                    actionsPerTurn: this.actionsPerTurn
-                });
-            }
-        });
-
-        Network.on('attackResult', (msg) => {
-            const targetDrone = this.drones[msg.targetPlayer]?.[msg.targetDrone];
-            const hit = msg.hit !== false;
-            const attackerDrone = this.drones[msg.attackerPlayer]?.[msg.attackerDrone];
-            const targetCarrier = this.carriers?.[msg.targetPlayer];
-            const attackerSide = this.playerSides[msg.attackerPlayer];
-            const isNavalAttacker = attackerSide === 'Naval' || attackerDrone?.droneType === 'Naval';
-            const isAereoAttacker = attackerSide === 'Aereo' || attackerDrone?.droneType === 'Aereo';
-
-            if (attackerDrone && typeof attackerDrone.clearAttackLock === 'function') {
-                attackerDrone.clearAttackLock();
-            }
-
-            if (attackerDrone && (targetDrone || (typeof msg.lineX === 'number' && typeof msg.lineY === 'number'))) {
-                if (isAereoAttacker) {
-                    // Animación especial para dron bomba
-                    const impactTarget = targetDrone?.sprite || { x: msg.lineX, y: msg.lineY };
-                    attackerDrone.aereoDronAttack(
-                        impactTarget.x,
-                        impactTarget.y,
-                        msg.attackerX,
-                        msg.attackerY,
-                        targetDrone ?? null
-                    );
-                } else if (isNavalAttacker) {
-                    // Animación especial para dron misil
-                    const targetPos = targetDrone?.sprite || { x: msg.lineX, y: msg.lineY };
-                    attackerDrone.launchMissile(targetPos.x, targetPos.y, targetDrone ?? null);
-                } else if (targetDrone) {
-                    this.playMissileShot(attackerDrone, targetDrone, hit, msg.lineX, msg.lineY);
-                }
-            }
-
-            if (targetDrone && hit) {
-                targetDrone.takeDamage(msg.damage, msg.remainingHealth);
-            }
-
-            if (targetCarrier) {
-                if (typeof msg.targetCarrierHealth === 'number') {
-                    targetCarrier.health = msg.targetCarrierHealth;
-                }
-                if (typeof msg.targetCarrierDestroyed === 'boolean') {
-                    targetCarrier.destroyed = msg.targetCarrierDestroyed;
-                } else if (typeof targetCarrier.health === 'number') {
-                    targetCarrier.destroyed = targetCarrier.health <= 0;
-                }
-
-                if (targetCarrier.destroyed) {
-                    targetCarrier.sprite.setVisible(false);
-                    targetCarrier.ring.setVisible(false);
-                    if (this.selectedCarrier === targetCarrier) {
-                        this.selectedCarrier = null;
-                    }
-                }
-            }
-
-            // Handle attacker death (e.g., from fuel consumption during aerial attack)
-            if (attackerDrone && msg.attackerDestroyed && attackerDrone.isAlive()) {
-                if (this.selectedDrone === attackerDrone) {
-                    this.selectedDrone.deselect();
-                    this.selectedDrone = null;
-                    this.clearTargetHighlights();
-                    this.actionMode = MODE_MOVE;
-                    this.events.emit('selectionChanged', { type: null });
-                }
-                attackerDrone.destroy();
-            } else if (attackerDrone && msg.attackerRemainingHealth !== undefined) {
-                // Sync attacker health even if not destroyed
-                if (attackerDrone.health !== msg.attackerRemainingHealth) {
-                    attackerDrone.health = msg.attackerRemainingHealth;
-                    attackerDrone.updateHealthBar();
-                }
-            }
-
-            if (!hit && msg.attackerPlayer === Network.playerIndex) {
-                this.showCombatMessage('El ataque fallo');
-            }
-            // Mark attacker as having attacked
-            if (attackerDrone && msg.attackerPlayer === Network.playerIndex) {
-                attackerDrone.hasAttacked = true;
-                if (typeof msg.attackerAmmo === 'number') {
-                    attackerDrone.missiles = msg.attackerAmmo;
-                } else {
-                    // Back-compat: old server didn't send ammo remaining.
-                    if (typeof attackerDrone.consumeMissile === 'function') {
-                        attackerDrone.consumeMissile();
-                    }
-                }
-                const nextActions = typeof msg.actionsRemaining === 'number'
-                    ? msg.actionsRemaining
-                    : Math.max(0, (Network.actionsRemaining ?? 0) - 1);
-                Network.actionsRemaining = nextActions;
-                this.events.emit('actionsUpdated', {
-                    actionsRemaining: nextActions,
-                    actionsPerTurn: this.actionsPerTurn
-                });
-            }
-            this.clearTargetHighlights();
-            this.actionMode = MODE_MOVE;
-            this.events.emit('attackModeEnded');
-
-            // Attacks can destroy units and change visibility.
-            this.updateVision();
-            this.checkDrawByNoDrones();
-        });
-
-        Network.on('playerLeft', () => {
-            this.add.text(400, 300, 'Oponente desconectado\nActualiza para jugar de nuevo', {
-                fontSize: '22px', fill: '#ff4444', align: 'center'
-            }).setOrigin(0.5).setScrollFactor(0).setDepth(1000);
-        });
-
-        Network.on('error', (msg) => {
-            console.warn('[game] server error:', msg.message);
-        });
-
-        // Handle game saved - redirect to menu
-        Network.on('gameSaved', (msg) => {
-            alert('Partida guardada correctamente');
-            window.location.href = '/menu';
-        });
-
-        Network.on('droneRecalled', (msg) => {
-            const { playerIndex, droneIndex, fuel, maxFuel, missiles, actionsRemaining } = msg;
-            const drone = this.drones[playerIndex]?.[droneIndex];
-            if (!drone) return;
-
-            // Unset deployed state and restore resources
-            drone.deployed = false;
-            if (typeof fuel === 'number') drone.fuel = fuel;
-            if (typeof maxFuel === 'number') drone.maxFuel = maxFuel;
-            if (typeof missiles === 'number') drone.missiles = missiles;
-
-            // Hide the drone visually (it is now inside the carrier)
-            drone.setLocalVisibility(false);
-            drone.deselect();
-
-            // If this was our selected drone, deselect it
-            if (playerIndex === Network.playerIndex && this.selectedDrone === drone) {
-                this.clearSelections();
-                this.events.emit('selectionChanged', { type: null });
-            }
-
-            // Sync our local actions counter
-            if (playerIndex === Network.playerIndex && typeof actionsRemaining === 'number') {
-                Network.actionsRemaining = actionsRemaining;
-                this.events.emit('actionsUpdated', {
-                    actionsRemaining,
-                    actionsPerTurn: this.actionsPerTurn
-                });
-            }
-
-            this.updateVision();
-            this.events.emit('fuelUpdated');
-        });
-        
-        // Note: Connection and join are handled by LobbyScene
+        tryDestroy();
     }
 
     createCarrierForPlayer(playerIndex, side, spawnHint = null) {
@@ -647,7 +393,8 @@ export default class MainScene extends Phaser.Scene {
         };
 
         sprite.setInteractive({ useHandCursor: true, pixelPerfect: true, alphaTolerance: 1 });
-        sprite.on('pointerdown', (pointer) => {
+        sprite.on('pointerup', (pointer) => {
+            if (this.isDragging) return;
             pointer.event.stopPropagation();
             this.onCarrierClicked(carrier);
         });
@@ -1133,70 +880,18 @@ export default class MainScene extends Phaser.Scene {
     }
 
     getVisionRangeForSide(side) {
-        return side === 'Aereo' ? this.aereoVisionRange : this.navalVisionRange;
+        return getVisionRangeForSide(this, side);
     }
 
     /** Returns true if the given drone should be visible to the local player. */
     isDroneVisibleToLocal(drone) {
-        if (!drone || !drone.isAlive()) return false;
-        if (drone.playerIndex === Network.playerIndex) return true;
-
-        const visionRange = this.getVisionRangeForSide(this.localSide);
-        if (!visionRange || visionRange <= 0) return false;
-
-        const sources = [];
-        const myDrones = this.drones[Network.playerIndex] || [];
-        for (const d of myDrones) {
-            if (d?.isAlive() && d.sprite && d.deployed) sources.push(d.sprite);
-        }
-
-        const myCarrier = this.carriers?.[Network.playerIndex];
-        if (myCarrier?.sprite) sources.push(myCarrier.sprite);
-
-        for (const sourceSprite of sources) {
-            const distance = this.hexGrid.getHexDistance(
-                sourceSprite.x,
-                sourceSprite.y,
-                drone.sprite.x,
-                drone.sprite.y
-            );
-
-            if (distance <= visionRange) return true;
-        }
-
-        return false;
+        return isDroneVisibleToLocal(this, drone);
     }
 
 
     /** Returns true if the given carrier should be visible to the local player. */
     isCarrierVisibleToLocal(carrier) {
-        if (!carrier?.sprite) return false;
-        if (carrier.playerIndex === Network.playerIndex) return true;
-
-        const visionRange = this.getVisionRangeForSide(this.localSide);
-        if (!visionRange || visionRange <= 0) return false;
-
-        const sources = [];
-        const myDrones = this.drones[Network.playerIndex] || [];
-        for (const d of myDrones) {
-            if (d?.isAlive() && d.sprite && d.deployed) sources.push(d.sprite);
-        }
-
-        const myCarrier = this.carriers?.[Network.playerIndex];
-        if (myCarrier?.sprite) sources.push(myCarrier.sprite);
-
-        for (const sourceSprite of sources) {
-            const distance = this.hexGrid.getHexDistance(
-                sourceSprite.x,
-                sourceSprite.y,
-                carrier.sprite.x,
-                carrier.sprite.y
-            );
-
-            if (distance <= visionRange) return true;
-        }
-
-        return false;
+        return isCarrierVisibleToLocal(this, carrier);
     }
 
     /**
@@ -1247,47 +942,7 @@ export default class MainScene extends Phaser.Scene {
      * (Aereo = 2x Naval)
      */
     updateVision() {
-        if (!this.hexGrid) return;
-        const localIndex = Network.playerIndex;
-        if (typeof localIndex !== 'number') return;
-
-        for (const pi in this.drones) {
-            const playerIndex = parseInt(pi);
-            for (const drone of this.drones[pi]) {
-                if (!drone?.isAlive()) continue;
-
-                if (playerIndex === localIndex) {
-                    drone.setLocalVisibility(true);
-                    continue;
-                }
-
-                const visible = this.isDroneVisibleToLocal(drone);
-                drone.setLocalVisibility(visible);
-                if (!visible) {
-                    drone.setTargetable(false);
-                }
-            }
-        }
-
-        for (const pi in this.carriers) {
-            const playerIndex = parseInt(pi);
-            const carrier = this.carriers[pi];
-            if (!carrier?.sprite) continue;
-            if (carrier.destroyed) {
-                carrier.sprite.setVisible(false);
-                continue;
-            }
-
-            if (playerIndex === localIndex) {
-                carrier.sprite.setVisible(true);
-                continue;
-            }
-
-            const visible = this.isCarrierVisibleToLocal(carrier);
-            carrier.sprite.setVisible(visible);
-        }
-
-        this.updateFogOfWar();
+        updateVision(this);
     }
 
     executeAttack(targetUnit) {

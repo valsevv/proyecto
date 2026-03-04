@@ -1,5 +1,6 @@
 package com.example.proyect.lobby.service;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -7,6 +8,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,7 +22,8 @@ import jakarta.persistence.EntityNotFoundException;
 
 @Service
 public class LobbyService {
-    
+    private static final Duration LOBBY_TTL = Duration.ofMinutes(5);
+
     private final Map<String, Lobby> lobbies = new ConcurrentHashMap<>();
     private final Map<Long, String> userToLobby = new ConcurrentHashMap<>(); // Track which lobby each user is in
 
@@ -35,6 +38,7 @@ public class LobbyService {
      * @return The created Lobby
      */
     public Lobby createLobby(String creatorUsername, Long userId) {
+        purgeExpiredLobbies();
         // Remove user from any existing lobby first
         String existingLobbyId = userToLobby.get(userId);
         if (existingLobbyId != null) {
@@ -55,8 +59,10 @@ public class LobbyService {
      * Get all lobbies that are not yet started (WAITING or READY).
      */
     public List<Lobby> getAllLobbies() {
+        purgeExpiredLobbies();
         return lobbies.values().stream()
-                .filter(lobby -> lobby.getStatus() != LobbyStatus.STARTED)
+            .filter(lobby -> lobby.getStatus() != LobbyStatus.STARTED)
+            .filter(lobby -> !lobby.isExpired(LOBBY_TTL))
                 .collect(Collectors.toList());
     }
 
@@ -66,9 +72,14 @@ public class LobbyService {
      * @throws IllegalStateException if lobby is full or doesn't exist
      */
     public Lobby joinLobby(String lobbyId, Long userId) {
+        purgeExpiredLobbies();
         Lobby lobby = lobbies.get(lobbyId);
         if (lobby == null) {
             throw new IllegalArgumentException("Lobby no existe");
+        }
+        if (lobby.isExpired(LOBBY_TTL)) {
+            removeLobby(lobbyId);
+            throw new IllegalStateException("Lobby expirado");
         }
         if (lobby.isFull()) {
             throw new IllegalStateException("Lobby lleno");
@@ -113,24 +124,37 @@ public class LobbyService {
      * Find which lobby a player is in.
      */
     public Optional<Lobby> getLobbyByUserId(Long userId) {
+        purgeExpiredLobbies();
         String lobbyId = userToLobby.get(userId);
         if (lobbyId == null) {
             return Optional.empty();
         }
-        return Optional.ofNullable(lobbies.get(lobbyId));
+        Lobby lobby = lobbies.get(lobbyId);
+        if (lobby != null && lobby.isExpired(LOBBY_TTL)) {
+            removeLobby(lobbyId);
+            return Optional.empty();
+        }
+        return Optional.ofNullable(lobby);
     }
 
     /**
      * Get a lobby by its ID.
      */
     public Optional<Lobby> getLobbyById(String lobbyId) {
-        return Optional.ofNullable(lobbies.get(lobbyId));
+        purgeExpiredLobbies();
+        Lobby lobby = lobbies.get(lobbyId);
+        if (lobby != null && lobby.isExpired(LOBBY_TTL)) {
+            removeLobby(lobbyId);
+            return Optional.empty();
+        }
+        return Optional.ofNullable(lobby);
     }
 
     /**
      * Leave a lobby (cleanup).
      */
     public void leaveLobby(Long userId) {
+        purgeExpiredLobbies();
         String lobbyId = userToLobby.remove(userId);
         if (lobbyId != null) {
             Lobby lobby = lobbies.get(lobbyId);
@@ -147,6 +171,7 @@ public class LobbyService {
 
     @Transactional
     public Lobby createLoadGameLobby(Long gameId, Long userId, String username) {
+        purgeExpiredLobbies();
     
         Game game = gameRepository.findById(gameId)
                 .orElseThrow(() -> new EntityNotFoundException("Game not found: " + gameId));
@@ -185,6 +210,24 @@ public class LobbyService {
         userToLobby.put(userId, lobbyId);  // Track the user's lobby
 
         return lobby;
+    }
+
+    @Scheduled(fixedDelay = 60_000)
+    public void scheduledLobbyCleanup() {
+        purgeExpiredLobbies();
+    }
+
+    private void purgeExpiredLobbies() {
+        lobbies.entrySet().removeIf(entry -> {
+            Lobby lobby = entry.getValue();
+            if (lobby == null) return false;
+            if (lobby.getStatus() == LobbyStatus.STARTED) return false;
+            if (!lobby.isExpired(LOBBY_TTL)) return false;
+            for (Long userId : lobby.getPlayerIds()) {
+                userToLobby.remove(userId);
+            }
+            return true;
+        });
     }
 
 

@@ -110,39 +110,73 @@ export default class HudScene extends Phaser.Scene {
 
     createActionButtons() {
         const margin = 20;
-        const btnWidth = 120;
+        const btnWidth = 140;
         const btnHeight = 40;
-        const btnRadius = 20;
-        const gap = 10;
+        const btnRadius = 18;
+        const gap = 12;
         this.actionBtnConfig = { margin, btnWidth, btnHeight, btnRadius, gap };
         this.saveBtnConfig = { margin, btnWidth, btnHeight, btnRadius };
         const { startX, y } = this.getActionButtonLayout();
 
-        // Colors
-        this.grayColor = 0x555555;
-        this.attackActiveColor = 0xaa3333;
-        this.endTurnActiveColor = 0x336699;
-        this.recallActiveColor = 0x226622;
+        // Colors (radar theme)
+        this.grayColor = 0x2a3232;
+        this.attackActiveColor = 0x4a0f0f; // Reddish
+        this.recallActiveColor = 0x0f4a0f; // Greenish
+        this.endTurnActiveColor = 0x0f1c2a; // Bluish
+        this.radarColors = {
+            attackFrame: 0xff4444, // Red
+            attackGlow: 0xff6666,
+            recallFrame: 0x44ff44, // Green
+            recallGlow: 0x66ff66,
+            endTurnFrame: 0x4ab3ff, // Blue
+            endTurnGlow: 0x6ac8ff,
+            disabledFrame: 0x2d3b3b,
+            disabledGlow: 0x0f1a1a
+        };
+        this.btnTextColor = '#ffffff';
+        this.btnTextDisabledColor = '#5f6f6b';
+        this.btnFontFamily = '"Orbitron", "Share Tech Mono", monospace';
 
         // Attack button state
         this.attackSelected = false;
+        this.attackHovered = false;
+        this.recallHovered = false;
+        this.endTurnHovered = false;
+
+        const btnDepth = 300;
 
         // Attack button background
+        this.attackBtnGlow = this.add.graphics();
         this.attackBtnBg = this.add.graphics();
-        this.drawRoundedButton(this.attackBtnBg, startX - btnWidth / 2, y - btnHeight / 2, btnWidth, btnHeight, btnRadius, this.grayColor);
+        this.attackBtnFrame = this.add.graphics();
+        this.drawRadarButton(this.attackBtnGlow, this.attackBtnBg, this.attackBtnFrame,
+            startX - btnWidth / 2, y - btnHeight / 2, btnWidth, btnHeight, btnRadius,
+            this.grayColor, this.radarColors.attackFrame, this.radarColors.attackGlow, 1, 0.2);
+        this.attackBtnGlow.setDepth(btnDepth);
+        this.attackBtnBg.setDepth(btnDepth + 1);
+        this.attackBtnFrame.setDepth(btnDepth + 2);
 
         // Attack button text
-        this.attackBtnText = this.add.text(startX, y, '⚔ Atacar', {
-            fontSize: '16px',
-            fill: '#ffffff'
+        this.attackBtnText = this.add.text(startX, y, 'ATACAR', {
+            fontSize: '15px',
+            fill: '#ffffff',
+            fontFamily: this.btnFontFamily,
+            stroke: '#000000',
+            strokeThickness: 3
         }).setOrigin(0.5);
+        this.attackBtnText.setDepth(btnDepth + 10);
+        this.attackBtnText.setScrollFactor(0);
 
         // Attack button hitbox
         this.attackBtn = this.add.rectangle(startX, y, btnWidth, btnHeight, 0x000000, 0.001)
             .setInteractive({ useHandCursor: true });
+        this.attackBtn.setDepth(btnDepth + 4);
 
-        this.attackBtn.on('pointerdown', () => {
+        this.attackBtn.on('pointerup', () => {
             const mainScene = this.scene.get('MainScene');
+            // Only trigger if it wasn't a camera drag in the main scene
+            if (mainScene?.isDragging) return;
+
             // Don't allow attack mode if drone can't attack
             if (!mainScene?.selectedDrone || mainScene.selectedDrone.hasAttacked) return;
 
@@ -154,44 +188,90 @@ export default class HudScene extends Phaser.Scene {
                 mainScene.cancelAttackMode();
             }
         });
+        this.attackBtn.on('pointerover', () => {
+            this.attackHovered = true;
+        });
+        this.attackBtn.on('pointerout', () => {
+            this.attackHovered = false;
+        });
 
         // Recall (Replegar) button
         const recallX = startX + btnWidth + gap;
+        this.recallBtnGlow = this.add.graphics();
         this.recallBtnBg = this.add.graphics();
-        this.drawRoundedButton(this.recallBtnBg, recallX - btnWidth / 2, y - btnHeight / 2, btnWidth, btnHeight, btnRadius, this.grayColor);
+        this.recallBtnFrame = this.add.graphics();
+        this.drawRadarButton(this.recallBtnGlow, this.recallBtnBg, this.recallBtnFrame,
+            recallX - btnWidth / 2, y - btnHeight / 2, btnWidth, btnHeight, btnRadius,
+            this.grayColor, this.radarColors.recallFrame, this.radarColors.recallGlow, 1, 0.2);
 
-        this.recallBtnText = this.add.text(recallX, y, '🔄 Replegar', {
-            fontSize: '16px',
-            fill: '#ffffff'
+        this.recallBtnText = this.add.text(recallX, y, 'REPLEGAR', {
+            fontSize: '15px',
+            fill: '#ffffff',
+            fontFamily: this.btnFontFamily,
+            stroke: '#000000',
+            strokeThickness: 3
         }).setOrigin(0.5);
+        this.recallBtnGlow.setDepth(btnDepth);
+        this.recallBtnBg.setDepth(btnDepth + 1);
+        this.recallBtnFrame.setDepth(btnDepth + 2);
+        this.recallBtnText.setDepth(btnDepth + 10);
+        this.recallBtnText.setScrollFactor(0);
 
         this.recallBtn = this.add.rectangle(recallX, y, btnWidth, btnHeight, 0x000000, 0.001)
             .setInteractive({ useHandCursor: true });
+        this.recallBtn.setDepth(btnDepth + 4);
 
-        this.recallBtn.on('pointerdown', () => {
+        this.recallBtn.on('pointerup', () => {
             const mainScene = this.scene.get('MainScene');
+            if (mainScene?.isDragging) return;
             if (!mainScene?.canRecallSelectedDrone?.()) return;
             mainScene.recallSelectedDrone();
+        });
+        this.recallBtn.on('pointerover', () => {
+            this.recallHovered = true;
+        });
+        this.recallBtn.on('pointerout', () => {
+            this.recallHovered = false;
         });
 
         // End Turn button background
         const endTurnX = recallX + btnWidth + gap;
+        this.endTurnBtnGlow = this.add.graphics();
         this.endTurnBtnBg = this.add.graphics();
-        this.drawRoundedButton(this.endTurnBtnBg, endTurnX - btnWidth / 2, y - btnHeight / 2, btnWidth, btnHeight, btnRadius, this.endTurnActiveColor);
+        this.endTurnBtnFrame = this.add.graphics();
+        this.drawRadarButton(this.endTurnBtnGlow, this.endTurnBtnBg, this.endTurnBtnFrame,
+            endTurnX - btnWidth / 2, y - btnHeight / 2, btnWidth, btnHeight, btnRadius,
+            this.endTurnActiveColor, this.radarColors.endTurnFrame, this.radarColors.endTurnGlow, 1, 0.2);
 
         // End Turn button text
-        this.endTurnBtnText = this.add.text(endTurnX, y, '⏭ Fin Turno', {
-            fontSize: '16px',
-            fill: '#ffffff'
+        this.endTurnBtnText = this.add.text(endTurnX, y, 'FIN TURNO', {
+            fontSize: '15px',
+            fill: '#ffffff',
+            fontFamily: this.btnFontFamily,
+            stroke: '#000000',
+            strokeThickness: 3
         }).setOrigin(0.5);
+        this.endTurnBtnGlow.setDepth(btnDepth);
+        this.endTurnBtnBg.setDepth(btnDepth + 1);
+        this.endTurnBtnFrame.setDepth(btnDepth + 2);
+        this.endTurnBtnText.setDepth(btnDepth + 10);
+        this.endTurnBtnText.setScrollFactor(0);
 
         // End Turn button hitbox
         this.endTurnBtn = this.add.rectangle(endTurnX, y, btnWidth, btnHeight, 0x000000, 0.001)
             .setInteractive({ useHandCursor: true });
+        this.endTurnBtn.setDepth(btnDepth + 4);
 
-        this.endTurnBtn.on('pointerdown', () => {
+        this.endTurnBtn.on('pointerup', () => {
             const mainScene = this.scene.get('MainScene');
+            if (mainScene?.isDragging) return;
             mainScene.endTurn();
+        });
+        this.endTurnBtn.on('pointerover', () => {
+            this.endTurnHovered = true;
+        });
+        this.endTurnBtn.on('pointerout', () => {
+            this.endTurnHovered = false;
         });
 
         // Save & Exit button (always visible during game, positioned at top-right)
@@ -289,13 +369,45 @@ export default class HudScene extends Phaser.Scene {
         graphics.fillRoundedRect(x, y, width, height, radius);
     }
 
+    drawRadarButton(glow, base, frame, x, y, width, height, radius, baseColor, frameColor, glowColor, alpha = 1, glowAlpha = 0.25) {
+        if (glow) {
+            glow.clear();
+            glow.fillStyle(glowColor, glowAlpha);
+            glow.fillRoundedRect(x - 2, y - 2, width + 4, height + 4, radius + 2);
+        }
+
+        if (base) {
+            base.clear();
+            base.fillStyle(baseColor, alpha);
+            base.fillRoundedRect(x, y, width, height, radius);
+        }
+
+        if (frame) {
+            frame.clear();
+            frame.lineStyle(2, frameColor, Math.min(1, alpha + 0.15));
+            frame.strokeRoundedRect(x, y, width, height, radius);
+            frame.lineStyle(1, frameColor, 0.35);
+            frame.strokeRoundedRect(x + 2, y + 2, width - 4, height - 4, Math.max(4, radius - 2));
+        }
+    }
+
     updateButtonStates() {
+        // Find main scene
+        const mainScene = this.scene.get('MainScene');
+        // Use either the internal isMyTurn or the one from MainScene
+        const isActuallyMyTurn = mainScene ? mainScene.isMyTurn : this.isMyTurn;
+
+        if (!isActuallyMyTurn) {
+            this.setButtonsVisible(false);
+            return;
+        }
+        this.setButtonsVisible(true);
+
         const layout = this.actionBtnLayout || this.getActionButtonLayout();
         const { startX, endTurnX, y, btnWidth, btnHeight } = layout;
         const btnRadius = this.actionBtnConfig?.btnRadius ?? 20;
 
         // Check if selected drone can attack
-        const mainScene = this.scene.get('MainScene');
         const selectedDrone = mainScene?.selectedDrone;
         const hasAmmoForAttack = !selectedDrone
             ? true
@@ -303,60 +415,122 @@ export default class HudScene extends Phaser.Scene {
         const canAttack = selectedDrone && !selectedDrone.hasAttacked && hasAmmoForAttack;
 
         // Update attack button color and alpha
-        let attackColor, attackAlpha, textAlpha;
-        if (!canAttack) {
-            attackColor = this.grayColor;
-            attackAlpha = 0.4;
-            textAlpha = 0.4;
-        } else if (this.attackSelected) {
-            attackColor = this.attackActiveColor;
+        let attackBase = this.grayColor;
+        let attackFrame = this.radarColors.disabledFrame;
+        let attackGlow = this.radarColors.disabledGlow;
+        let attackAlpha = 0.55;
+        let textColor = this.btnTextDisabledColor;
+        let glowAlpha = 0.15;
+
+        if (canAttack) {
+            attackBase = this.attackSelected ? this.attackActiveColor : this.grayColor;
+            attackFrame = this.radarColors.attackFrame;
+            attackGlow = this.radarColors.attackGlow;
             attackAlpha = 1;
-            textAlpha = 1;
-        } else {
-            attackColor = this.grayColor;
-            attackAlpha = 1;
-            textAlpha = 1;
+            textColor = this.btnTextColor;
+            glowAlpha = this.attackSelected ? 0.4 : (this.attackHovered ? 0.35 : 0.3);
         }
-        this.drawRoundedButton(
+
+        this.drawRadarButton(
+            this.attackBtnGlow,
             this.attackBtnBg,
+            this.attackBtnFrame,
             startX - btnWidth / 2,
             y - btnHeight / 2,
             btnWidth,
             btnHeight,
             btnRadius,
-            attackColor,
-            attackAlpha
+            attackBase,
+            attackFrame,
+            attackGlow,
+            attackAlpha,
+            glowAlpha
         );
-        this.attackBtnText.setAlpha(textAlpha);
+        this.attackBtnText.setAlpha(1);
+        this.attackBtnText.setVisible(true);
 
-        // End turn is always blue
-        this.drawRoundedButton(
+        // End turn is always available
+        this.drawRadarButton(
+            this.endTurnBtnGlow,
             this.endTurnBtnBg,
+            this.endTurnBtnFrame,
             endTurnX - btnWidth / 2,
             y - btnHeight / 2,
             btnWidth,
             btnHeight,
             btnRadius,
-            this.endTurnActiveColor
+            this.endTurnActiveColor,
+            this.radarColors.endTurnFrame,
+            this.radarColors.endTurnGlow,
+            1,
+            this.endTurnHovered ? 0.35 : 0.2
         );
+        this.endTurnBtnText.setColor(this.btnTextColor);
+        this.endTurnBtnText.setAlpha(1);
 
         // Recall button — enabled only when selected drone is deployed and within 2 hexes of carrier
         if (this.recallBtnBg) {
             const canRecall = !!(mainScene?.canRecallSelectedDrone?.());
-            const recallColor = canRecall ? this.recallActiveColor : this.grayColor;
-            const recallAlpha = canRecall ? 1 : 0.4;
+            const recallBase = canRecall ? this.recallActiveColor : this.grayColor;
+            const recallAlpha = canRecall ? 1 : 0.55;
+            const recallFrame = canRecall ? this.radarColors.recallFrame : this.radarColors.disabledFrame;
+            const recallGlow = canRecall ? this.radarColors.recallGlow : this.radarColors.disabledGlow;
+            const recallGlowAlpha = canRecall ? (this.recallHovered ? 0.35 : 0.2) : 0.12;
             const recallX = layout.recallX ?? (startX + btnWidth + (this.actionBtnConfig?.gap ?? 10));
-            this.drawRoundedButton(
+            this.drawRadarButton(
+                this.recallBtnGlow,
                 this.recallBtnBg,
+                this.recallBtnFrame,
                 recallX - btnWidth / 2,
                 y - btnHeight / 2,
                 btnWidth,
                 btnHeight,
                 btnRadius,
-                recallColor,
-                recallAlpha
+                recallBase,
+                recallFrame,
+                recallGlow,
+                recallAlpha,
+                recallGlowAlpha
             );
-            if (this.recallBtnText) this.recallBtnText.setAlpha(recallAlpha);
+            if (this.recallBtnText) {
+                this.recallBtnText.setColor(canRecall ? this.btnTextColor : this.btnTextDisabledColor);
+                this.recallBtnText.setAlpha(1);
+            }
+        }
+
+        this.updateAttackPulse(canAttack && !this.attackSelected);
+    }
+
+    setButtonsVisible(visible) {
+        const btns = [
+            this.attackBtn, this.attackBtnText, this.attackBtnBg, this.attackBtnGlow, this.attackBtnFrame,
+            this.recallBtn, this.recallBtnText, this.recallBtnBg, this.recallBtnGlow, this.recallBtnFrame,
+            this.endTurnBtn, this.endTurnBtnText, this.endTurnBtnBg, this.endTurnBtnGlow, this.endTurnBtnFrame
+        ];
+        btns.forEach(btn => {
+            if (btn) {
+                btn.setVisible(visible);
+                if (visible && btn.setAlpha) btn.setAlpha(1);
+            }
+        });
+    }
+
+    updateAttackPulse(shouldPulse) {
+        if (!this.attackBtnGlow) return;
+        if (shouldPulse) {
+            if (this.attackPulseTween) return;
+            this.attackPulseTween = this.tweens.add({
+                targets: this.attackBtnGlow,
+                alpha: { from: 0.35, to: 0.85 },
+                duration: 900,
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut'
+            });
+        } else if (this.attackPulseTween) {
+            this.attackPulseTween.stop();
+            this.attackPulseTween = null;
+            this.attackBtnGlow.setAlpha(1);
         }
     }
 
@@ -473,7 +647,8 @@ export default class HudScene extends Phaser.Scene {
             const droneIdx = d.droneIndex;
             const hit = this.add.rectangle(btnX + btnW / 2, rowY + rowH / 2, btnW, btnH, 0x000000, 0.001)
                 .setInteractive({ useHandCursor: true }).setDepth(203);
-            hit.on('pointerdown', (ptr) => {
+            hit.on('pointerup', (ptr) => {
+                if (mainScene?.isDragging) return;
                 ptr.event.stopPropagation();
                 mainScene.deployDroneFromPanel(droneIdx);
             });
@@ -526,6 +701,7 @@ export default class HudScene extends Phaser.Scene {
             this.turnText.setText(`Tu turno (${this.actionsRemaining}/${this.actionsPerTurn} acciones)`);
             this.turnText.setStyle({ fill: '#00ff00' });
             this.setButtonsVisible(true);
+            this.updateButtonStates(); // Force refresh of colors when turn starts
         } else {
             this.turnText.setText('Turno del oponente');
             this.turnText.setStyle({ fill: '#fc0f0f' });
@@ -548,21 +724,27 @@ export default class HudScene extends Phaser.Scene {
 
     setButtonsVisible(visible) {
         this.attackBtn.setVisible(visible);
+        if (this.attackBtnGlow) this.attackBtnGlow.setVisible(visible);
         this.attackBtnBg.setVisible(visible);
+        if (this.attackBtnFrame) this.attackBtnFrame.setVisible(visible);
         this.attackBtnText.setVisible(visible);
         if (this.recallBtn) {
             this.recallBtn.setVisible(visible);
+            if (this.recallBtnGlow) this.recallBtnGlow.setVisible(visible);
             this.recallBtnBg.setVisible(visible);
+            if (this.recallBtnFrame) this.recallBtnFrame.setVisible(visible);
             this.recallBtnText.setVisible(visible);
         }
         this.endTurnBtn.setVisible(visible);
+        if (this.endTurnBtnGlow) this.endTurnBtnGlow.setVisible(visible);
         this.endTurnBtnBg.setVisible(visible);
+        if (this.endTurnBtnFrame) this.endTurnBtnFrame.setVisible(visible);
         this.endTurnBtnText.setVisible(visible);
 
         // Reset attack selection when hiding
         if (!visible) {
             this.attackSelected = false;
-            this.updateButtonStates();
+            this.updateAttackPulse(false);
         }
     }
 
