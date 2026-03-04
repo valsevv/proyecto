@@ -103,6 +103,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             case JOIN        -> handleJoin(session, packet);
             case SELECT_SIDE -> handleSelectSide(session, packet);
             case MOVE        -> handleMove(session, packet);
+            case MOVE_CARRIER -> handleCarrierMove(session, packet);
             case ATTACK      -> handleAttack(session, packet);
             case END_TURN    -> handleEndTurn(session);
             case SAVE_AND_EXIT -> handleSaveAndExit(session);
@@ -207,6 +208,24 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         broadcastToRoom(session.getId(), result.getPacket());
 
         // If turn ended, broadcast new turn to room
+        if (result.isTurnEnded()) {
+            Packet turnStart = Packet.turnStart(result.getNextPlayer(), result.getActionsRemaining());
+            broadcastToRoom(session.getId(), turnStart);
+        }
+    }
+
+    private void handleCarrierMove(WebSocketSession session, Packet packet) throws IOException {
+        double x = packet.getDouble("x");
+        double y = packet.getDouble("y");
+
+        GameResult result = gameController.processCarrierMove(session.getId(), x, y);
+        if (!result.isSuccess()) {
+            send(session, result.getPacket());
+            return;
+        }
+
+        broadcastToRoom(session.getId(), result.getPacket());
+
         if (result.isTurnEnded()) {
             Packet turnStart = Packet.turnStart(result.getNextPlayer(), result.getActionsRemaining());
             broadcastToRoom(session.getId(), turnStart);

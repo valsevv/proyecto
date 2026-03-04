@@ -226,7 +226,7 @@ export default class MainScene extends Phaser.Scene {
                     return;
                 }
 
-                this.moveCarrier(this.selectedCarrier, nearest.x, nearest.y);
+                Network.requestCarrierMove(nearest.x, nearest.y);
                 return;
             }
 
@@ -437,6 +437,20 @@ export default class MainScene extends Phaser.Scene {
             this.checkDrawByNoDrones();
         });
 
+        Network.on('carrierMoved', (msg) => {
+            const carrier = this.carriers[msg.playerIndex];
+            if (!carrier || typeof msg.x !== 'number' || typeof msg.y !== 'number') return;
+            this.moveCarrier(carrier, msg.x, msg.y);
+
+            if (typeof msg.actionsRemaining === 'number') {
+                Network.actionsRemaining = msg.actionsRemaining;
+                this.events.emit('actionsUpdated', {
+                    actionsRemaining: msg.actionsRemaining,
+                    actionsPerTurn: this.actionsPerTurn
+                });
+            }
+        });
+
         Network.on('attackResult', (msg) => {
             const targetDrone = this.drones[msg.targetPlayer]?.[msg.targetDrone];
             const hit = msg.hit !== false;
@@ -596,8 +610,10 @@ export default class MainScene extends Phaser.Scene {
         // Note: Connection and join are handled by LobbyScene
     }
 
-    createCarrierForPlayer(playerIndex, side, spawnHintY = null) {
-        const basePosition = this.getCarrierSpawnPosition(playerIndex, spawnHintY);
+    createCarrierForPlayer(playerIndex, side, spawnHint = null) {
+        const basePosition = spawnHint && typeof spawnHint.x === 'number' && typeof spawnHint.y === 'number'
+            ? { x: spawnHint.x, y: spawnHint.y }
+            : this.getCarrierSpawnPosition(playerIndex, spawnHint?.y ?? null);
         const spriteKey = side === 'Naval' ? NAVAL_CARRIER_SPRITES[0] : 'porta_drones_volador';
 
         if (this.carriers[playerIndex]) {
@@ -688,8 +704,10 @@ export default class MainScene extends Phaser.Scene {
             const side = player.side || 'Aereo';
             this.playerSides[player.playerIndex] = side;
             if (isLocal) this.localSide = side;
-            const spawnHintY = player.drones?.[0]?.y ?? null;
-            this.createCarrierForPlayer(player.playerIndex, side, spawnHintY);
+            const spawnHint = (typeof player.carrierX === 'number' && typeof player.carrierY === 'number')
+                ? { x: player.carrierX, y: player.carrierY }
+                : { x: undefined, y: player.drones?.[0]?.y ?? null };
+            this.createCarrierForPlayer(player.playerIndex, side, spawnHint);
             if (this.carriers[player.playerIndex]) {
                 this.carriers[player.playerIndex].maxHealth = player.carrierMaxHealth ?? 5;
                 this.carriers[player.playerIndex].health = player.carrierHealth ?? this.carriers[player.playerIndex].maxHealth;
@@ -862,19 +880,6 @@ export default class MainScene extends Phaser.Scene {
                 carrier.isMoving = false;
                 this.setCarrierSpriteDirection(carrier, 0);
                 this.updateVision();
-
-                if (carrier.playerIndex === Network.playerIndex) {
-                    const nextActions = Math.max(0, (Network.actionsRemaining ?? 0) - 1);
-                    Network.actionsRemaining = nextActions;
-                    this.events.emit('actionsUpdated', {
-                        actionsRemaining: nextActions,
-                        actionsPerTurn: this.actionsPerTurn
-                    });
-
-                    if (nextActions <= 0) {
-                        this.endTurn();
-                    }
-                }
             }
         });
     }

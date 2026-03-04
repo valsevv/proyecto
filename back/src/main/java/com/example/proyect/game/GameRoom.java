@@ -54,6 +54,7 @@ public class GameRoom {
     // Side selection state (Naval or Aereo)
     private final Map<Integer, String> playerSides = new HashMap<>();
     private final Map<Integer, HexCoord> playerSpawnAnchors = new HashMap<>();
+    private final Map<Integer, HexCoord> carrierPositions = new HashMap<>();
 
     // Turn state
     private boolean gameStarted = false;
@@ -126,6 +127,7 @@ public class GameRoom {
 
     private void initializeCarrierForPlayer(int playerIndex) {
         carrierHealthByPlayer.put(playerIndex, carrierHitsToDestroy);
+        carrierPositions.put(playerIndex, playerSpawnAnchors.computeIfAbsent(playerIndex, this::getCarrierSpawnPosition));
     }
     
     /*
@@ -204,6 +206,7 @@ public class GameRoom {
                 it.remove();
                 playerSpawnAnchors.remove(p.getPlayerIndex());
                 carrierHealthByPlayer.remove(p.getPlayerIndex());
+                carrierPositions.remove(p.getPlayerIndex());
                 return p;
             }
         }
@@ -344,6 +347,7 @@ public class GameRoom {
         players.clear();
         playerSides.clear();
         carrierHealthByPlayer.clear();
+        carrierPositions.clear();
         gameStarted = false;
         currentTurn = 0;
         actionsRemaining = actionsPerTurn;
@@ -479,6 +483,26 @@ public class GameRoom {
         return new ArrayList<>(players);
     }
 
+
+    public synchronized HexCoord getCarrierPosition(int playerIndex) {
+        return carrierPositions.computeIfAbsent(playerIndex, idx -> playerSpawnAnchors.computeIfAbsent(idx, this::getCarrierSpawnPosition));
+    }
+
+    public synchronized boolean moveCarrier(String sessionId, double x, double y) {
+        PlayerState player = getPlayerBySession(sessionId);
+        if (player == null) return false;
+
+        HexCoord current = getCarrierPosition(player.getPlayerIndex());
+        HexCoord target = new HexCoord(x, y);
+        if (isPositionOccupiedByCarrierOrDrone(target, current, null)) {
+            return false;
+        }
+
+        carrierPositions.put(player.getPlayerIndex(), target);
+        playerSpawnAnchors.put(player.getPlayerIndex(), target);
+        return true;
+    }
+
     /**
      * Check if a position is occupied by any drone (except the ignoreDrone).
      * Uses squared Euclidean distance with tolerance of 15 pixels.
@@ -488,30 +512,30 @@ public class GameRoom {
      * @return true if position is occupied
      */
     public synchronized boolean isPositionOccupied(HexCoord position, Drone ignoreDrone) {
+        return isPositionOccupiedByCarrierOrDrone(position, null, ignoreDrone);
+    }
+
+    private boolean isPositionOccupiedByCarrierOrDrone(HexCoord position, HexCoord ignoreCarrierPosition, Drone ignoreDrone) {
         if (position == null) return false;
 
-        final double TOLERANCE_SQ = 15 * 15; // 15 pixel tolerance, squared for performance
+        final double TOLERANCE_SQ = 15 * 15;
 
-        // Check all drones from all players
         for (PlayerState player : players) {
             for (Drone drone : player.getDrones()) {
-                // Skip dead drones and the ignored drone
-                if (!drone.isAlive() || drone == ignoreDrone) {
-                    continue;
-                }
-
+                if (!drone.isAlive() || drone == ignoreDrone) continue;
                 HexCoord dronePos = drone.getPosition();
                 if (dronePos == null) continue;
-
-                // Calculate squared distance
                 double dx = dronePos.getX() - position.getX();
                 double dy = dronePos.getY() - position.getY();
-                double distanceSq = dx * dx + dy * dy;
-
-                if (distanceSq < TOLERANCE_SQ) {
-                    return true;
-                }
+                if ((dx * dx + dy * dy) < TOLERANCE_SQ) return true;
             }
+        }
+
+        for (HexCoord carrierPos : carrierPositions.values()) {
+            if (carrierPos == null || carrierPos == ignoreCarrierPosition) continue;
+            double dx = carrierPos.getX() - position.getX();
+            double dy = carrierPos.getY() - position.getY();
+            if ((dx * dx + dy * dy) < TOLERANCE_SQ) return true;
         }
 
         return false;
@@ -532,6 +556,9 @@ public class GameRoom {
             pm.put("carrierHealth", getCarrierHealth(p.getPlayerIndex()));
             pm.put("carrierMaxHealth", carrierHitsToDestroy);
             pm.put("carrierDestroyed", isCarrierDestroyed(p.getPlayerIndex()));
+            HexCoord carrierPos = getCarrierPosition(p.getPlayerIndex());
+            pm.put("carrierX", carrierPos.getX());
+            pm.put("carrierY", carrierPos.getY());
             log.info("Saving player {} side={}", p.getPlayerIndex(), p.getSide());
             List<Map<String, Object>> droneMaps = new ArrayList<>();
             for (Drone d : p.getDrones()) {
@@ -723,6 +750,11 @@ public class GameRoom {
                 throw new IllegalArgumentException("carrierHealth out of range");
             }
             room.carrierHealthByPlayer.put(playerIndex, carrierHealth);
+            double carrierX = getOptionalDoubleField(rawPlayer, "carrierX", room.getCarrierPosition(playerIndex).getX());
+            double carrierY = getOptionalDoubleField(rawPlayer, "carrierY", room.getCarrierPosition(playerIndex).getY());
+            HexCoord restoredCarrier = new HexCoord(carrierX, carrierY);
+            room.carrierPositions.put(playerIndex, restoredCarrier);
+            room.playerSpawnAnchors.put(playerIndex, restoredCarrier);
         }
 
         log.info("[GameRoom] -> End fromStateMap");
@@ -743,6 +775,17 @@ public class GameRoom {
         Object value = map.get(field);
         if (!(value instanceof Number)) {
             throw new IllegalArgumentException(field + " is required");
+        }
+        return ((Number) value).doubleValue();
+    }
+
+    private static double getOptionalDoubleField(Map<?, ?> map, String field, double defaultValue) {
+        Object value = map.get(field);
+        if (value == null) {
+            return defaultValue;
+        }
+        if (!(value instanceof Number)) {
+            throw new IllegalArgumentException(field + " must be a number");
         }
         return ((Number) value).doubleValue();
     }
@@ -813,6 +856,8 @@ public class GameRoom {
         this.carrierHitsToDestroy = source.carrierHitsToDestroy;
         this.carrierHealthByPlayer.clear();
         this.carrierHealthByPlayer.putAll(source.carrierHealthByPlayer);
+        this.carrierPositions.clear();
+        this.carrierPositions.putAll(source.carrierPositions);
         log.info("[GameRoom] -> End restoreFrom ");
     }
 }

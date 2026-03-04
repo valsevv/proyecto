@@ -143,6 +143,15 @@ public class Packet {
         return new Packet(PacketType.MOVE_DRONE, payload);
     }
 
+
+    public static Packet carrierMoved(int playerIndex, double x, double y, int actionsRemaining) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("playerIndex", playerIndex);
+        payload.put("x", x);
+        payload.put("y", y);
+        payload.put("actionsRemaining", actionsRemaining);
+        return new Packet(PacketType.CARRIER_MOVED, payload);
+    }
     public static Packet fuelUpdate(int playerIndex, int droneIndex, int remainingFuel, boolean destroyedByFuel) {
         Map<String, Object> payload = new HashMap<>();
         payload.put("playerIndex", playerIndex);
