@@ -170,14 +170,18 @@ export default class MainScene extends Phaser.Scene {
             const nearest = this.hexGrid.getNearestCenter(pointer.worldX, pointer.worldY);
 
             if (this.actionMode === MODE_ATTACK && this.selectedDrone) {
-                // Naval = missile: allow manual aiming to any hex.
+                const targetUnit = this.findEnemyUnitAtHex(nearest);
+
                 if (this.selectedDrone.droneType === 'Naval') {
-                    console.log('[MainScene] Naval attack path');
-                    this.setManualAttackLine(nearest);
-                    this.executeManualAttack();
+                    if (targetUnit) {
+                        this.setManualAttackLine({ x: targetUnit.sprite.x, y: targetUnit.sprite.y });
+                        this.executeAttack(targetUnit);
+                    } else {
+                        this.setManualAttackLine(nearest);
+                        this.executeManualAttack();
+                    }
                 } else {
                     console.log('[MainScene] Aereo attack path');
-                    const targetUnit = this.findEnemyUnitAtHex(nearest);
                     if (targetUnit) {
                         this.pendingAerialTarget = targetUnit;
                         if (this.manualTargetHex) {
@@ -437,6 +441,7 @@ export default class MainScene extends Phaser.Scene {
             const targetDrone = this.drones[msg.targetPlayer]?.[msg.targetDrone];
             const hit = msg.hit !== false;
             const attackerDrone = this.drones[msg.attackerPlayer]?.[msg.attackerDrone];
+            const targetCarrier = this.carriers?.[msg.targetPlayer];
             const attackerSide = this.playerSides[msg.attackerPlayer];
             const isNavalAttacker = attackerSide === 'Naval' || attackerDrone?.droneType === 'Naval';
             const isAereoAttacker = attackerSide === 'Aereo' || attackerDrone?.droneType === 'Aereo';
@@ -467,6 +472,25 @@ export default class MainScene extends Phaser.Scene {
 
             if (targetDrone && hit) {
                 targetDrone.takeDamage(msg.damage, msg.remainingHealth);
+            }
+
+            if (targetCarrier) {
+                if (typeof msg.targetCarrierHealth === 'number') {
+                    targetCarrier.health = msg.targetCarrierHealth;
+                }
+                if (typeof msg.targetCarrierDestroyed === 'boolean') {
+                    targetCarrier.destroyed = msg.targetCarrierDestroyed;
+                } else if (typeof targetCarrier.health === 'number') {
+                    targetCarrier.destroyed = targetCarrier.health <= 0;
+                }
+
+                if (targetCarrier.destroyed) {
+                    targetCarrier.sprite.setVisible(false);
+                    targetCarrier.ring.setVisible(false);
+                    if (this.selectedCarrier === targetCarrier) {
+                        this.selectedCarrier = null;
+                    }
+                }
             }
 
             // Handle attacker death (e.g., from fuel consumption during aerial attack)
@@ -600,16 +624,17 @@ export default class MainScene extends Phaser.Scene {
             maxMoveDistance: MAX_CARRIER_MOVE_DISTANCE,
             type: 'carrier',
             side,
-            direction: 0
+            direction: 0,
+            health: 5,
+            maxHealth: 5,
+            destroyed: false
         };
 
-        if (isLocal) {
-            sprite.setInteractive({ useHandCursor: true, pixelPerfect: true, alphaTolerance: 1 });
-            sprite.on('pointerdown', (pointer) => {
-                pointer.event.stopPropagation();
-                this.onCarrierClicked(carrier);
-            });
-        }
+        sprite.setInteractive({ useHandCursor: true, pixelPerfect: true, alphaTolerance: 1 });
+        sprite.on('pointerdown', (pointer) => {
+            pointer.event.stopPropagation();
+            this.onCarrierClicked(carrier);
+        });
 
         this.carriers[playerIndex] = carrier;
     }
@@ -665,6 +690,15 @@ export default class MainScene extends Phaser.Scene {
             if (isLocal) this.localSide = side;
             const spawnHintY = player.drones?.[0]?.y ?? null;
             this.createCarrierForPlayer(player.playerIndex, side, spawnHintY);
+            if (this.carriers[player.playerIndex]) {
+                this.carriers[player.playerIndex].maxHealth = player.carrierMaxHealth ?? 5;
+                this.carriers[player.playerIndex].health = player.carrierHealth ?? this.carriers[player.playerIndex].maxHealth;
+                this.carriers[player.playerIndex].destroyed = player.carrierDestroyed === true || this.carriers[player.playerIndex].health <= 0;
+                if (this.carriers[player.playerIndex].destroyed) {
+                    this.carriers[player.playerIndex].sprite.setVisible(false);
+                    this.carriers[player.playerIndex].ring.setVisible(false);
+                }
+            }
 
             for (const d of player.drones) {
                 const hex = this.hexGrid.getNearestCenter(d.x, d.y);
@@ -719,7 +753,37 @@ export default class MainScene extends Phaser.Scene {
 
 
     onCarrierClicked(carrier) {
-        if (!carrier?.isLocal) return;
+        if (!carrier || carrier.destroyed) return;
+
+        if (!carrier.isLocal) {
+            if (this.actionMode !== MODE_ATTACK || !this.selectedDrone || !this.isMyTurn) return;
+
+            if (this.selectedDrone.droneType === 'Naval') {
+                this.setManualAttackLine({ x: carrier.sprite.x, y: carrier.sprite.y });
+                this.executeAttack({
+                    targetType: 'carrier',
+                    playerIndex: carrier.playerIndex,
+                    droneIndex: -1,
+                    sprite: carrier.sprite
+                });
+                return;
+            }
+
+            const targetHex = this.hexGrid?.getNearestCenter(carrier.sprite.x, carrier.sprite.y) || {
+                x: carrier.sprite.x,
+                y: carrier.sprite.y
+            };
+            this.manualTargetHex = targetHex;
+            this.pendingAerialTarget = {
+                targetType: 'carrier',
+                playerIndex: carrier.playerIndex,
+                droneIndex: -1,
+                sprite: carrier.sprite
+            };
+            this.executeAttack(this.pendingAerialTarget);
+            return;
+        }
+
         this.selectCarrier(carrier);
 
         // Show deploy panel if it's our turn and there are drones waiting to be deployed
@@ -1204,6 +1268,10 @@ export default class MainScene extends Phaser.Scene {
             const playerIndex = parseInt(pi);
             const carrier = this.carriers[pi];
             if (!carrier?.sprite) continue;
+            if (carrier.destroyed) {
+                carrier.sprite.setVisible(false);
+                continue;
+            }
 
             if (playerIndex === localIndex) {
                 carrier.sprite.setVisible(true);
@@ -1327,8 +1395,8 @@ export default class MainScene extends Phaser.Scene {
      * and inside aerial weapon range.
      */
     findEnemyUnitAtHex(hexCenter) {
-        if (!hexCenter || !this.selectedDrone || this.selectedDrone.droneType !== 'Aereo') {
-            console.log('[MainScene] Early return: no hexCenter or not Aereo');
+        if (!hexCenter || !this.selectedDrone) {
+            console.log('[MainScene] Early return: no hexCenter or no selected drone');
             return null;
         }
 
@@ -1338,13 +1406,17 @@ export default class MainScene extends Phaser.Scene {
             if (!drone?.isAlive() || !drone.deployed) return false;
             if (!this.isDroneVisibleToLocal(drone)) return false;
 
-            const attackDistance = this.hexGrid.getHexDistance(
-                this.selectedDrone.sprite.x,
-                this.selectedDrone.sprite.y,
-                drone.sprite.x,
-                drone.sprite.y
-            );
-            return attackDistance <= (this.selectedDrone.attackRange ?? 0);
+            if (this.selectedDrone.droneType === 'Aereo') {
+                const attackDistance = this.hexGrid.getHexDistance(
+                    this.selectedDrone.sprite.x,
+                    this.selectedDrone.sprite.y,
+                    drone.sprite.x,
+                    drone.sprite.y
+                );
+                return attackDistance <= (this.selectedDrone.attackRange ?? 0);
+            }
+
+            return true;
         });
 
         const enemyCarrier = this.findEnemyCarrierAtHex(hexCenter);
@@ -1385,14 +1457,17 @@ export default class MainScene extends Phaser.Scene {
         const enemyIndex = Network.playerIndex === 0 ? 1 : 0;
         const carrier = this.carriers?.[enemyIndex];
         if (!carrier?.sprite || !this.isCarrierVisibleToLocal(carrier)) return null;
+        if (carrier.destroyed) return null;
 
-        const attackDistance = this.hexGrid.getHexDistance(
-            this.selectedDrone.sprite.x,
-            this.selectedDrone.sprite.y,
-            carrier.sprite.x,
-            carrier.sprite.y
-        );
-        if (attackDistance > (this.selectedDrone.attackRange ?? 0)) return null;
+        if (this.selectedDrone?.droneType === 'Aereo') {
+            const attackDistance = this.hexGrid.getHexDistance(
+                this.selectedDrone.sprite.x,
+                this.selectedDrone.sprite.y,
+                carrier.sprite.x,
+                carrier.sprite.y
+            );
+            if (attackDistance > (this.selectedDrone.attackRange ?? 0)) return null;
+        }
 
         const dx = hexCenter.x - carrier.sprite.x;
         const dy = hexCenter.y - carrier.sprite.y;
@@ -1567,6 +1642,7 @@ export default class MainScene extends Phaser.Scene {
         if ((Network.actionsRemaining ?? 0) <= 0) return false;
         const carrier = this.carriers[Network.playerIndex];
         if (!carrier?.sprite) return false;
+        if (carrier.destroyed) return false;
         const dist = this.hexGrid.getHexDistance(
             this.selectedDrone.sprite.x, this.selectedDrone.sprite.y,
             carrier.sprite.x, carrier.sprite.y
