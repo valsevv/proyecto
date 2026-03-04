@@ -797,10 +797,6 @@ public class GameController {
             return GameResult.error("Carrier attacks cannot target drones");
         }
 
-        if (carrierTarget && attackerDrone instanceof NavalDrone) {
-            return GameResult.error("Naval drones cannot attack carriers");
-        }
-
         if (carrierTarget && room.isCarrierDestroyed(targetPlayerIndex)) {
             return GameResult.error("Target carrier is already destroyed");
         }
