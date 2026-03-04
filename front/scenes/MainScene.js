@@ -364,6 +364,7 @@ export default class MainScene extends Phaser.Scene {
 
         if (this.carriers[playerIndex]) {
             this.carriers[playerIndex].ring.destroy();
+            this.carriers[playerIndex].targetRing?.destroy();
             this.carriers[playerIndex].sprite.destroy();
         }
 
@@ -378,9 +379,16 @@ export default class MainScene extends Phaser.Scene {
         ring.setFillStyle();
         ring.setVisible(false);
 
+        const targetRing = this.add.circle(basePosition.x, basePosition.y, 52);
+        targetRing.setDepth(5);
+        targetRing.setStrokeStyle(3, 0xff0000);
+        targetRing.setFillStyle();
+        targetRing.setVisible(false);
+
         const carrier = {
             sprite,
             ring,
+            targetRing,
             playerIndex,
             isLocal,
             maxMoveDistance: MAX_CARRIER_MOVE_DISTANCE,
@@ -389,7 +397,8 @@ export default class MainScene extends Phaser.Scene {
             direction: 0,
             health: 5,
             maxHealth: 5,
-            destroyed: false
+            destroyed: false,
+            isTargetable: false
         };
 
         sprite.setInteractive({ useHandCursor: true, pixelPerfect: true, alphaTolerance: 1 });
@@ -462,6 +471,7 @@ export default class MainScene extends Phaser.Scene {
                 if (this.carriers[player.playerIndex].destroyed) {
                     this.carriers[player.playerIndex].sprite.setVisible(false);
                     this.carriers[player.playerIndex].ring.setVisible(false);
+                    this.carriers[player.playerIndex].targetRing?.setVisible(false);
                 }
             }
 
@@ -618,7 +628,7 @@ export default class MainScene extends Phaser.Scene {
         const dy = y - carrier.sprite.y;
         this.setCarrierSpriteDirection(carrier, this.getCarrierDirectionFromDelta(dx, dy));
         this.tweens.add({
-            targets: [carrier.sprite, carrier.ring],
+            targets: [carrier.sprite, carrier.ring, carrier.targetRing].filter(Boolean),
             x,
             y,
             duration: 4000,
@@ -865,6 +875,24 @@ export default class MainScene extends Phaser.Scene {
 
             drone.setTargetable(true);
         }
+
+        const enemyCarrier = this.carriers?.[enemyIndex];
+        if (enemyCarrier && !enemyCarrier.destroyed && this.isCarrierVisibleToLocal(enemyCarrier)) {
+            if (this.selectedDrone?.droneType === 'Aereo') {
+                const distance = this.hexGrid.getHexDistance(
+                    this.selectedDrone.sprite.x,
+                    this.selectedDrone.sprite.y,
+                    enemyCarrier.sprite.x,
+                    enemyCarrier.sprite.y
+                );
+                if (distance <= (this.selectedDrone.attackRange ?? 0)) {
+                    this.setCarrierTargetable(enemyCarrier, true);
+                }
+            } else {
+                this.setCarrierTargetable(enemyCarrier, true);
+            }
+        }
+
         this.drawMissileGuides();
     }
 
@@ -874,9 +902,20 @@ export default class MainScene extends Phaser.Scene {
                 drone.setTargetable(false);
             }
         }
+        for (const pi in this.carriers) {
+            this.setCarrierTargetable(this.carriers[pi], false);
+        }
         this.manualTargetHex = null;
         this.pendingAerialTarget = null;
         this.missileGuideGraphics.clear();
+    }
+
+    setCarrierTargetable(carrier, isTargetable) {
+        if (!carrier?.targetRing) return;
+        carrier.isTargetable = isTargetable;
+        carrier.targetRing.setPosition(carrier.sprite.x, carrier.sprite.y);
+        const shouldShow = isTargetable && !carrier.destroyed && this.isCarrierVisibleToLocal(carrier);
+        carrier.targetRing.setVisible(shouldShow);
     }
 
     getVisionRangeForSide(side) {
