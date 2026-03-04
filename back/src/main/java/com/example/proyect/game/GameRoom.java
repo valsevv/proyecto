@@ -36,6 +36,8 @@ public class GameRoom {
     public static final int DEFAULT_AERIAL_VISION_RANGE = 4;
     public static final int DEFAULT_NAVAL_VISION_RANGE = 3;
     public static final int DEFAULT_CARRIER_HITS_TO_DESTROY = 5;
+    public static final int AERIAL_CARRIER_HITS_TO_DESTROY = 6;
+    public static final int NAVAL_CARRIER_HITS_TO_DESTROY = 3;
 
     public static final int MOVEMENT_FUEL_COST = 1;
     public static final int IDLE_FUEL_COST = 1;
@@ -126,7 +128,7 @@ public class GameRoom {
     }
 
     private void initializeCarrierForPlayer(int playerIndex) {
-        carrierHealthByPlayer.put(playerIndex, carrierHitsToDestroy);
+        carrierHealthByPlayer.put(playerIndex, getCarrierMaxHealth(playerIndex));
         carrierPositions.put(playerIndex, playerSpawnAnchors.computeIfAbsent(playerIndex, this::getCarrierSpawnPosition));
     }
     
@@ -155,6 +157,19 @@ public class GameRoom {
         player.getDrones().clear();
         player.getDrones().addAll(drones);
         player.setSide(side);
+        playerSides.put(playerIndex, side);
+        carrierHealthByPlayer.put(playerIndex, getCarrierMaxHealth(playerIndex));
+    }
+
+    private int getCarrierMaxHealth(int playerIndex) {
+        String side = playerSides.get(playerIndex);
+        if ("Aereo".equals(side)) {
+            return AERIAL_CARRIER_HITS_TO_DESTROY;
+        }
+        if ("Naval".equals(side)) {
+            return NAVAL_CARRIER_HITS_TO_DESTROY;
+        }
+        return carrierHitsToDestroy;
     }
 
 
@@ -354,14 +369,14 @@ public class GameRoom {
     }
 
     public synchronized int damageCarrier(int playerIndex, int attacks) {
-        int currentHealth = carrierHealthByPlayer.getOrDefault(playerIndex, carrierHitsToDestroy);
+        int currentHealth = carrierHealthByPlayer.getOrDefault(playerIndex, getCarrierMaxHealth(playerIndex));
         int updatedHealth = Math.max(0, currentHealth - Math.max(0, attacks));
         carrierHealthByPlayer.put(playerIndex, updatedHealth);
         return updatedHealth;
     }
 
     public synchronized int getCarrierHealth(int playerIndex) {
-        return carrierHealthByPlayer.getOrDefault(playerIndex, carrierHitsToDestroy);
+        return carrierHealthByPlayer.getOrDefault(playerIndex, getCarrierMaxHealth(playerIndex));
     }
 
     public synchronized int getCarrierHitsToDestroy() {
@@ -554,7 +569,7 @@ public class GameRoom {
             pm.put("playerIndex", p.getPlayerIndex());
             pm.put("side", p.getSide());
             pm.put("carrierHealth", getCarrierHealth(p.getPlayerIndex()));
-            pm.put("carrierMaxHealth", carrierHitsToDestroy);
+            pm.put("carrierMaxHealth", getCarrierMaxHealth(p.getPlayerIndex()));
             pm.put("carrierDestroyed", isCarrierDestroyed(p.getPlayerIndex()));
             HexCoord carrierPos = getCarrierPosition(p.getPlayerIndex());
             pm.put("carrierX", carrierPos.getX());
@@ -745,8 +760,9 @@ public class GameRoom {
             player.setSide(side);
             room.players.add(player);
             room.playerSides.put(playerIndex, side);
-            int carrierHealth = getOptionalNonNegativeIntField(rawPlayer, "carrierHealth", room.carrierHitsToDestroy);
-            if (carrierHealth > room.carrierHitsToDestroy) {
+            int carrierMaxHealth = room.getCarrierMaxHealth(playerIndex);
+            int carrierHealth = getOptionalNonNegativeIntField(rawPlayer, "carrierHealth", carrierMaxHealth);
+            if (carrierHealth > carrierMaxHealth) {
                 throw new IllegalArgumentException("carrierHealth out of range");
             }
             room.carrierHealthByPlayer.put(playerIndex, carrierHealth);
