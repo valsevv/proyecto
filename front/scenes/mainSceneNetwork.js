@@ -196,10 +196,29 @@ export function attachNetworkHandlers(scene, options = {}) {
             scene.events.emit('turnChanged', { isMyTurn: false });
             const isLocalWinner = msg.winnerPlayerIndex === Network.playerIndex;
             const winnerText = isLocalWinner ? '¡Ganaste la partida!' : 'Perdiste la partida';
-            scene.add.text(400, 300, `${winnerText}
-Volvé al lobby para iniciar otra partida`, {
-                fontSize: '22px', fill: '#ffdd57', align: 'center'
-            }).setOrigin(0.5).setScrollFactor(0).setDepth(1000);
+
+            const camera = scene.cameras.main;
+            const panelWidth = 620;
+            const panelHeight = 220;
+            const panelX = camera.midPoint.x;
+            const panelY = camera.midPoint.y;
+
+            scene.add.rectangle(panelX, panelY, panelWidth, panelHeight, 0x04111f, 0.92)
+                .setStrokeStyle(4, 0xffdd57, 1)
+                .setScrollFactor(0)
+                .setDepth(1000);
+
+            scene.add.text(panelX, panelY, `Finaliza partidas para ambos jugadores\n${winnerText}\nVolviendo al menú principal...`, {
+                fontSize: '30px',
+                fill: '#ffdd57',
+                align: 'center',
+                fontStyle: 'bold',
+                lineSpacing: 10
+            }).setOrigin(0.5).setScrollFactor(0).setDepth(1001);
+
+            scene.time.delayedCall(2500, () => {
+                window.location.href = '/menu';
+            });
             scene.updateVision();
             return;
         }
