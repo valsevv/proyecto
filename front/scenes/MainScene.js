@@ -178,7 +178,15 @@ export default class MainScene extends Phaser.Scene {
             const nearest = this.hexGrid.getNearestCenter(pointer.worldX, pointer.worldY);
 
             if (this.actionMode === MODE_ATTACK && this.selectedDrone) {
-                const targetUnit = this.findEnemyUnitAtHex(nearest);
+                const carrierByAura = this.findEnemyCarrierAtPoint(pointer.worldX, pointer.worldY);
+                const targetUnit = carrierByAura
+                    ? {
+                        targetType: 'carrier',
+                        playerIndex: carrierByAura.playerIndex,
+                        droneIndex: -1,
+                        sprite: carrierByAura.sprite
+                    }
+                    : this.findEnemyUnitAtHex(nearest);
 
                 if (this.selectedDrone.droneType === 'Naval') {
                     if (targetUnit) {
@@ -753,14 +761,20 @@ export default class MainScene extends Phaser.Scene {
             return;
         }
 
-        const noAliveDrones = (playerIndex) => {
+        const aliveCount = (playerIndex) => {
             const drones = this.drones[playerIndex] || [];
-            return drones.length > 0 && drones.every((drone) => !drone?.isAlive());
+            return drones.filter((drone) => drone?.isAlive()).length;
         };
 
-        if (!noAliveDrones(0) || !noAliveDrones(1)) {
+        const player0Alive = aliveCount(0);
+        const player1Alive = aliveCount(1);
+
+        if (player0Alive > 0 && player1Alive > 0) {
             return;
         }
+
+        const winnerPlayerIndex = player0Alive > 0 ? 0 : 1;
+        const isLocalWinner = winnerPlayerIndex === Network.playerIndex;
 
         this.gameFinished = true;
         this.isMyTurn = false;
@@ -768,9 +782,35 @@ export default class MainScene extends Phaser.Scene {
         this.clearSelections();
         this.events.emit('turnChanged', { isMyTurn: false });
 
-        this.add.text(400, 300, 'Empate\nNo quedan drones activos', {
+        const winnerText = isLocalWinner ? '¡Ganaste la partida!' : 'Perdiste la partida';
+        const message = `${winnerText}
+Volvé al lobby para iniciar otra partida`;
+
+        this.add.text(400, 300, message, {
             fontSize: '22px', fill: '#ffdd57', align: 'center'
         }).setOrigin(0.5).setScrollFactor(0).setDepth(1000);
+    }
+
+    findEnemyCarrierAtPoint(worldX, worldY) {
+        const enemyIndex = Network.playerIndex === 0 ? 1 : 0;
+        const carrier = this.carriers?.[enemyIndex];
+        if (!carrier?.sprite || carrier.destroyed || !this.isCarrierVisibleToLocal(carrier)) return null;
+
+        if (this.selectedDrone?.droneType === 'Aereo') {
+            const attackDistance = this.hexGrid.getHexDistance(
+                this.selectedDrone.sprite.x,
+                this.selectedDrone.sprite.y,
+                carrier.sprite.x,
+                carrier.sprite.y
+            );
+            if (attackDistance > (this.selectedDrone.attackRange ?? 0)) return null;
+        }
+
+        const dx = worldX - carrier.sprite.x;
+        const dy = worldY - carrier.sprite.y;
+        const distancePx = Math.sqrt(dx * dx + dy * dy);
+        const ringRadius = carrier.targetRing?.radius ?? 52;
+        return distancePx <= ringRadius ? carrier : null;
     }
 
     startCarrierPulse(carrier) {
@@ -1278,7 +1318,7 @@ export default class MainScene extends Phaser.Scene {
         const dx = hexCenter.x - carrier.sprite.x;
         const dy = hexCenter.y - carrier.sprite.y;
         const distancePx = Math.sqrt(dx * dx + dy * dy);
-        const maxSnapDistance = this.hexGrid.size * 0.9;
+        const maxSnapDistance = Math.max(this.hexGrid.size * 0.9, carrier.targetRing?.radius ?? 52);
         return distancePx <= maxSnapDistance ? carrier : null;
     }
 

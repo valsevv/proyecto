@@ -170,6 +170,30 @@ public class Packet {
                                        int attackerRemainingHealth, boolean attackerDestroyed,
                                        int attackerAmmo,
                                        int targetCarrierHealth, boolean targetCarrierDestroyed) {
+        return attackResult(
+            attackerPlayer, attackerDrone,
+            targetPlayer, targetDrone,
+            damage, remainingHealth, hit,
+            lineX, lineY,
+            actionsRemaining,
+            attackerX, attackerY,
+            attackerRemainingHealth, attackerDestroyed,
+            attackerAmmo,
+            targetCarrierHealth, targetCarrierDestroyed,
+            false, -1
+        );
+    }
+
+    public static Packet attackResult(int attackerPlayer, int attackerDrone,
+                                       int targetPlayer, int targetDrone,
+                                       int damage, int remainingHealth, boolean hit,
+                                       double lineX, double lineY,
+                                       int actionsRemaining,
+                                       double attackerX, double attackerY,
+                                       int attackerRemainingHealth, boolean attackerDestroyed,
+                                       int attackerAmmo,
+                                       int targetCarrierHealth, boolean targetCarrierDestroyed,
+                                       boolean gameFinished, int winnerPlayerIndex) {
         Map<String, Object> payload = new HashMap<>();
         payload.put("attackerPlayer", attackerPlayer);
         payload.put("attackerDrone", attackerDrone);
@@ -188,6 +212,8 @@ public class Packet {
         payload.put("attackerAmmo", attackerAmmo);
         payload.put("targetCarrierHealth", targetCarrierHealth);
         payload.put("targetCarrierDestroyed", targetCarrierDestroyed);
+        payload.put("gameFinished", gameFinished);
+        payload.put("winnerPlayerIndex", winnerPlayerIndex);
         return new Packet(PacketType.ATTACK_RESULT, payload);
     }
 

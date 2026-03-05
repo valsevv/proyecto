@@ -1,5 +1,6 @@
 package com.example.proyect.controller;
 
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -29,6 +30,7 @@ import com.example.proyect.persistence.classes.Game;
 import com.example.proyect.persistence.classes.GameState;
 import com.example.proyect.persistence.classes.GameStatus;
 import com.example.proyect.websocket.packet.Packet;
+import com.example.proyect.persistence.repos.UserRepository;
 
 //vseverio Clase principal controladora de partida en tiempo real, salas, turnos, movimientos, ataques, guardado/cargado y estado por sesion
 @Service
@@ -67,6 +69,7 @@ public class GameController {
     private final LobbyService lobbyService;
 
     private final GameService gameService;
+    private final UserRepository userRepository;
     // todos los rooms x id
     private final Map<String, GameRoom> rooms = new ConcurrentHashMap<>();
     
@@ -87,9 +90,10 @@ public class GameController {
     //
     private final AtomicInteger roomCounter = new AtomicInteger(1);
 
-    public GameController(LobbyService lobbyService, GameService gameService) { //inicializa controlador
+    public GameController(LobbyService lobbyService, GameService gameService, UserRepository userRepository) { //inicializa controlador
         this.lobbyService = lobbyService;
         this.gameService = gameService;
+        this.userRepository = userRepository;
     }
     public void bindSessionUser(String sessionId, Long userId) { //vincula sesion websocket con userid para trazabilidad
         if (sessionId != null && userId != null) {
@@ -737,10 +741,34 @@ public class GameController {
             targetCarrierDestroyed
         );
 
+        boolean gameFinished = false;
+        int winnerPlayerIndex = -1;
+
         // Check game over
-        if (targetDrone != null && isPlayerDefeated(room, targetPlayerIndex)) {
-            log.info("Player {} has been defeated in room {}!", targetPlayerIndex, room.getRoomId());
-            //Aca hay que manejar el final del juego
+        if (isPlayerDefeated(room, targetPlayerIndex)) {
+            winnerPlayerIndex = attacker.getPlayerIndex();
+            gameFinished = true;
+            markGameAsFinished(room, winnerPlayerIndex);
+            registerWinForSession(room.getPlayerByIndex(winnerPlayerIndex));
+            log.info("Player {} has been defeated in room {}. Winner: {}", targetPlayerIndex, room.getRoomId(), winnerPlayerIndex);
+        }
+
+        if (gameFinished) {
+            Packet finishedAttackPacket = Packet.attackResult(
+                attacker.getPlayerIndex(), attackerIndex,
+                targetPlayerIndex, targetDroneIndex,
+                damage, targetDrone != null ? targetDrone.getCurrentHp() : 0, true,
+                lineX, lineY,
+                room.getActionsRemaining(),
+                attackerFinalPosition.getX(), attackerFinalPosition.getY(),
+                attackerDrone.getCurrentHp(), !attackerDrone.isAlive(),
+                attackerAmmo,
+                targetCarrierHealth,
+                targetCarrierDestroyed,
+                true,
+                winnerPlayerIndex
+            );
+            return GameResult.ok(finishedAttackPacket);
         }
 
         return finalizeTurn(room, attackPacket);
@@ -1072,6 +1100,40 @@ public class GameController {
             if (drone.isAlive()) return false;
         }
         return true;
+    }
+
+
+    private void markGameAsFinished(GameRoom room, int winnerPlayerIndex) {
+        Long gameId = roomToGame.get(room.getRoomId());
+        if (gameId == null) return;
+
+        Game game = games.get(gameId);
+        if (game == null) {
+            game = gameService.getById(gameId);
+            games.put(gameId, game);
+        }
+
+        GameState state = game.getState();
+        if (state == null) {
+            state = new GameState();
+            game.setState(state);
+        }
+
+        state.setStatus(GameStatus.FINISHED);
+        state.setTurn(winnerPlayerIndex + 1);
+        game.setEndedAt(OffsetDateTime.now());
+        gameService.saveGame(game.getPlayer1Id(), game.getPlayer2Id(), game);
+    }
+
+    private void registerWinForSession(PlayerState winner) {
+        if (winner == null) return;
+        Long winnerUserId = sessionToUserId.get(winner.getSessionId());
+        if (winnerUserId == null) return;
+
+        userRepository.findById(winnerUserId).ifPresent(user -> {
+            user.registerWin(10);
+            userRepository.save(user);
+        });
     }
 
     // room ID de la session  

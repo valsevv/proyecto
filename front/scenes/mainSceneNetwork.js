@@ -189,6 +189,21 @@ export function attachNetworkHandlers(scene, options = {}) {
         scene.actionMode = modeMove;
         scene.events.emit('attackModeEnded');
 
+        if (msg.gameFinished) {
+            scene.gameFinished = true;
+            scene.isMyTurn = false;
+            scene.clearSelections();
+            scene.events.emit('turnChanged', { isMyTurn: false });
+            const isLocalWinner = msg.winnerPlayerIndex === Network.playerIndex;
+            const winnerText = isLocalWinner ? '¡Ganaste la partida!' : 'Perdiste la partida';
+            scene.add.text(400, 300, `${winnerText}
+Volvé al lobby para iniciar otra partida`, {
+                fontSize: '22px', fill: '#ffdd57', align: 'center'
+            }).setOrigin(0.5).setScrollFactor(0).setDepth(1000);
+            scene.updateVision();
+            return;
+        }
+
         scene.updateVision();
         scene.checkDrawByNoDrones();
     });
