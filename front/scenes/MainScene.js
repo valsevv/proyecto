@@ -365,6 +365,8 @@ export default class MainScene extends Phaser.Scene {
         if (this.carriers[playerIndex]) {
             this.carriers[playerIndex].ring.destroy();
             this.carriers[playerIndex].targetRing?.destroy();
+            this.carriers[playerIndex].healthBarBg?.destroy();
+            this.carriers[playerIndex].healthBar?.destroy();
             this.carriers[playerIndex].sprite.destroy();
         }
 
@@ -385,10 +387,24 @@ export default class MainScene extends Phaser.Scene {
         targetRing.setFillStyle();
         targetRing.setVisible(false);
 
+        const healthBarOffsetY = 58;
+        const healthBarWidth = 56;
+        const healthBarBg = this.add.rectangle(basePosition.x, basePosition.y - healthBarOffsetY, healthBarWidth, 6, 0x333333);
+        healthBarBg.setDepth(6);
+        healthBarBg.setOrigin(0.5);
+
+        const healthBar = this.add.rectangle(basePosition.x - healthBarWidth / 2, basePosition.y - healthBarOffsetY, healthBarWidth, 4, 0x00ff00);
+        healthBar.setDepth(7);
+        healthBar.setOrigin(0, 0.5);
+
         const carrier = {
             sprite,
             ring,
             targetRing,
+            healthBarBg,
+            healthBar,
+            healthBarOffsetY,
+            healthBarWidth,
             playerIndex,
             isLocal,
             maxMoveDistance: MAX_CARRIER_MOVE_DISTANCE,
@@ -400,6 +416,8 @@ export default class MainScene extends Phaser.Scene {
             destroyed: false,
             isTargetable: false
         };
+
+        this.updateCarrierHealthBar(carrier);
 
         sprite.setInteractive({ useHandCursor: true, pixelPerfect: true, alphaTolerance: 1 });
         sprite.on('pointerup', (pointer) => {
@@ -473,6 +491,7 @@ export default class MainScene extends Phaser.Scene {
                     this.carriers[player.playerIndex].ring.setVisible(false);
                     this.carriers[player.playerIndex].targetRing?.setVisible(false);
                 }
+                this.updateCarrierHealthBar(this.carriers[player.playerIndex]);
             }
 
             for (const d of player.drones) {
@@ -627,18 +646,53 @@ export default class MainScene extends Phaser.Scene {
         const dx = x - carrier.sprite.x;
         const dy = y - carrier.sprite.y;
         this.setCarrierSpriteDirection(carrier, this.getCarrierDirectionFromDelta(dx, dy));
+
+        const movedTargets = [carrier.sprite, carrier.ring, carrier.targetRing, carrier.healthBarBg]
+            .filter(Boolean);
+
         this.tweens.add({
-            targets: [carrier.sprite, carrier.ring, carrier.targetRing].filter(Boolean),
+            targets: movedTargets,
             x,
             y,
             duration: 4000,
             ease: 'Power2',
+            onUpdate: () => {
+                if (carrier.healthBar) {
+                    carrier.healthBar.y = y - carrier.healthBarOffsetY;
+                    carrier.healthBar.x = x - carrier.healthBarWidth / 2;
+                }
+            },
             onComplete: () => {
                 carrier.isMoving = false;
                 this.setCarrierSpriteDirection(carrier, 0);
+                this.updateCarrierHealthBar(carrier);
                 this.updateVision();
             }
         });
+    }
+
+    updateCarrierHealthBar(carrier) {
+        if (!carrier?.healthBar || !carrier?.healthBarBg) return;
+        const maxHealth = Math.max(1, carrier.maxHealth ?? 1);
+        const health = Math.max(0, carrier.health ?? 0);
+        const ratio = Phaser.Math.Clamp(health / maxHealth, 0, 1);
+
+        carrier.healthBar.width = carrier.healthBarWidth * ratio;
+
+        if (ratio > 0.6) {
+            carrier.healthBar.setFillStyle(0x00ff00);
+        } else if (ratio > 0.3) {
+            carrier.healthBar.setFillStyle(0xffff00);
+        } else {
+            carrier.healthBar.setFillStyle(0xff0000);
+        }
+
+        carrier.healthBarBg.setPosition(carrier.sprite.x, carrier.sprite.y - carrier.healthBarOffsetY);
+        carrier.healthBar.setPosition(carrier.sprite.x - carrier.healthBarWidth / 2, carrier.sprite.y - carrier.healthBarOffsetY);
+
+        const visible = !carrier.destroyed && carrier.sprite.visible;
+        carrier.healthBarBg.setVisible(visible);
+        carrier.healthBar.setVisible(visible);
     }
 
     checkDrawByNoDrones() {

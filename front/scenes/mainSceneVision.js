@@ -125,18 +125,22 @@ export function updateVision(scene) {
         if (carrier.destroyed) {
             carrier.sprite.setVisible(false);
             carrier.targetRing?.setVisible(false);
+            carrier.healthBarBg?.setVisible(false);
+            carrier.healthBar?.setVisible(false);
             continue;
         }
 
         if (playerIndex === localIndex) {
             carrier.sprite.setVisible(true);
             carrier.targetRing?.setVisible(false);
+            scene.updateCarrierHealthBar?.(carrier);
             continue;
         }
 
         const visible = isCarrierVisibleToLocal(scene, carrier);
         carrier.sprite.setVisible(visible);
         carrier.targetRing?.setVisible(Boolean(visible && carrier.isTargetable));
+        scene.updateCarrierHealthBar?.(carrier);
     }
 
     updateFogOfWar(scene);
