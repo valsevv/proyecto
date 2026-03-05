@@ -228,6 +228,9 @@ export function attachNetworkHandlers(scene, options = {}) {
     });
 
     Network.on('playerLeft', () => {
+        if (scene.gameFinished) {
+            return;
+        }
         showPlayerLeftOverlay(scene);
     });
 
