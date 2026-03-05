@@ -392,6 +392,28 @@ class GameRoomTest {
         assertTrue(room.isCarrierDestroyed(1));
     }
 
+
+    @Test
+    void shouldDestroyUndeployedDronesWhenCarrierIsDestroyed() {
+        GameRoom room = new GameRoom("room-carrier-destroys-hangar", 10, 4, 3, 1);
+        room.addPlayer("session-1");
+        room.addPlayer("session-2");
+
+        room.moveDrone("session-1", 0, 100, 100);
+
+        Drone deployedDrone = room.getDrone(0, 0);
+        Drone undeployedDrone = room.getDrone(0, 1);
+        assertTrue(deployedDrone.isDeployed());
+        assertFalse(undeployedDrone.isDeployed());
+        assertTrue(undeployedDrone.isAlive());
+
+        room.damageCarrier(0, 1);
+
+        assertTrue(room.isCarrierDestroyed(0));
+        assertTrue(deployedDrone.isAlive(), "Deployed drones should not be auto-destroyed with the carrier");
+        assertFalse(undeployedDrone.isAlive(), "Undeployed drones inside the carrier must be destroyed");
+    }
+
     @Test
     void shouldNotRecallDroneWhenCarrierDestroyed() {
         GameRoom room = new GameRoom("room-carrier-recall", 10, 4, 3, 1);
