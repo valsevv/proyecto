@@ -695,6 +695,59 @@ export default class MainScene extends Phaser.Scene {
         carrier.healthBar.setVisible(visible);
     }
 
+    destroyUndeployedDronesForPlayer(playerIndex) {
+        const drones = this.drones?.[playerIndex] ?? [];
+        for (const drone of drones) {
+            if (!drone?.isAlive() || drone.deployed) continue;
+            drone.destroy();
+        }
+    }
+
+    destroyCarrier(carrier, playExplosion = true) {
+        if (!carrier || carrier._destructionHandled) return;
+
+        carrier.destroyed = true;
+        carrier._destructionHandled = true;
+
+        if (this.selectedCarrier === carrier) {
+            this.selectedCarrier = null;
+            this.deployPanelCarrier = null;
+            this.events.emit('deployPanelClose');
+            this.events.emit('selectionChanged', { type: null });
+        }
+
+        const x = carrier.sprite?.x;
+        const y = carrier.sprite?.y;
+
+        if (playExplosion && typeof x === 'number' && typeof y === 'number' && this.textures?.exists('explosion')) {
+            const boom = this.add.image(x, y, 'explosion');
+            boom.setDepth(30);
+            boom.setDisplaySize(220, 220);
+            boom.setAlpha(0.95);
+            this.sound?.play?.('explosion', { volume: 0.55 });
+            this.tweens.add({
+                targets: boom,
+                alpha: 0,
+                scaleX: 1.25,
+                scaleY: 1.25,
+                duration: 450,
+                ease: 'Cubic.easeOut',
+                onComplete: () => boom.destroy()
+            });
+        }
+
+        carrier.sprite?.setVisible(false);
+        carrier.ring?.setVisible(false);
+        carrier.targetRing?.setVisible(false);
+        carrier.healthBarBg?.setVisible(false);
+        carrier.healthBar?.setVisible(false);
+
+        this.destroyUndeployedDronesForPlayer(carrier.playerIndex);
+        this.updateCarrierHealthBar?.(carrier);
+        this.updateVision?.();
+        this.checkDrawByNoDrones?.();
+    }
+
     checkDrawByNoDrones() {
         if (this.gameFinished) {
             return;

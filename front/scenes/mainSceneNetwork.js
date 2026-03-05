@@ -142,17 +142,10 @@ export function attachNetworkHandlers(scene, options = {}) {
             }
 
             if (targetCarrier.destroyed) {
-                targetCarrier.sprite.setVisible(false);
-                targetCarrier.ring.setVisible(false);
-                targetCarrier.targetRing?.setVisible(false);
-                targetCarrier.healthBarBg?.setVisible(false);
-                targetCarrier.healthBar?.setVisible(false);
-                if (scene.selectedCarrier === targetCarrier) {
-                    scene.selectedCarrier = null;
-                }
+                scene.destroyCarrier?.(targetCarrier, true);
+            } else {
+                scene.updateCarrierHealthBar?.(targetCarrier);
             }
-
-            scene.updateCarrierHealthBar?.(targetCarrier);
         }
 
         if (attackerDrone && msg.attackerDestroyed && attackerDrone.isAlive()) {

@@ -372,7 +372,25 @@ public class GameRoom {
         int currentHealth = carrierHealthByPlayer.getOrDefault(playerIndex, getCarrierMaxHealth(playerIndex));
         int updatedHealth = Math.max(0, currentHealth - Math.max(0, attacks));
         carrierHealthByPlayer.put(playerIndex, updatedHealth);
+        if (updatedHealth <= 0) {
+            destroyUndeployedDronesInCarrier(playerIndex);
+        }
         return updatedHealth;
+    }
+
+    private void destroyUndeployedDronesInCarrier(int playerIndex) {
+        PlayerState player = getPlayerByIndex(playerIndex);
+        if (player == null) {
+            return;
+        }
+
+        for (Drone drone : player.getDrones()) {
+            if (!drone.isAlive() || drone.isDeployed()) {
+                continue;
+            }
+            drone.setCurrentHp(0);
+            drone.receiveDamage(1);
+        }
     }
 
     public synchronized int getCarrierHealth(int playerIndex) {
