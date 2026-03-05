@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 
 import com.example.proyect.VOs.GameResult;
 import com.example.proyect.auth.service.GameService;
+import com.example.proyect.auth.service.RankingService;
 import com.example.proyect.game.GameRoom;
 import com.example.proyect.game.PlayerState;
 import com.example.proyect.game.units.Unit.HexCoord;
@@ -29,6 +30,7 @@ import com.example.proyect.lobby.service.LobbyService;
 import com.example.proyect.persistence.classes.Game;
 import com.example.proyect.persistence.classes.GameState;
 import com.example.proyect.persistence.classes.GameStatus;
+import com.example.proyect.persistence.classes.User;
 import com.example.proyect.websocket.packet.Packet;
 import com.example.proyect.persistence.repos.UserRepository;
 
@@ -69,6 +71,7 @@ public class GameController {
     private final LobbyService lobbyService;
 
     private final GameService gameService;
+    private final RankingService rankingService;
     private final UserRepository userRepository;
     // todos los rooms x id
     private final Map<String, GameRoom> rooms = new ConcurrentHashMap<>();
@@ -90,9 +93,10 @@ public class GameController {
     //
     private final AtomicInteger roomCounter = new AtomicInteger(1);
 
-    public GameController(LobbyService lobbyService, GameService gameService, UserRepository userRepository) { //inicializa controlador
+    public GameController(LobbyService lobbyService, GameService gameService, RankingService rankingService, UserRepository userRepository) { //inicializa controlador
         this.lobbyService = lobbyService;
         this.gameService = gameService;
+        this.rankingService = rankingService;
         this.userRepository = userRepository;
     }
     public void bindSessionUser(String sessionId, Long userId) { //vincula sesion websocket con userid para trazabilidad
@@ -1132,7 +1136,8 @@ public class GameController {
 
         userRepository.findById(winnerUserId).ifPresent(user -> {
             user.registerWin(10);
-            userRepository.save(user);
+            User savedUser = userRepository.save(user);
+            rankingService.createSnapshot(savedUser.getUserId(), savedUser.getScore());
         });
     }
 
