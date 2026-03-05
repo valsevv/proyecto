@@ -1,0 +1,16 @@
+# Build / IDE
+back/target/
+**/.mvn/
+**/.idea/
+**/.classpath
+**/.project
+**/.settings/
+
+# Third-party / vendored
+front/lib/
+
+# Assets
+front/assets/
+
+# SQL dumps or generated
+SQL/

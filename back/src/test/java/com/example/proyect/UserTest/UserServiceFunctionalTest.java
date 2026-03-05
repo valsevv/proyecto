@@ -1,6 +1,4 @@
-//Test Funcional del servicio UserService. Prueba el servicio y tambien el repositorio
-
-package com.example.proyect.UserTest;
+package com.example.proyect.usertest;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -11,9 +9,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.example.proyect.auth.Exceptions.EmailAlreadyExistsException;
-import com.example.proyect.auth.Exceptions.InvalidCredentialsException;
-import com.example.proyect.auth.Exceptions.UserAlreadyExistsException;
+import com.example.proyect.auth.exceptions.EmailAlreadyExistsException;
+import com.example.proyect.auth.exceptions.InvalidCredentialsException;
+import com.example.proyect.auth.exceptions.UserAlreadyExistsException;
 import com.example.proyect.auth.service.UserService;
 import com.example.proyect.persistence.classes.User;
 import com.example.proyect.persistence.repos.UserRepository;
@@ -29,9 +27,7 @@ class UserServiceFunctionalTest {
     private UserRepository userRepository;
 
     @Test
-    //Se prueba crear un usuario 
     void shouldRegisterUserSuccessfully() {
-
         User user = userService.register("alexis", "alexis@mail.com", "123456");
 
         assertNotNull(user.getUserId());
@@ -44,70 +40,46 @@ class UserServiceFunctionalTest {
 
         assertTrue(userRepository.existsByUsername("alexis"));
         assertTrue(userRepository.existsByEmail("alexis@mail.com"));
-    
-        //Si quisieramos usar el Repositorio para traer ese usuario creado
-        // Optional<User> optionalUser = userRepository.findByUsername("alexis");
-
-        // if (optionalUser.isPresent()) {
-        //     User user2 = optionalUser.get();
-        //     System.out.println("[DEBUG]-> El usuario existe : " + user2.getUsername() );
-        //     System.out.println("[DEBUG]--> Su Email es : " + user2.getEmail() );
-        //     System.out.println("[DEBUG]---> Su puntaje es : " + user2.getScore() );
-        //     System.out.println("[DEBUG]----> Password hasheado es : " + user2.getPasswordHash() );
-        // }
     }
 
     @Test
     void shouldNotAllowDuplicateUsername() {
-
         userService.register("duplicate_u", "dup_u@mail.com", "123456789");
 
-        assertThrows(UserAlreadyExistsException.class, () ->
-            userService.register("duplicate_u", "other_u@mail.com", "456456456")
-        );
+        assertThrows(
+                UserAlreadyExistsException.class,
+                () -> userService.register("duplicate_u", "other_u@mail.com", "456456456"));
     }
 
     @Test
     void shouldNotAllowDuplicateEmail() {
-
         userService.register("user_same_1", "same_u@mail.com", "123456789");
 
-        assertThrows(EmailAlreadyExistsException.class, () ->
-            userService.register("user_same_2", "same_u@mail.com", "456456456")
-        );
+        assertThrows(
+                EmailAlreadyExistsException.class,
+                () -> userService.register("user_same_2", "same_u@mail.com", "456456456"));
     }
 
     @Test
     void shouldLoginSuccessfully() {
-
         userService.register("loginUser", "login@mail.com", "mypassword");
 
         User logged = userService.login("loginUser", "mypassword");
-    
-        // Si quisiera debugear y ver en el Debug Console mas info del usuario
-        // System.out.println("[DEBUG]-> Usuario logeado : " + logged.getUsername() );
-        // System.out.println("[DEBUG]--> Email  : " + logged.getEmail() );
-        // System.out.println("[DEBUG]---> ultima conexion : " + logged.getLastConnection() );
-        
+
         assertNotNull(logged.getLastConnection());
     }
 
     @Test
     void shouldFailLoginWithWrongPassword() {
-
         userService.register("wrong_pwd_user", "wrong_pwd_user@mail.com", "correct");
 
-        assertThrows(InvalidCredentialsException.class, () ->
-            userService.login("wrong_pwd_user", "wrong")
-        );
+        assertThrows(
+                InvalidCredentialsException.class,
+                () -> userService.login("wrong_pwd_user", "wrong"));
     }
 
     @Test
     void shouldFailLoginIfUserDoesNotExist() {
-
-        assertThrows(InvalidCredentialsException.class, () ->
-                userService.login("ghost", "123")
-        );
+        assertThrows(InvalidCredentialsException.class, () -> userService.login("ghost", "123"));
     }
-
 }

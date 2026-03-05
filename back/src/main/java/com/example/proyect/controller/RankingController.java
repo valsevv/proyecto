@@ -23,16 +23,14 @@ import jakarta.persistence.EntityNotFoundException;
 public class RankingController {
 
     //gestiona puntajes historicos de usuarios
-
     private final RankingService rankingService;
 
     public RankingController(RankingService rankingService) {
         this.rankingService = rankingService;
     }
 
-     //POST /api/ranking/snapshot
-     //Crea un nuevo snapshot de ranking para un usuario.
-
+    //POST /api/ranking/snapshot
+    //Crea un nuevo snapshot de ranking para un usuario.
     @PostMapping("/snapshot")
     public ResponseEntity<Ranking> createSnapshot(
             @RequestParam Long userId,
@@ -45,19 +43,16 @@ public class RankingController {
         }
     }
 
-
-     //GET /api/ranking/history/{userId}
-     //Devuelve todo el historial de ranking de un usuario.
+    //GET /api/ranking/history/{userId}
+    //Devuelve todo el historial de ranking de un usuario.
     @GetMapping("/history/{userId}")
     public ResponseEntity<List<Ranking>> getHistory(@PathVariable Long userId) {
         List<Ranking> history = rankingService.getHistoryByUserId(userId);
         return ResponseEntity.ok(history);
     }
 
-
-     //GET /api/ranking/best/{userId}
-     //Devuelve el mejor puntaje histórico de un usuario.
-
+    //GET /api/ranking/best/{userId}
+    //Devuelve el mejor puntaje histórico de un usuario.
     @GetMapping("/best/{userId}")
     public ResponseEntity<Ranking> getBest(@PathVariable Long userId) {
         Ranking best = rankingService.getBestByUserId(userId);
@@ -67,10 +62,8 @@ public class RankingController {
         return ResponseEntity.ok(best);
     }
 
-
-     // GET /api/ranking/top
-     //evuelve el Top N global (por defecto 10)
-
+    // GET /api/ranking/top
+    //evuelve el Top N global (por defecto 10)
     @GetMapping("/top")
     public ResponseEntity<List<RankingTopDTO>> getTop(
             @RequestParam(defaultValue = "10") int limit) {
@@ -78,8 +71,8 @@ public class RankingController {
         return ResponseEntity.ok(top);
     }
 
-     //DELETE /api/ranking/history/{userId}
-     //Borra todo el historial de ranking de un usuario.
+    //DELETE /api/ranking/history/{userId}
+    //Borra todo el historial de ranking de un usuario.
     @DeleteMapping("/history/{userId}")
     public ResponseEntity<Void> deleteHistory(@PathVariable Long userId) {
         rankingService.deleteByUserId(userId);

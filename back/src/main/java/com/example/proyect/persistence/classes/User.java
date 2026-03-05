@@ -8,6 +8,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 
@@ -44,10 +45,10 @@ public class User {
     @Column(nullable = false)
     private int score = 0;
 
-    @Column(name = "created_at", nullable = false, updatable = false, columnDefinition = "TIMESTAMPTZ DEFAULT now()")
+    @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 
-    @Column(name = "last_connection", columnDefinition = "TIMESTAMPTZ DEFAULT now()")
+    @Column(name = "last_connection")
     private OffsetDateTime lastConnection;
 
     protected User() {}
@@ -57,6 +58,16 @@ public class User {
         setEmail(email);
         setPasswordHash(passwordHash);
         this.createdAt = OffsetDateTime.now();
+    }
+
+    @PrePersist
+    public void prePersist() {
+        if (createdAt == null) {
+            createdAt = OffsetDateTime.now();
+        }
+        if (lastConnection == null) {
+            lastConnection = OffsetDateTime.now();
+        }
     }
 
     // Getters

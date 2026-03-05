@@ -1,5 +1,5 @@
-package com.example.proyect.UserTest;
-// Test unitario basico de la clase
+package com.example.proyect.usertest;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -24,16 +24,13 @@ class UserUnitTest {
 
     @Test
     void shouldNotAllowBlankUsername() {
-        assertThrows(IllegalArgumentException.class, () ->
-                new User("", "mail@test.com", "hash")
-        );
+        assertThrows(IllegalArgumentException.class, () -> new User("", "mail@test.com", "hash"));
     }
 
     @Test
     void shouldNotAllowInvalidEmail() {
-        assertThrows(IllegalArgumentException.class, () ->
-                new User("alex", "invalidEmail", "hash")
-        );
+        assertThrows(
+                IllegalArgumentException.class, () -> new User("alex", "invalidEmail", "hash"));
     }
 
     @Test

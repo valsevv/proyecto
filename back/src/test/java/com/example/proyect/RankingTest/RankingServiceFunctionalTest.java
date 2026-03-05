@@ -15,14 +15,12 @@ import com.example.proyect.auth.service.UserService;
 import com.example.proyect.persistence.classes.Ranking;
 import com.example.proyect.persistence.classes.User;
 
-
 @SpringBootTest
 @Transactional
 class RankingServiceFunctionalTest {
 
     @Autowired
     private RankingService rankingService;
-
 
     @Autowired
     private UserService userService;
@@ -41,7 +39,7 @@ class RankingServiceFunctionalTest {
     @Test
     void shouldReturnBestScore() {
 
-       User user = userService.register("alexis", "alexis@mail.com", "123456");
+        User user = userService.register("alexis", "alexis@mail.com", "123456");
 
         rankingService.createSnapshot(user.getUserId(), 50);
         rankingService.createSnapshot(user.getUserId(), 200);
@@ -67,10 +65,10 @@ class RankingServiceFunctionalTest {
 
         // Filter to only our test users
         List<RankingTopDTO> ourUsers = top.stream()
-            .filter(dto -> dto.getUserId().equals(u1.getUserId()) || 
-                          dto.getUserId().equals(u2.getUserId()) || 
-                          dto.getUserId().equals(u3.getUserId()))
-            .toList();
+                .filter(dto -> dto.getUserId().equals(u1.getUserId())
+                || dto.getUserId().equals(u2.getUserId())
+                || dto.getUserId().equals(u3.getUserId()))
+                .toList();
 
         assertEquals(3, ourUsers.size());
         assertEquals(u2.getUserId(), ourUsers.get(0).getUserId()); // 300 points

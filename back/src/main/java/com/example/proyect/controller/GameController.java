@@ -40,25 +40,31 @@ public class GameController {
     private static final double NAVAL_ATTACK_VERTICAL_OFFSET = 90.0;
 
     @Value("${game.actions-per-turn:10}")
-    private int actionsPerTurn;
+    private int actionsPerTurn = 10;
 
     @Value("${game.vision-range-aereo:4}")
-    private int aerialVisionRange;
+    private int aerialVisionRange = 4;
 
     @Value("${game.vision-range-naval:3}")
-    private int navalVisionRange;
+    private int navalVisionRange = 3;
 
     @Value("${game.missile.max-distance:15}")
-    private int missileMaxDistance;
+    private int missileMaxDistance = 15;
 
     @Value("${game.missile.damage-percent-on-naval:0.5}")
-    private double missileDamagePercentOnNaval;
+    private double missileDamagePercentOnNaval = 0.5;
 
     @Value("${game.aerial-attack-fuel-cost:2}")
-    private int aerialAttackFuelCost;
+    private int aerialAttackFuelCost = 2;
 
     @Value("${game.carrier-hits-to-destroy:5}")
-    private int carrierHitsToDestroy;
+    private int carrierHitsToDestroy = 5;
+
+    @Value("${game.drone.max-move-distance:6}")
+    private int droneMaxMoveDistance = 6;
+
+    @Value("${game.carrier.max-move-distance:3}")
+    private int carrierMaxMoveDistance = 3;
 
     // Must match frontend HexGrid size (front/scenes/MainScene.js -> new HexGrid(this, 35, ...))
     private static final double HEX_SIZE_PX = 35.0;
@@ -69,13 +75,13 @@ public class GameController {
     private final GameService gameService;
     // todos los rooms x id
     private final Map<String, GameRoom> rooms = new ConcurrentHashMap<>();
-    
+
     // T trackea en que room esta cada sesion
     private final Map<String, String> sessionToRoom = new ConcurrentHashMap<>();
-    
+
     // Trackea user id por sesion
     private final Map<String, Long> sessionToUserId = new ConcurrentHashMap<>();
-    
+
     //GamesId de la session
     private final Map<Long, Game> games = new ConcurrentHashMap<>();
 
@@ -91,29 +97,37 @@ public class GameController {
         this.lobbyService = lobbyService;
         this.gameService = gameService;
     }
+
     public void bindSessionUser(String sessionId, Long userId) { //vincula sesion websocket con userid para trazabilidad
         if (sessionId != null && userId != null) {
             sessionToUserId.put(sessionId, userId);
         }
     }
+
     public Long getUserIdBySession(String sessionId) {
         return sessionToUserId.get(sessionId);
     } //devuelve userid asociado a una sesion
-    
 
     //crea el froom apartir del lobby, si ya existe lo retorna
     private GameRoom findOrCreateRoomForLobby(Lobby lobby) {
 
         return rooms.computeIfAbsent(
-            lobby.getLobbyId(),
-            id -> {
-                GameRoom newRoom = new GameRoom(id, actionsPerTurn, aerialVisionRange, navalVisionRange, carrierHitsToDestroy);
-                log.info("Created game room {} from lobby {}", id, lobby.getLobbyId());
-                return newRoom;
-            }
+                lobby.getLobbyId(),
+                id -> {
+                    GameRoom newRoom = new GameRoom(
+                            id,
+                            actionsPerTurn,
+                            aerialVisionRange,
+                            navalVisionRange,
+                            carrierHitsToDestroy,
+                            droneMaxMoveDistance,
+                            carrierMaxMoveDistance,
+                            missileMaxDistance);
+                    log.info("Created game room {} from lobby {}", id, lobby.getLobbyId());
+                    return newRoom;
+                }
         );
     }
-
 
     private Game createGameFromLobby(Lobby lobby) { //crea una partida desde un lobby
 
@@ -146,12 +160,13 @@ public class GameController {
         log.info("Created game {} from lobby {}", gameId, lobbyId);
 
         return newGame;
-}
- 
+    }
 
     private GameRoom getRoomForSession(String sessionId) { //obtiene el room de una sesion, o null si no hay rooms
         String roomId = sessionToRoom.get(sessionId);
-        if (roomId == null) return null;
+        if (roomId == null) {
+            return null;
+        }
         return rooms.get(roomId);
     }
 
@@ -179,14 +194,16 @@ public class GameController {
         });
     }
 
-   public GameResult joinGame(String sessionId, String lobbyId, Long userId) { //mete al jugador en el lobby y devuelve packet de bienvenida
+    public GameResult joinGame(String sessionId, String lobbyId, Long userId) { //mete al jugador en el lobby y devuelve packet de bienvenida
 
         if (sessionToRoom.containsKey(sessionId)) {
             return GameResult.error("Already in a game");
         }
 
         Lobby lobby = lobbyService.getLobbyById(lobbyId).orElse(null);
-        if (lobby == null) return GameResult.error("Lobby not found");
+        if (lobby == null) {
+            return GameResult.error("Lobby not found");
+        }
 
         if (!lobby.getPlayerIds().contains(userId)) {
             return GameResult.error("You are not in this lobby");
@@ -202,7 +219,9 @@ public class GameController {
         if (!isLoadGame) {
             // PARTIDA NUEVA
             player = room.addPlayer(sessionId);
-            if (player == null) return GameResult.error("Game is full");
+            if (player == null) {
+                return GameResult.error("Game is full");
+            }
 
         } else {
             // PARTIDA CARGADA
@@ -225,16 +244,15 @@ public class GameController {
         sessionToRoom.put(sessionId, room.getRoomId());
 
         Packet welcome = Packet.welcome(
-            sessionId,
-            player.getPlayerIndex(),
-            isLoadGame,
-            lobby.getGameId()
+                sessionId,
+                player.getPlayerIndex(),
+                isLoadGame,
+                lobby.getGameId()
         );
 
         // =========================
         // empieza uego si esta pronto
         // =========================
-
         if (room.allPlayersConnected()) {
             if (isLoadGame) {
                 lobby.markStarted();
@@ -283,7 +301,7 @@ public class GameController {
         return player;
     }
 
-   @SuppressWarnings("unchecked")
+    @SuppressWarnings("unchecked")
     private void loadSavedGameIntoRoom(Long gameId, GameRoom room) { //carga partida en un room
 
         log.info("[GameController] -> begin loadSavedGameIntoRoom ");
@@ -308,49 +326,46 @@ public class GameController {
         gameLocks.putIfAbsent(gameId, new ReentrantLock());
 
         log.info("[GameController] -> end loadSavedGameIntoRoom ");
-        
 
-    }   
-    
-    
+    }
 
     public GameResult selectSide(String sessionId, String side) { //manejador de seleccion de lados para jugador
         log.info("[GameController] -> begin selectSide");
         log.info("[GameController] -> selectSide, sessionId {}, side {}", sessionId, side);
-        
+
         // valida lado
         if (!"Naval".equals(side) && !"Aereo".equals(side)) {
             return GameResult.error("Invalid side. Must be 'Naval' or 'Aereo'");
         }
-        
+
         GameRoom room = getRoomForSession(sessionId);
         log.info("[GameController] -> room {}", room);
 
         if (room == null) {
             return GameResult.error("You are not in a game room");
         }
-        
+
         PlayerState player = room.getPlayerBySession(sessionId);
         log.info("[GameController] -> player {}", player);
 
         if (player == null) {
             return GameResult.error("You are not in the game");
         }
-        
+
         int playerIndex = player.getPlayerIndex();
-        
+
         // revisa si el jugador ya eligio lado
         if (room.getPlayerSide(playerIndex) != null) {
             return GameResult.error("You already selected a side");
         }
-        
+
         // el primer jugador elige
         // al segundo se le asigna el lado automaticamente
         room.setPlayerSide(playerIndex, side);
         room.createDronesForSide(playerIndex, side);
-        
+
         log.info("Player {} selected side {} in room {}", playerIndex, side, room.getRoomId());
-        
+
         // esto revisa que ambos jugadores tengan lado
         if (room.bothSidesSelected() && room.isFull()) {
             room.startGame();
@@ -367,7 +382,6 @@ public class GameController {
         return GameResult.ok(Packet.sideChosen(playerIndex, side));
     }
 
-
     public int removePlayer(String sessionId) { //eliminar player de un room
         GameRoom room = getRoomForSession(sessionId);
         if (room == null) {
@@ -382,10 +396,10 @@ public class GameController {
             Long linkedGameId = roomToGame.get(room.getRoomId());
             clearLoadedGameMapping(linkedGameId, room.getRoomId());
             room.reset();
-            
+
             // limpa rooms
             cleanupEmptyRooms();
-            
+
             return removed.getPlayerIndex();
         }
         return -1;
@@ -394,7 +408,7 @@ public class GameController {
     public GameResult saveAndExit(String sessionId) { //funcionalidad e guardado y salida en base
 
         log.info("[GameController] -> begin saveAndExit ");
-     
+
         GameResult firstValidation = saveAndExitFirstValidation(sessionId);
         if (firstValidation != null) {
             return firstValidation;
@@ -405,17 +419,17 @@ public class GameController {
 
         PlayerState p0 = room.getPlayerByIndex(0);
         PlayerState p1 = room.getPlayerByIndex(1);
-        
+
         Long player1Id = sessionToUserId.get(p0.getSessionId());
         Long player2Id = sessionToUserId.get(p1.getSessionId());
-        
+
         log.info("[GameController] -> player1Id {}, player2Id {}", player1Id, player2Id);
 
         if (player1Id == null || player2Id == null) {
             return GameResult.error("Cannot resolve players for persistence");
         }
-         
-        GameState persistedState = buildPersistedState(room,  actor,  sessionId);
+
+        GameState persistedState = buildPersistedState(room, actor, sessionId);
 
         String roomId = room.getRoomId();
         Long gameId = resolveGameId(roomId, player1Id, player2Id);
@@ -437,7 +451,6 @@ public class GameController {
             gameLock.unlock();
         }
 
-        
         clearLoadedGameMapping(gameToSave.getId(), roomId);
         List<String> sessionsInRoom = getSessionsInSameRoom(sessionId);
 
@@ -451,20 +464,19 @@ public class GameController {
         cleanupEmptyRooms();
 
         log.info("Game room {} saved and closed by player {}. Persisted gameId={}", roomId, actor.getPlayerIndex(), gameToSave.getId());
-        
+
         return GameResult.ok(Packet.gameSaved(gameToSave.getId(), actor.getPlayerIndex()));
     }
 
-
-    private GameResult saveAndExitFirstValidation(String sessionId ) { //valida antes de guardar
+    private GameResult saveAndExitFirstValidation(String sessionId) { //valida antes de guardar
 
         GameRoom room = getRoomForSession(sessionId);
         log.info("[GameController] -> saveAndExitFirstValidation, sessionId {}", sessionId);
-        
+
         if (room == null) {
             return GameResult.error("You are not in a game room");
         }
-        
+
         PlayerState actor = room.getPlayerBySession(sessionId);
         log.info("[GameController] -> saveAndExitFirstValidation, actor {}", actor);
 
@@ -481,14 +493,14 @@ public class GameController {
         return null;
     }
 
-    private GameState buildPersistedState(GameRoom room, PlayerState actor, String sessionId){
+    private GameState buildPersistedState(GameRoom room, PlayerState actor, String sessionId) {
         log.info("[GameController] -> begin buildPersistedState, room {}, actor {}, sessionId {}", room, actor, sessionId);
 
         GameState persistedState = new GameState();
 
         persistedState.setStatus(GameStatus.SAVED);
         persistedState.setTurn(room.getCurrentTurn());
-        
+
         //La meta dato en que va a ir guardada en jsonb
         Map<String, Object> meta = new LinkedHashMap<>();
         meta.put("roomId", room.getRoomId());
@@ -503,25 +515,24 @@ public class GameController {
 
         return persistedState;
     }
-     
-    private Long resolveGameId(String roomId, Long player1Id, Long player2Id){
-        if (!gameService.existsGameBetweenUsers(player1Id, player2Id)){
+
+    private Long resolveGameId(String roomId, Long player1Id, Long player2Id) {
+        if (!gameService.existsGameBetweenUsers(player1Id, player2Id)) {
             return null;
-        }    
+        }
 
         Long gameId = roomToGame.getOrDefault(roomId, null);
-            
+
         if (gameId == null) {
             gameId = games.values().stream()
                     .filter(g -> (player1Id.equals(g.getPlayer1Id()) && player2Id.equals(g.getPlayer2Id()))
-                            || (player1Id.equals(g.getPlayer2Id()) && player2Id.equals(g.getPlayer1Id())))
+                    || (player1Id.equals(g.getPlayer2Id()) && player2Id.equals(g.getPlayer1Id())))
                     .map(Game::getId)
                     .findFirst()
                     .orElse(null);
         }
         return gameId;
     }
-
 
     public GameResult processMove(String sessionId, int droneIndex, double x, double y) { //procesa un movimiento
         log.info("[GameController] -> processMove sessionId {}, droneIndex {} ", sessionId, droneIndex);
@@ -533,8 +544,8 @@ public class GameController {
         log.info("[GameController] -> room {}", room);
 
         PlayerState player = room.getPlayerBySession(sessionId);//player llega en null al cargar partida
-        log.info("[GameController] -> player  {}", player );
-        
+        log.info("[GameController] -> player  {}", player);
+
         if (player == null) {
             return GameResult.error("You are not in the game");
         }
@@ -559,13 +570,13 @@ public class GameController {
 
         // consume accion
         room.useAction();
-        
-        log.debug("Player {} moved drone {} to ({}, {}) in room {}", 
-            player.getPlayerIndex(), droneIndex, x, y, room.getRoomId());
+
+        log.debug("Player {} moved drone {} to ({}, {}) in room {}",
+                player.getPlayerIndex(), droneIndex, x, y, room.getRoomId());
 
         boolean destroyedByFuel = !drone.isAlive();
         Packet movePacket = Packet.moveDrone(player.getPlayerIndex(), droneIndex, x, y, drone.getFuel(), destroyedByFuel);
-        
+
         // revisa si deberia pasar de turno
         if (room.getActionsRemaining() <= 0) {
             room.endTurn();
@@ -576,8 +587,6 @@ public class GameController {
 
         return GameResult.withActionsRemaining(movePacket, room.getActionsRemaining());
     }
-
-
 
     public GameResult processCarrierMove(String sessionId, double x, double y) { //procesa movimiento de carrier
         GameRoom room = getRoomForSession(sessionId);
@@ -609,10 +618,10 @@ public class GameController {
         return GameResult.withActionsRemaining(movedPacket, room.getActionsRemaining());
     }
 
-    public GameResult processAttack(String sessionId, int attackerIndex, 
-                                     int targetPlayerIndex, int targetDroneIndex,
-                                     Double manualLineX, Double manualLineY,
-                                     Double destinationX, Double destinationY, String targetType) { //procesa ataque
+    public GameResult processAttack(String sessionId, int attackerIndex,
+            int targetPlayerIndex, int targetDroneIndex,
+            Double manualLineX, Double manualLineY,
+            Double destinationX, Double destinationY, String targetType) { //procesa ataque
 
         GameRoom room = getRoomForSession(sessionId);
         if (room == null) {
@@ -622,22 +631,26 @@ public class GameController {
         PlayerState attacker = room.getPlayerBySession(sessionId);
         GameResult validation = validateAttackContext(room, sessionId, attacker);
         log.info("[GameController] ->  validation {}", validation);
-        if (validation != null) return validation;
-                
+        if (validation != null) {
+            return validation;
+        }
+
         Drone attackerDrone = room.getDrone(attacker.getPlayerIndex(), attackerIndex);
         Drone targetDrone = targetDroneIndex >= 0 ? room.getDrone(targetPlayerIndex, targetDroneIndex) : null;
         boolean manualBlindShot = targetDroneIndex < 0;
         boolean carrierTarget = "carrier".equalsIgnoreCase(targetType);
-                                        
+
         GameResult droneValidation = validateDrones(room, attacker, attackerDrone, targetDrone, targetPlayerIndex, manualBlindShot, carrierTarget);
         log.info("[GameController] ->  droneValidation {}", droneValidation);
-        if (droneValidation != null) return droneValidation;
+        if (droneValidation != null) {
+            return droneValidation;
+        }
 
         int actionCost = getAttackActionCost(attackerDrone);
         if (room.getActionsRemaining() < actionCost) {
             return GameResult.error("Not enough actions remaining for this attack");
         }
-        
+
         if (manualBlindShot && (manualLineX == null || manualLineY == null)) {
             return GameResult.error("Manual shot requires target coordinates");
         }
@@ -652,10 +665,10 @@ public class GameController {
             double targetX = targetDrone != null ? targetDrone.getPosition().getX() : lineX;
             double targetY = targetDrone != null ? targetDrone.getPosition().getY() : lineY;
             double targetDistance = hexDistanceBetween(
-                attackerDrone.getPosition().getX(),
-                attackerDrone.getPosition().getY(),
-                targetX,
-                targetY
+                    attackerDrone.getPosition().getX(),
+                    attackerDrone.getPosition().getY(),
+                    targetX,
+                    targetY
             );
             if (targetDistance > attackerDrone.getWeapon().getRange()) {
                 return GameResult.error("Target out of aerial attack range");
@@ -690,16 +703,16 @@ public class GameController {
         if (!attackResolution.hit()) {
             room.useActions(actionCost);
             Packet missPacket = Packet.attackResult(
-                attacker.getPlayerIndex(), attackerIndex,
-                targetPlayerIndex, targetDroneIndex,
-                0, targetDrone != null ? targetDrone.getCurrentHp() : 0, false,
-                lineX, lineY,
-                room.getActionsRemaining(),
-                attackerFinalPosition.getX(), attackerFinalPosition.getY(),
-                attackerDrone.getCurrentHp(), !attackerDrone.isAlive(),
-                attackerAmmo,
-                room.getCarrierHealth(targetPlayerIndex),
-                room.isCarrierDestroyed(targetPlayerIndex)
+                    attacker.getPlayerIndex(), attackerIndex,
+                    targetPlayerIndex, targetDroneIndex,
+                    0, targetDrone != null ? targetDrone.getCurrentHp() : 0, false,
+                    lineX, lineY,
+                    room.getActionsRemaining(),
+                    attackerFinalPosition.getX(), attackerFinalPosition.getY(),
+                    attackerDrone.getCurrentHp(), !attackerDrone.isAlive(),
+                    attackerAmmo,
+                    room.getCarrierHealth(targetPlayerIndex),
+                    room.isCarrierDestroyed(targetPlayerIndex)
             );
             return finalizeTurn(room, missPacket);
         }
@@ -720,21 +733,21 @@ public class GameController {
         room.useActions(actionCost);
 
         log.info("Player {} drone {} attacked player {} drone {} for {} damage (remaining HP: {}) in room {}",
-            attacker.getPlayerIndex(), attackerIndex, 
-            targetPlayerIndex, targetDroneIndex,
-            damage, targetDrone != null ? targetDrone.getCurrentHp() : 0, room.getRoomId());
+                attacker.getPlayerIndex(), attackerIndex,
+                targetPlayerIndex, targetDroneIndex,
+                damage, targetDrone != null ? targetDrone.getCurrentHp() : 0, room.getRoomId());
 
         Packet attackPacket = Packet.attackResult(
-            attacker.getPlayerIndex(), attackerIndex,
-            targetPlayerIndex, targetDroneIndex,
-            damage, targetDrone != null ? targetDrone.getCurrentHp() : 0, true,
-            lineX, lineY,
-            room.getActionsRemaining(),
-            attackerFinalPosition.getX(), attackerFinalPosition.getY(),
-            attackerDrone.getCurrentHp(), !attackerDrone.isAlive(),
-            attackerAmmo,
-            targetCarrierHealth,
-            targetCarrierDestroyed
+                attacker.getPlayerIndex(), attackerIndex,
+                targetPlayerIndex, targetDroneIndex,
+                damage, targetDrone != null ? targetDrone.getCurrentHp() : 0, true,
+                lineX, lineY,
+                room.getActionsRemaining(),
+                attackerFinalPosition.getX(), attackerFinalPosition.getY(),
+                attackerDrone.getCurrentHp(), !attackerDrone.isAlive(),
+                attackerAmmo,
+                targetCarrierHealth,
+                targetCarrierDestroyed
         );
 
         // Check game over
@@ -752,7 +765,7 @@ public class GameController {
         if (room == null) {
             return GameResult.error("You are not in a game room");
         }
-    
+
         if (attacker == null) {
             return GameResult.error("You are not in the game");
         }
@@ -766,10 +779,10 @@ public class GameController {
     }
 
     private GameResult validateDrones(GameRoom room, PlayerState attacker, Drone attackerDrone,
-            Drone targetDrone,int targetPlayerIndex, boolean manualBlindShot, boolean carrierTarget) {
-                
-    log.info("[GameController] -> begin validateDrones, attacker {}, attackerDrone {}", attacker, attackerDrone);
-    
+            Drone targetDrone, int targetPlayerIndex, boolean manualBlindShot, boolean carrierTarget) {
+
+        log.info("[GameController] -> begin validateDrones, attacker {}, attackerDrone {}", attacker, attackerDrone);
+
         if (attacker.getPlayerIndex() == targetPlayerIndex) {
             return GameResult.error("Cannot attack your own drones");
         }
@@ -820,10 +833,9 @@ public class GameController {
         }
 
         log.info("[GameController] -> End validateDrones");
-        
+
         return null;
     }
-
 
     private HexCoord resolveAerialFinalPosition(GameRoom room, HexCoord requestedDestination, Drone attackerDrone) { //resuelve la posicion final del dron aereo
         if (!room.isPositionOccupied(requestedDestination, attackerDrone)) {
@@ -883,10 +895,10 @@ public class GameController {
         }
 
         double traveledDistance = hexDistanceBetween(
-            attackerDrone.getPosition().getX(),
-            attackerDrone.getPosition().getY(),
-            lineX,
-            lineY
+                attackerDrone.getPosition().getX(),
+                attackerDrone.getPosition().getY(),
+                lineX,
+                lineY
         );
         if (!missileWeapon.canReach(traveledDistance) || traveledDistance > missileMaxDistance) {
             navalDrone.consumeMissile();
@@ -935,12 +947,13 @@ public class GameController {
 
     private HexCoord getNavalAttackPosition(Drone targetDrone) {
         return new HexCoord(
-            targetDrone.getPosition().getX(),
-            targetDrone.getPosition().getY() - NAVAL_ATTACK_VERTICAL_OFFSET
+                targetDrone.getPosition().getX(),
+                targetDrone.getPosition().getY() - NAVAL_ATTACK_VERTICAL_OFFSET
         );
     }
 
     private record AttackResolution(int damage, boolean hit) {
+
     }
 
     private int getAttackerAmmoForPacket(Drone attackerDrone) {
@@ -954,10 +967,8 @@ public class GameController {
     }
 
 //Las 3 funciones anteriores se separan para bajar la complejidad ciclomatica
-
-
     public GameResult endTurn(String sessionId) {
-        
+
         GameRoom room = getRoomForSession(sessionId);
         log.info("[GameController] -> endTurn, room {}, sessionId {}", room, sessionId);
 
@@ -974,7 +985,7 @@ public class GameController {
         room.endTurn();
 
         log.info("Turn ended in room {}. Now player {}'s turn with {} actions",
-            room.getRoomId(), room.getCurrentTurn(), room.getActionsRemaining());
+                room.getRoomId(), room.getCurrentTurn(), room.getActionsRemaining());
 
         Packet turnPacket = Packet.turnStart(room.getCurrentTurn(), room.getActionsRemaining());
         if (destroyedByIdleIndexes.isEmpty()) {
@@ -994,7 +1005,6 @@ public class GameController {
         payload.put("fuelUpdates", fuelUpdates);
         return GameResult.ok(Packet.of(turnPacket.getType(), payload));
     }
-
 
     public GameResult processRecall(String sessionId, int droneIndex) { //procesa recalls, guarda un dron deplegado, llena de combustible y misiles o bombas
         GameRoom room = getRoomForSession(sessionId);
@@ -1030,9 +1040,9 @@ public class GameController {
 
         int missiles = drone instanceof NavalDrone nd ? nd.getMissiles() : 0;
         Packet recallPacket = Packet.droneRecalled(
-            player.getPlayerIndex(), droneIndex,
-            drone.getFuel(), drone.getMaxFuel(), missiles,
-            room.getActionsRemaining()
+                player.getPlayerIndex(), droneIndex,
+                drone.getFuel(), drone.getMaxFuel(), missiles,
+                room.getActionsRemaining()
         );
 
         log.info("Player {} recalled drone {} in room {}", player.getPlayerIndex(), droneIndex, room.getRoomId());
@@ -1042,40 +1052,51 @@ public class GameController {
 
     public Map<String, Object> getGameState(String sessionId) {
         GameRoom room = getRoomForSession(sessionId);
-        if (room == null) return Map.of();
+        if (room == null) {
+            return Map.of();
+        }
         return room.toStateMap();
     }
 
     public int getCurrentTurn(String sessionId) {
         GameRoom room = getRoomForSession(sessionId);
-        if (room == null) return 0;
+        if (room == null) {
+            return 0;
+        }
         return room.getCurrentTurn();
     }
 
     public int getActionsRemaining(String sessionId) {
         GameRoom room = getRoomForSession(sessionId);
-        if (room == null) return 0;
+        if (room == null) {
+            return 0;
+        }
         return room.getActionsRemaining();
     }
 
     public boolean isGameStarted(String sessionId) {
         GameRoom room = getRoomForSession(sessionId);
-        if (room == null) return false;
+        if (room == null) {
+            return false;
+        }
         return room.isGameStarted();
     }
 
     private boolean isPlayerDefeated(GameRoom room, int playerIndex) {
         PlayerState player = room.getPlayerByIndex(playerIndex);
-        if (player == null) return false;
-        
+        if (player == null) {
+            return false;
+        }
+
         for (Drone drone : player.getDrones()) {
-            if (drone.isAlive()) return false;
+            if (drone.isAlive()) {
+                return false;
+            }
         }
         return true;
     }
 
     // room ID de la session  
-     
     public String getRoomId(String sessionId) {
         return sessionToRoom.get(sessionId);
     }
@@ -1083,12 +1104,14 @@ public class GameController {
     // Todas las sessionId de una session
     public java.util.List<String> getSessionsInSameRoom(String sessionId) {
         String roomId = sessionToRoom.get(sessionId);
-        if (roomId == null) return java.util.List.of();
-        
+        if (roomId == null) {
+            return java.util.List.of();
+        }
+
         return sessionToRoom.entrySet().stream()
-            .filter(entry -> roomId.equals(entry.getValue()))
-            .map(Map.Entry::getKey)
-            .collect(java.util.stream.Collectors.toList());
+                .filter(entry -> roomId.equals(entry.getValue()))
+                .map(Map.Entry::getKey)
+                .collect(java.util.stream.Collectors.toList());
     }
 
     public int getActiveRoomCount() {

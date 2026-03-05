@@ -1,182 +1,182 @@
 body {
-    margin: 0;
-    min-height: 100vh;
-    font-family: 'Orbitron', sans-serif;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: clamp(8px, 2.5vw, 24px);
-    color: #7ef9ff;
-    font-size: clamp(14px, 2.6vw, 16px);
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Orbitron", sans-serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(8px, 2.5vw, 24px);
+  color: #7ef9ff;
+  font-size: clamp(14px, 2.6vw, 16px);
 }
 
 body::before {
-    content: "";
-    position: fixed;
-    top: -50%;
-    left: -50%;
-    width: 200%;
-    height: 200%;
-    background: url("/assets/mar.png") repeat;
-    background-size: 600px auto;
+  content: "";
+  position: fixed;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: url("/assets/mar.png") repeat;
+  background-size: 600px auto;
 
-    animation: oceanMove 40s linear infinite;
-    z-index: -2;
+  animation: oceanMove 40s linear infinite;
+  z-index: -2;
 }
 
 /* Oscurecido estilo cinematográfico */
 body::after {
-    content: "";
-    position: fixed;
-    inset: 0;
-    background: radial-gradient(circle at center, rgba(0,0,0,0.2) 40%, rgba(0,0,0,0.85) 100%);
-    z-index: -1;
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(0, 0, 0, 0.2) 40%, rgba(0, 0, 0, 0.85) 100%);
+  z-index: -1;
 }
 
 /* Movimiento suave diagonal */
 @keyframes oceanMove {
-    from {
-        transform: translate(0, 0);
-    }
-    to {
-        transform: translate(-600px, -400px);
-    }
+  from {
+    transform: translate(0, 0);
+  }
+  to {
+    transform: translate(-600px, -400px);
+  }
 }
 /* ===== MENU FUTURISTA ESTILO HUD ===== */
 
 .menu-container {
-    position: relative;
-    width: min(94vw, 420px);
+  position: relative;
+  width: min(94vw, 420px);
 
-    padding: clamp(14px, 3.6vw, 28px) clamp(14px, 3.6vw, 26px);
-    border-radius: 10px;
+  padding: clamp(14px, 3.6vw, 28px) clamp(14px, 3.6vw, 26px);
+  border-radius: 10px;
 
-    background: rgba(5, 20, 40, 0.75);
-    backdrop-filter: blur(8px);
+  background: rgba(5, 20, 40, 0.75);
+  backdrop-filter: blur(8px);
 
-    border: 2px solid rgba(0,255,255,0.7);
-    box-shadow:
-        0 0 15px rgba(0,255,255,0.8),
-        inset 0 0 15px rgba(0,255,255,0.3);
+  border: 2px solid rgba(0, 255, 255, 0.7);
+  box-shadow:
+    0 0 15px rgba(0, 255, 255, 0.8),
+    inset 0 0 15px rgba(0, 255, 255, 0.3);
 
-    color: #7ef9ff;
-    max-height: 90vh;
-    overflow-y: auto;
+  color: #7ef9ff;
+  max-height: 90vh;
+  overflow-y: auto;
 }
 
 /* Esquinas tipo marco HUD */
 .menu-container::before,
 .menu-container::after {
-    content: "";
-    position: absolute;
-    width: 32px;
-    height: 32px;
-    border: 3px solid #00f7ff;
+  content: "";
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  border: 3px solid #00f7ff;
 }
 
 .menu-container::before {
-    top: -12px;
-    left: -12px;
-    border-right: none;
-    border-bottom: none;
+  top: -12px;
+  left: -12px;
+  border-right: none;
+  border-bottom: none;
 }
 
 .menu-container::after {
-    bottom: -12px;
-    right: -12px;
-    border-left: none;
-    border-top: none;
+  bottom: -12px;
+  right: -12px;
+  border-left: none;
+  border-top: none;
 }
 
 .menu-container h1 {
-    text-align: center;
-    margin-bottom: clamp(16px, 4vw, 28px);
-    font-size: clamp(18px, 4.8vw, 26px);
-    letter-spacing: 1.5px;
+  text-align: center;
+  margin-bottom: clamp(16px, 4vw, 28px);
+  font-size: clamp(18px, 4.8vw, 26px);
+  letter-spacing: 1.5px;
 
-    color: #7ef9ff;
-    text-shadow:
-        0 0 8px #00f7ff,
-        0 0 20px #00f7ff;
+  color: #7ef9ff;
+  text-shadow:
+    0 0 8px #00f7ff,
+    0 0 20px #00f7ff;
 }
 
 /* ===== BOTONES ===== */
 
 .menu-btn {
-    width: 100%;
-    padding: clamp(9px, 2.8vw, 12px);
-    margin-bottom: 14px;
+  width: 100%;
+  padding: clamp(9px, 2.8vw, 12px);
+  margin-bottom: 14px;
 
-    background: transparent;
-    border: 2px solid rgba(0,180,255,0.7);
-    border-radius: 4px;
+  background: transparent;
+  border: 2px solid rgba(0, 180, 255, 0.7);
+  border-radius: 4px;
 
-    color: #7ef9ff;
-    font-size: clamp(12px, 3vw, 15px);
-    letter-spacing: 0.4px;
+  color: #7ef9ff;
+  font-size: clamp(12px, 3vw, 15px);
+  letter-spacing: 0.4px;
 
-    cursor: pointer;
-    transition: all 0.25s ease;
+  cursor: pointer;
+  transition: all 0.25s ease;
 }
 
 /* Hover neon rosa (como el primero de la imagen) */
 .menu-btn:hover {
-    border-color: #005eff;
-    color: #ffffff;
-    box-shadow:
-        0 0 10px #0059ff,
-        0 0 25px rgba(0, 89, 255, 0.6);
-    transform: scale(1.03);
+  border-color: #005eff;
+  color: #ffffff;
+  box-shadow:
+    0 0 10px #0059ff,
+    0 0 25px rgba(0, 89, 255, 0.6);
+  transform: scale(1.03);
 }
 
 /* Botón música */
 #musicToggleBtn {
-    display: inline-block;
-    width: 48%;
+  display: inline-block;
+  width: 48%;
 }
 
 /* Botón logout rojo */
 #logoutBtn {
-    width: 48%;
-    float: right;
+  width: 48%;
+  float: right;
 
-    border-color: rgba(255,50,50,0.8);
-    color: #ff8080;
+  border-color: rgba(255, 50, 50, 0.8);
+  color: #ff8080;
 }
 
 #logoutBtn:hover {
-    border-color: #ff0000
+  border-color: #ff0000;
 }
 
 @media (max-width: 520px) {
-    .menu-container {
-        border-width: 1px;
-    }
+  .menu-container {
+    border-width: 1px;
+  }
 
-    #musicToggleBtn,
-    #logoutBtn {
-        width: 100%;
-        float: none;
-    }
+  #musicToggleBtn,
+  #logoutBtn {
+    width: 100%;
+    float: none;
+  }
 
-    .menu-btn {
-        margin-bottom: 12px;
-    }
+  .menu-btn {
+    margin-bottom: 12px;
+  }
 }
 
 @media (max-width: 380px) {
-    .menu-container {
-        padding: 12px 12px 14px;
-    }
+  .menu-container {
+    padding: 12px 12px 14px;
+  }
 
-    .menu-container::before,
-    .menu-container::after {
-        width: 24px;
-        height: 24px;
-        border-width: 2px;
-    }
+  .menu-container::before,
+  .menu-container::after {
+    width: 24px;
+    height: 24px;
+    border-width: 2px;
+  }
 
-    .menu-container h1 {
-        letter-spacing: 1px;
-    }
+  .menu-container h1 {
+    letter-spacing: 1px;
+  }
 }

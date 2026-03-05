@@ -1,0 +1,11 @@
+{
+  "name": "proyecto2",
+  "private": true,
+  "devDependencies": {
+    "prettier": "^3.3.3"
+  },
+  "scripts": {
+    "format": "prettier --write \"front/**/*.{js,html,css,json,md}\"",
+    "format:check": "prettier --check \"front/**/*.{js,html,css,json,md}\""
+  }
+}

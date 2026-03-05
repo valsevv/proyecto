@@ -31,8 +31,7 @@ public class Ranking {
     @Column(name = "points", nullable = false)
     private Integer points = 0;
 
-    // DEFAULT now() en DB; fallback en @PrePersist
-    @Column(name = "reached_at", nullable = false, columnDefinition = "TIMESTAMPTZ DEFAULT now()")
+    @Column(name = "reached_at", nullable = false)
     private OffsetDateTime reachedAt;
 
     public Ranking() {}

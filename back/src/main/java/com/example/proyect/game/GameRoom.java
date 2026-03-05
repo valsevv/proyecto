@@ -36,6 +36,9 @@ public class GameRoom {
     public static final int DEFAULT_AERIAL_VISION_RANGE = 4;
     public static final int DEFAULT_NAVAL_VISION_RANGE = 3;
     public static final int DEFAULT_CARRIER_HITS_TO_DESTROY = 5;
+    public static final int DEFAULT_DRONE_MAX_MOVE_DISTANCE = 6;
+    public static final int DEFAULT_CARRIER_MAX_MOVE_DISTANCE = 3;
+    public static final int DEFAULT_MISSILE_MAX_DISTANCE = 15;
     public static final int AERIAL_CARRIER_HITS_TO_DESTROY = 6;
     public static final int NAVAL_CARRIER_HITS_TO_DESTROY = 3;
 
@@ -65,15 +68,18 @@ public class GameRoom {
     private int aerialVisionRange;
     private int navalVisionRange;
     private int carrierHitsToDestroy;
+    private int droneMaxMoveDistance;
+    private int carrierMaxMoveDistance;
+    private int missileMaxDistance;
     private int actionsRemaining;
     private final Map<Integer, Integer> carrierHealthByPlayer = new HashMap<>();
 
     public GameRoom(String roomId) {
-        this(roomId, DEFAULT_ACTIONS_PER_TURN, DEFAULT_AERIAL_VISION_RANGE, DEFAULT_NAVAL_VISION_RANGE, DEFAULT_CARRIER_HITS_TO_DESTROY);
+        this(roomId, DEFAULT_ACTIONS_PER_TURN);
     }
 
     public GameRoom(String roomId, int actionsPerTurn) {
-        this(roomId, actionsPerTurn, DEFAULT_AERIAL_VISION_RANGE, DEFAULT_NAVAL_VISION_RANGE, DEFAULT_CARRIER_HITS_TO_DESTROY);
+        this(roomId, actionsPerTurn, DEFAULT_AERIAL_VISION_RANGE, DEFAULT_NAVAL_VISION_RANGE);
     }
 
     public GameRoom(String roomId, int actionsPerTurn, int aerialVisionRange, int navalVisionRange) {
@@ -81,6 +87,24 @@ public class GameRoom {
     }
 
     public GameRoom(String roomId, int actionsPerTurn, int aerialVisionRange, int navalVisionRange, int carrierHitsToDestroy) {
+        this(roomId,
+             actionsPerTurn,
+             aerialVisionRange,
+             navalVisionRange,
+             carrierHitsToDestroy,
+             DEFAULT_DRONE_MAX_MOVE_DISTANCE,
+             DEFAULT_CARRIER_MAX_MOVE_DISTANCE,
+             DEFAULT_MISSILE_MAX_DISTANCE);
+    }
+
+    public GameRoom(String roomId,
+            int actionsPerTurn,
+            int aerialVisionRange,
+            int navalVisionRange,
+            int carrierHitsToDestroy,
+            int droneMaxMoveDistance,
+            int carrierMaxMoveDistance,
+            int missileMaxDistance) {
         this.roomId = roomId;
         if (actionsPerTurn <= 0) {
             throw new IllegalArgumentException("actionsPerTurn must be > 0");
@@ -94,10 +118,22 @@ public class GameRoom {
         if (carrierHitsToDestroy <= 0) {
             throw new IllegalArgumentException("carrierHitsToDestroy must be > 0");
         }
+        if (droneMaxMoveDistance <= 0) {
+            throw new IllegalArgumentException("droneMaxMoveDistance must be > 0");
+        }
+        if (carrierMaxMoveDistance <= 0) {
+            throw new IllegalArgumentException("carrierMaxMoveDistance must be > 0");
+        }
+        if (missileMaxDistance <= 0) {
+            throw new IllegalArgumentException("missileMaxDistance must be > 0");
+        }
         this.actionsPerTurn = actionsPerTurn;
         this.aerialVisionRange = aerialVisionRange;
         this.navalVisionRange = navalVisionRange;
         this.carrierHitsToDestroy = carrierHitsToDestroy;
+        this.droneMaxMoveDistance = droneMaxMoveDistance;
+        this.carrierMaxMoveDistance = carrierMaxMoveDistance;
+        this.missileMaxDistance = missileMaxDistance;
         this.actionsRemaining = actionsPerTurn;
     }
 
@@ -612,6 +648,9 @@ public class GameRoom {
         state.put("aerialVisionRange", aerialVisionRange);
         state.put("navalVisionRange", navalVisionRange);
         state.put("carrierHitsToDestroy", carrierHitsToDestroy);
+        state.put("droneMaxMoveDistance", droneMaxMoveDistance);
+        state.put("carrierMaxMoveDistance", carrierMaxMoveDistance);
+        state.put("missileMaxDistance", missileMaxDistance);
         state.put("gameStarted", gameStarted);
         
         log.info("[GameRoom] -> End toStateMap");
@@ -642,6 +681,9 @@ public class GameRoom {
         int aerialVisionRange = getOptionalNonNegativeIntField(stateMap, "aerialVisionRange", DEFAULT_AERIAL_VISION_RANGE);
         int navalVisionRange = getOptionalNonNegativeIntField(stateMap, "navalVisionRange", DEFAULT_NAVAL_VISION_RANGE);
         int carrierHitsToDestroy = getOptionalPositiveIntField(stateMap, "carrierHitsToDestroy", DEFAULT_CARRIER_HITS_TO_DESTROY);
+        int droneMaxMoveDistance = getOptionalPositiveIntField(stateMap, "droneMaxMoveDistance", DEFAULT_DRONE_MAX_MOVE_DISTANCE);
+        int carrierMaxMoveDistance = getOptionalPositiveIntField(stateMap, "carrierMaxMoveDistance", DEFAULT_CARRIER_MAX_MOVE_DISTANCE);
+        int missileMaxDistance = getOptionalPositiveIntField(stateMap, "missileMaxDistance", DEFAULT_MISSILE_MAX_DISTANCE);
         int actionsRemaining = getIntField(stateMap, "actionsRemaining");
         if (actionsRemaining < 0 || actionsRemaining > actionsPerTurn) {
             throw new IllegalArgumentException("actionsRemaining out of range");
@@ -653,7 +695,15 @@ public class GameRoom {
             throw new IllegalArgumentException("started games must have two players");
         }
 
-        GameRoom room = new GameRoom(roomId, actionsPerTurn, aerialVisionRange, navalVisionRange, carrierHitsToDestroy);
+        GameRoom room = new GameRoom(
+            roomId,
+            actionsPerTurn,
+            aerialVisionRange,
+            navalVisionRange,
+            carrierHitsToDestroy,
+            droneMaxMoveDistance,
+            carrierMaxMoveDistance,
+            missileMaxDistance);
         room.gameStarted = gameStarted;
         room.currentTurn = currentTurn;
         room.actionsRemaining = actionsRemaining;
@@ -870,6 +920,9 @@ public class GameRoom {
         this.navalVisionRange = source.navalVisionRange;
         this.actionsRemaining = source.actionsRemaining;
         this.carrierHitsToDestroy = source.carrierHitsToDestroy;
+        this.droneMaxMoveDistance = source.droneMaxMoveDistance;
+        this.carrierMaxMoveDistance = source.carrierMaxMoveDistance;
+        this.missileMaxDistance = source.missileMaxDistance;
         this.carrierHealthByPlayer.clear();
         this.carrierHealthByPlayer.putAll(source.carrierHealthByPlayer);
         this.carrierPositions.clear();

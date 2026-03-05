@@ -1,35 +1,38 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Lobby Browser - Drone Carrier Command</title>
-    <link rel="stylesheet" href="/screen/styles/lobby.css">
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
-</head>
-<body>
+    <link rel="stylesheet" href="/screen/styles/lobby.css" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
     <div class="ocean"></div>
     <div class="radar"></div>
 
     <div class="lobby-container">
-        <h1>Lobbies disponibles</h1>
-        
-        <div class="lobby-controls">
-            <button class="btn-primary" id="createLobbyBtn">Crear Nuevo Lobby</button>
-            <button class="btn-secondary" id="refreshBtn">Actualizar</button>
-            <button class="btn-secondary" id="backBtn">Volver al Menú</button>
-        </div>
+      <h1>Lobbies disponibles</h1>
 
-        <div class="lobby-list" id="lobbyList">
-            <p class="loading">Cargando lobbies...</p>
-        </div>
+      <div class="lobby-controls">
+        <button class="btn-primary" id="createLobbyBtn">Crear Nuevo Lobby</button>
+        <button class="btn-secondary" id="refreshBtn">Actualizar</button>
+        <button class="btn-secondary" id="backBtn">Volver al Menú</button>
+      </div>
 
-        <div class="lobby-info">
-            <p>Haga click en una lobby para entrar o crea la tuya!</p>
-        </div>
+      <div class="lobby-list" id="lobbyList">
+        <p class="loading">Cargando lobbies...</p>
+      </div>
+
+      <div class="lobby-info">
+        <p>Haga click en una lobby para entrar o crea la tuya!</p>
+      </div>
     </div>
 
     <script src="/screen/LobbyBrowser.js"></script>
     <script src="/screen/CheckAuth.js"></script>
-</body>
+  </body>
 </html>

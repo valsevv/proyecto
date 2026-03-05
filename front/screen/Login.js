@@ -12,9 +12,7 @@ toggleMode.onclick = () => {
   isLogin = !isLogin;
 
   actionBtn.textContent = isLogin ? "LOGEARSE" : "REGISTRARSE";
-  toggleMode.textContent = isLogin
-    ? "¿No tenés cuenta? Registrarse"
-    : "¿Ya tenés cuenta? Logearse";
+  toggleMode.textContent = isLogin ? "¿No tenés cuenta? Registrarse" : "¿Ya tenés cuenta? Logearse";
 
   emailInput.style.display = isLogin ? "none" : "block";
   statusText.textContent = "";
@@ -30,14 +28,10 @@ actionBtn.onclick = async () => {
     return;
   }
 
-
-
   const endpointPath = isLogin ? "/api/auth/login" : "/api/auth/register";
   const endpoint = `${BASE_URL}${endpointPath}`;
 
-  const body = isLogin
-    ? { username, password }
-    : { username, email, password };
+  const body = isLogin ? { username, password } : { username, email, password };
 
   try {
     statusText.textContent = "Conectando...";
@@ -77,41 +71,37 @@ actionBtn.onclick = async () => {
     setTimeout(() => {
       window.location.href = "/menu";
     }, 1200);
-
   } catch (err) {
     statusText.textContent = err.message || "Error de autenticación";
   }
 };
 
-  window.addEventListener("DOMContentLoaded", async () => {
+window.addEventListener("DOMContentLoaded", async () => {
+  const statusText = document.getElementById("status");
 
-    const statusText = document.getElementById("status");
+  try {
+    const response = await fetch("http://localhost:8080/api/auth/me", {
+      method: "GET",
+      credentials: "include"
+    });
 
-    try {
-      const response = await fetch("http://localhost:8080/api/auth/me", {
-        method: "GET",
-        credentials: "include"
-      });
+    if (response.ok) {
+      statusText.textContent = "Sesión detectada...";
+      statusText.style.color = "#00ff88";
+      statusText.style.opacity = "1";
 
-      if (response.ok) {
-        statusText.textContent = "Sesión detectada...";
-        statusText.style.color = "#00ff88";
-        statusText.style.opacity = "1";
+      setTimeout(() => {
+        document.body.style.transition = "opacity 0.6s";
+        document.body.style.opacity = "0";
+      }, 800);
 
-        setTimeout(() => {
-          document.body.style.transition = "opacity 0.6s";
-          document.body.style.opacity = "0";
-        }, 800);
+      setTimeout(() => {
+        window.location.href = "/menu";
+      }, 1200);
 
-        setTimeout(() => {
-          window.location.href = "/menu";
-        }, 1200);
-
-        return;
-      }
-
-    } catch (e) {
-      // No autenticado → no hacer nada
+      return;
     }
-
-  });
+  } catch (e) {
+    // No autenticado → no hacer nada
+  }
+});

@@ -1,36 +1,36 @@
 document.addEventListener("DOMContentLoaded", loadRanking);
 
 async function loadRanking() {
-    const loading = document.getElementById("loading");
-    const errorDiv = document.getElementById("error");
-    const table = document.getElementById("rankingTable");
-    const tbody = table.querySelector("tbody");
+  const loading = document.getElementById("loading");
+  const errorDiv = document.getElementById("error");
+  const table = document.getElementById("rankingTable");
+  const tbody = table.querySelector("tbody");
 
-    try {
-        const response = await fetch("/api/ranking/top", {
-            method: "GET",
-            credentials: "include"
-        });
+  try {
+    const response = await fetch("/api/ranking/top", {
+      method: "GET",
+      credentials: "include"
+    });
 
-        if (!response.ok) {
-            throw new Error("Error al obtener ranking");
-        }
+    if (!response.ok) {
+      throw new Error("Error al obtener ranking");
+    }
 
-        const data = await response.json();
+    const data = await response.json();
 
-        loading.style.display = "none";
+    loading.style.display = "none";
 
-        if (data.length === 0) {
-            errorDiv.textContent = "No hay datos disponibles.";
-            return;
-        }
+    if (data.length === 0) {
+      errorDiv.textContent = "No hay datos disponibles.";
+      return;
+    }
 
-        table.style.display = "table";
+    table.style.display = "table";
 
-        data.forEach((player, index) => {
-            const row = document.createElement("tr");
+    data.forEach((player, index) => {
+      const row = document.createElement("tr");
 
-            row.innerHTML = `
+      row.innerHTML = `
                 <td>${index + 1}</td>
                 <td>${player.username}</td>
                 <td>${player.wins}</td>
@@ -38,11 +38,10 @@ async function loadRanking() {
                 <td>${player.points}</td>
             `;
 
-            tbody.appendChild(row);
-        });
-
-    } catch (err) {
-        loading.style.display = "none";
-        errorDiv.textContent = err.message;
-    }
+      tbody.appendChild(row);
+    });
+  } catch (err) {
+    loading.style.display = "none";
+    errorDiv.textContent = err.message;
+  }
 }

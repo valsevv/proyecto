@@ -1,57 +1,60 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<title>Batalla de Drones</title>
-<head>
-    <meta charset=utf-8>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Batalla de Drones</title>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600&family=Share+Tech+Mono&display=swap');
-        * { margin: 0; padding: 0; }
-        html, body {
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-        }
-        body {
-            background: #000;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-        }
+      @import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600&family=Share+Tech+Mono&display=swap");
+      * {
+        margin: 0;
+        padding: 0;
+      }
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
+      body {
+        background: #000;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+      }
 
-        canvas {
-            display: block;
-            width: 100%;
-            height: 100%;
-        }
+      canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
 
+      .btn {
+        position: absolute;
+        bottom: 4%;
+        left: 4%;
+      }
+      .return {
+        color: #e2e9eaf5;
+        background: rgba(36, 118, 226, 0.367);
+        padding: clamp(6px, 1.2vw, 10px) clamp(8px, 2vw, 14px);
+        border-radius: 2px;
+        border: 1px solid rgba(5, 93, 187, 0.4);
+        font-size: clamp(12px, 2.2vw, 16px);
+      }
+      @media (max-width: 520px) {
         .btn {
-            position: absolute;
-            bottom: 4%;
-            left: 4%;
-                }
-        .return {
-            color: #e2e9eaf5;
-            background: rgba(36, 118, 226, 0.367); 
-            padding: clamp(6px, 1.2vw, 10px) clamp(8px, 2vw, 14px);
-            border-radius: 2px;
-            border: 1px solid rgba(5, 93, 187, 0.4);
-            font-size: clamp(12px, 2.2vw, 16px);
-                }        
-        @media (max-width: 520px) {
-            .btn {
-                bottom: 3%;
-                left: 3%;
-            }
+          bottom: 3%;
+          left: 3%;
         }
+      }
     </style>
-   <script src="/lib/phaser.js"></script>
-   <script type="module" src="/game.js"></script>
-</head>
+    <script src="/lib/phaser.js"></script>
+    <script type="module" src="/game.js"></script>
+  </head>
 
-<body>
- <div> <button class="btn return" onclick="location.href='/menu'">Volver</button></div>
-</body>
-
+  <body>
+    <div><button class="btn return" onclick="location.href = '/menu'">Volver</button></div>
+  </body>
 </html>

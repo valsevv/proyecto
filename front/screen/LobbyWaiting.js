@@ -1,102 +1,102 @@
-const API_BASE = 'http://localhost:8080/api';
+const API_BASE = "http://localhost:8080/api";
 let checkInterval = null;
 
 async function checkLobbyStatus() {
-    if (!await checkAuth()) return;
+  if (!(await checkAuth())) return;
 
-    try {
-        const response = await fetch(`${API_BASE}/lobby/my-lobby`, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            credentials: 'include'
-        });
+  try {
+    const response = await fetch(`${API_BASE}/lobby/my-lobby`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      credentials: "include"
+    });
 
-        const result = await response.json();
+    const result = await response.json();
 
-        if (!result.inLobby) {
-            window.location.href = '/lobby-browser';
-            return;
-        }
-
-        displayLobbyInfo(result);
-
-        if (result.playerCount >= 2 || result.status === 'READY') {
-            console.log('Lobby ready! Starting game...');
-            sessionStorage.setItem('currentLobbyId', result.lobbyId);
-            window.location.href = '/game';
-        }
-    } catch (error) {
-        console.error('Error checking lobby status:', error);
+    if (!result.inLobby) {
+      window.location.href = "/lobby-browser";
+      return;
     }
+
+    displayLobbyInfo(result);
+
+    if (result.playerCount >= 2 || result.status === "READY") {
+      console.log("Lobby ready! Starting game...");
+      sessionStorage.setItem("currentLobbyId", result.lobbyId);
+      window.location.href = "/game";
+    }
+  } catch (error) {
+    console.error("Error checking lobby status:", error);
+  }
 }
 
 function displayLobbyInfo(lobbyInfo) {
-    const detailsDiv = document.getElementById('lobbyDetails');
+  const detailsDiv = document.getElementById("lobbyDetails");
 
-    if (lobbyInfo.isLoadGame) {
-        detailsDiv.innerHTML = `
+  if (lobbyInfo.isLoadGame) {
+    detailsDiv.innerHTML = `
                     <p><strong>🔄 Reanudando Partida Guardada</strong></p>
                     <p><strong>Jugadores:</strong> ${lobbyInfo.playerCount}/2</p>
                     <p><strong>Estado:</strong> Esperando al oponente...</p>
                     <p class="info-text">Tu oponente verá esta partida en su lista de lobbies</p>
                 `;
-    } else {
-        detailsDiv.innerHTML = `
+  } else {
+    detailsDiv.innerHTML = `
                     <p><strong>Creador:</strong> ${lobbyInfo.creatorUsername}</p>
                     <p><strong>Jugadores:</strong> ${lobbyInfo.playerCount}/2</p>
                     <p><strong>Estado:</strong> ${lobbyInfo.status}</p>
                 `;
-    }
+  }
 }
 
 async function leaveLobby() {
-    if (!await checkAuth()) return;
+  if (!(await checkAuth())) return;
 
-    if (!confirm('Are you sure you want to leave this lobby?')) {
-        return;
+  if (!confirm("Are you sure you want to leave this lobby?")) {
+    return;
+  }
+
+  try {
+    const response = await fetch(`${API_BASE}/lobby/leave`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      credentials: "include"
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      sessionStorage.removeItem("currentLobbyId");
+      window.location.href = "/lobby-browser";
+    } else {
+      alert("Failed to leave lobby: " + (result.error || "Unknown error"));
     }
-
-    try {
-        const response = await fetch(`${API_BASE}/lobby/leave`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            credentials: 'include'
-        });
-
-        const result = await response.json();
-
-        if (result.success) {
-            sessionStorage.removeItem('currentLobbyId');
-            window.location.href = '/lobby-browser';
-        } else {
-            alert('Failed to leave lobby: ' + (result.error || 'Unknown error'));
-        }
-    } catch (error) {
-        console.error('Error leaving lobby:', error);
-        alert('Error leaving lobby. Please try again.');
-    }
+  } catch (error) {
+    console.error("Error leaving lobby:", error);
+    alert("Error leaving lobby. Please try again.");
+  }
 }
 
 // Initialize
-document.addEventListener('DOMContentLoaded', () => {
-    checkAuth();
+document.addEventListener("DOMContentLoaded", () => {
+  checkAuth();
 
-    document.getElementById('leaveLobbyBtn').addEventListener('click', leaveLobby);
+  document.getElementById("leaveLobbyBtn").addEventListener("click", leaveLobby);
 
-    // Initial check
-    checkLobbyStatus();
+  // Initial check
+  checkLobbyStatus();
 
-    // Check every 2 seconds
-    checkInterval = setInterval(checkLobbyStatus, 2000);
+  // Check every 2 seconds
+  checkInterval = setInterval(checkLobbyStatus, 2000);
 });
 
 // Cleanup
-window.addEventListener('beforeunload', () => {
-    if (checkInterval) {
-        clearInterval(checkInterval);
-    }
+window.addEventListener("beforeunload", () => {
+  if (checkInterval) {
+    clearInterval(checkInterval);
+  }
 });

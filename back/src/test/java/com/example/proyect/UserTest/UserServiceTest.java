@@ -1,5 +1,5 @@
-package com.example.proyect.UserTest;
-//Test con mock del UserService y su repo
+package com.example.proyect.usertest;
+
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -15,8 +15,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import com.example.proyect.auth.Exceptions.InvalidCredentialsException;
-import com.example.proyect.auth.Exceptions.UserAlreadyExistsException;
+import com.example.proyect.auth.exceptions.InvalidCredentialsException;
+import com.example.proyect.auth.exceptions.UserAlreadyExistsException;
 import com.example.proyect.auth.security.PasswordHasher;
 import com.example.proyect.auth.service.UserService;
 import com.example.proyect.persistence.classes.User;
@@ -29,7 +29,7 @@ class UserServiceTest {
     private UserRepository userRepository;
 
     @Test
-    void register_newUser_hashesPassword_andPersists() {
+    void registerNewUserHashesPasswordAndPersists() {
         UserService service = new UserService(userRepository);
         String username = "alex";
         String raw = "secret123";
@@ -38,12 +38,10 @@ class UserServiceTest {
 
         when(userRepository.existsByUsername(username)).thenReturn(false);
 
-        // mockear estático PasswordHasher
         try (MockedStatic<PasswordHasher> mocked = mockStatic(PasswordHasher.class)) {
             mocked.when(() -> PasswordHasher.hash(raw)).thenReturn(hashed);
 
-            when(userRepository.save(any(User.class)))
-                    .thenAnswer(inv -> inv.getArgument(0, User.class));
+            when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0, User.class));
 
             User created = service.register(username, email, raw);
 
@@ -57,11 +55,11 @@ class UserServiceTest {
     }
 
     @Test
-    void register_existingUsername_throws() {
+    void registerExistingUsernameThrows() {
         UserService service = new UserService(userRepository);
         when(userRepository.existsByUsername("alex")).thenReturn(true);
 
-        assertThatThrownBy(() -> service.register("alex","alex@mail.com", "x"))
+        assertThatThrownBy(() -> service.register("alex", "alex@mail.com", "x"))
                 .isInstanceOf(UserAlreadyExistsException.class)
                 .hasMessageContaining("usuario ya existe");
 
@@ -70,7 +68,7 @@ class UserServiceTest {
     }
 
     @Test
-    void login_success_updatesLastLogin() {
+    void loginSuccessUpdatesLastLogin() {
         UserService service = new UserService(userRepository);
         String username = "alex";
         String raw = "secret";
@@ -80,8 +78,7 @@ class UserServiceTest {
         User u = new User(username, email, hashed);
 
         when(userRepository.findByUsername(username)).thenReturn(Optional.of(u));
-        when(userRepository.save(any(User.class)))
-                .thenAnswer(inv -> inv.getArgument(0, User.class));
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0, User.class));
 
         try (MockedStatic<PasswordHasher> mocked = mockStatic(PasswordHasher.class)) {
             mocked.when(() -> PasswordHasher.matches(raw, hashed)).thenReturn(true);
@@ -95,7 +92,7 @@ class UserServiceTest {
     }
 
     @Test
-    void login_wrongPassword_throws() {
+    void loginWrongPasswordThrows() {
         UserService service = new UserService(userRepository);
         String username = "alex";
         String hashed = "$2a$10$hash";
@@ -115,12 +112,12 @@ class UserServiceTest {
     }
 
     @Test
-    void login_userNotFound_throws() {
+    void loginUserNotFoundThrows() {
         UserService service = new UserService(userRepository);
         when(userRepository.findByUsername("missing")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.login("missing", "x"))
-            .isInstanceOf(InvalidCredentialsException.class)
+                .isInstanceOf(InvalidCredentialsException.class)
                 .hasMessageContaining("Credenciales");
     }
 }

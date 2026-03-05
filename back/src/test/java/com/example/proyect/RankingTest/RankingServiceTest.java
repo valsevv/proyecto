@@ -32,7 +32,6 @@ class RankingServiceTest {
     UserRepository userRepository;
 
     // ---------------- CREATE SNAPSHOT ----------------
-
     @Test
     void createSnapshot_success() {
         RankingService service = new RankingService(rankingRepository, userRepository);
@@ -63,7 +62,6 @@ class RankingServiceTest {
     }
 
     // ---------------- HISTORY ----------------
-
     @Test
     void getHistoryByUserId_returnsList() {
         RankingService service = new RankingService(rankingRepository, userRepository);
@@ -81,7 +79,6 @@ class RankingServiceTest {
     }
 
     // ---------------- BEST ----------------
-
     @Test
     void getBestByUserId_returnsHighestPoints() {
         RankingService service = new RankingService(rankingRepository, userRepository);
@@ -101,7 +98,6 @@ class RankingServiceTest {
     }
 
     // ---------------- TOP ----------------
-
     @Test
     void getTop_returnsList() {
         RankingService service = new RankingService(rankingRepository, userRepository);
@@ -118,7 +114,6 @@ class RankingServiceTest {
     }
 
     // ---------------- DELETE ----------------
-
     @Test
     void deleteByUserId_deletesAllUserHistory() {
         RankingService service = new RankingService(rankingRepository, userRepository);

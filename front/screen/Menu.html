@@ -1,30 +1,32 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Drone Carrier Command</title>
-    <link rel="stylesheet" href="/screen/styles/menu.css">
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
-</head>
-<body>
- 
+    <link rel="stylesheet" href="/screen/styles/menu.css" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
     <div class="menu-container">
-        <h1>Batalla de Drones</h1>
+      <h1>Batalla de Drones</h1>
 
-        <button class="menu-btn" onclick="location.href='/lobby-browser'">Explorar Lobbies</button>
-        <button class="menu-btn" id="loadGamesBtn">Cargar Partidas Guardadas</button>
-        <button class="menu-btn" id="rankingBtn">Ranking de Jugadores</button>
-        <button class="menu-btn">Créditos</button>
-        <button class="menu-btn" id="musicToggleBtn">🔊 Música: ON</button>
-        <button class="menu-btn" id="logoutBtn">Logout</button>
+      <button class="menu-btn" onclick="location.href = '/lobby-browser'">Explorar Lobbies</button>
+      <button class="menu-btn" id="loadGamesBtn">Cargar Partidas Guardadas</button>
+      <button class="menu-btn" id="rankingBtn">Ranking de Jugadores</button>
+      <button class="menu-btn">Créditos</button>
+      <button class="menu-btn" id="musicToggleBtn">🔊 Música: ON</button>
+      <button class="menu-btn" id="logoutBtn">Logout</button>
     </div>
 
     <audio id="bgMusic" loop>
-        <source src="/assets/Menu_loop.mp3" type="audio/mpeg">
+      <source src="/assets/Menu_loop.mp3" type="audio/mpeg" />
     </audio>
 
     <script src="/screen/Menu.js"></script>
     <script src="/screen/CheckAuth.js"></script>
-</body>
+  </body>
 </html>

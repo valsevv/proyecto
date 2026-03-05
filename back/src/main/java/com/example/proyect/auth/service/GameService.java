@@ -1,9 +1,11 @@
 package com.example.proyect.auth.service;
 
 import java.time.OffsetDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -78,7 +80,17 @@ public class GameService {
     public List<Game> getPausedGamesOfUser(Long userId) { //Devuelve partidas del usuario cuyo estado guardado es Saved
         Objects.requireNonNull(userId, "user no puede ser null");
 
-        return gameRepository.findByUserIdAndStateStatus(userId, GameStatus.SAVED.name());
+        Page<Game> gamesPage = gameRepository.findByPlayer1IdOrPlayer2Id(userId, userId, Pageable.unpaged());
+
+        if (gamesPage == null || gamesPage.isEmpty()) {
+            return List.of();
+        }
+
+        return gamesPage.stream()
+            .filter(game -> game.getState() != null && game.getState().getStatus() == GameStatus.SAVED)
+            .sorted(Comparator.comparing(Game::getStartedAt, Comparator.nullsLast(Comparator.naturalOrder()))
+                .reversed())
+            .toList();
     }
 
     public boolean canUserAccessGame(Long userId, Game game) { //verifica si el usuario participa en la partida

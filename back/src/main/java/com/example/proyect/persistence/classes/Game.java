@@ -22,9 +22,6 @@ import jakarta.persistence.UniqueConstraint;
     indexes = {
         @Index(name = "idx_game_player1_id", columnList = "player1_id"),
         @Index(name = "idx_game_player2_id", columnList = "player2_id")
-    },
-    uniqueConstraints = {
-        @UniqueConstraint(name = "uq_players", columnNames = {"player1_id", "player2_id"})
     }
 )
 public class Game {
@@ -34,7 +31,7 @@ public class Game {
     @Column(name = "game_id")
     private Long id;
 
-    @Column(name = "state", nullable = false, columnDefinition = "jsonb")
+    @Column(name = "state", nullable = false)
     @JdbcTypeCode(SqlTypes.JSON)
     private GameState state = defaultState();
 
@@ -44,8 +41,7 @@ public class Game {
     @Column(name = "player2_id", nullable = false)
     private Long player2Id;
 
-    // DEFAULT now() en DB; fallback en @PrePersist
-    @Column(name = "started_at", nullable = false, columnDefinition = "TIMESTAMPTZ DEFAULT now()")
+    @Column(name = "started_at", nullable = false)
     private OffsetDateTime startedAt;
 
     @Column(name = "ended_at")

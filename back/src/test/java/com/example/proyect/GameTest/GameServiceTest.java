@@ -1,21 +1,21 @@
 package com.example.proyect.GameTest;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -23,6 +23,7 @@ import org.springframework.data.domain.Pageable;
 
 import com.example.proyect.auth.service.GameService;
 import com.example.proyect.persistence.classes.Game;
+import com.example.proyect.persistence.classes.GameState;
 import com.example.proyect.persistence.classes.GameStatus;
 import com.example.proyect.persistence.repos.GameRepository;
 
@@ -125,16 +126,35 @@ class GameServiceTest {
     void getPausedGamesOfUser_shouldReturnSavedGames() {
         Game game1 = new Game();
         game1.setId(1L);
+        game1.setStartedAt(OffsetDateTime.now().minusHours(1));
+        GameState savedState1 = new GameState();
+        savedState1.setStatus(GameStatus.SAVED);
+        game1.setState(savedState1);
+
         Game game2 = new Game();
         game2.setId(2L);
+        game2.setStartedAt(OffsetDateTime.now());
+        GameState savedState2 = new GameState();
+        savedState2.setStatus(GameStatus.SAVED);
+        game2.setState(savedState2);
 
-        when(gameRepository.findByUserIdAndStateStatus(1L, GameStatus.SAVED.name()))
-                .thenReturn(List.of(game1, game2));
+        Game game3 = new Game();
+        game3.setId(3L);
+        GameState inProgress = new GameState();
+        inProgress.setStatus(GameStatus.IN_PROGRESS);
+        game3.setState(inProgress);
+
+        Page<Game> page = new PageImpl<>(List.of(game1, game2, game3));
+
+        when(gameRepository.findByPlayer1IdOrPlayer2Id(eq(1L), eq(1L), any(Pageable.class)))
+            .thenReturn(page);
 
         List<Game> pausedGames = gameService.getPausedGamesOfUser(1L);
 
-        assertThat(pausedGames).hasSize(2);
-        verify(gameRepository).findByUserIdAndStateStatus(1L, GameStatus.SAVED.name());
+        assertThat(pausedGames)
+            .hasSize(2)
+            .allMatch(game -> game.getState().getStatus() == GameStatus.SAVED);
+        verify(gameRepository).findByPlayer1IdOrPlayer2Id(eq(1L), eq(1L), any(Pageable.class));
     }
 
     @Test
