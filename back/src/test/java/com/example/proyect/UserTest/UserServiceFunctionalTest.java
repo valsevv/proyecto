@@ -1,6 +1,6 @@
 //Test Funcional del servicio UserService. Prueba el servicio y tambien el repositorio
 
-package com.example.proyect.UserTest;
+package com.example.proyect.usertest;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -11,9 +11,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.example.proyect.auth.Exceptions.EmailAlreadyExistsException;
-import com.example.proyect.auth.Exceptions.InvalidCredentialsException;
-import com.example.proyect.auth.Exceptions.UserAlreadyExistsException;
+import com.example.proyect.auth.exceptions.EmailAlreadyExistsException;
+import com.example.proyect.auth.exceptions.InvalidCredentialsException;
+import com.example.proyect.auth.exceptions.UserAlreadyExistsException;
 import com.example.proyect.auth.service.UserService;
 import com.example.proyect.persistence.classes.User;
 import com.example.proyect.persistence.repos.UserRepository;

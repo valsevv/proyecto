@@ -2,12 +2,13 @@ package com.example.proyect.auth.service;
 
 import org.springframework.stereotype.Service;
 
-import com.example.proyect.auth.Exceptions.EmailAlreadyExistsException;
-import com.example.proyect.auth.Exceptions.InvalidCredentialsException;
-import com.example.proyect.auth.Exceptions.UserAlreadyExistsException;
+import com.example.proyect.auth.exceptions.EmailAlreadyExistsException;
+import com.example.proyect.auth.exceptions.InvalidCredentialsException;
+import com.example.proyect.auth.exceptions.UserAlreadyExistsException;
 import com.example.proyect.auth.security.PasswordHasher;
 import com.example.proyect.persistence.classes.User;
 import com.example.proyect.persistence.repos.UserRepository;
+
 import jakarta.persistence.EntityNotFoundException;
 
 //vseverio Esta clase maneja alta,login y busqueda de usuario con validacion de negocio

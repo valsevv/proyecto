@@ -1,4 +1,4 @@
-package com.example.proyect.auth.Exceptions;
+package com.example.proyect.auth.exceptions;
 
 
 public class InvalidCredentialsException extends RuntimeException {

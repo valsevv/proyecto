@@ -1,4 +1,4 @@
-package com.example.proyect.UserTest;
+package com.example.proyect.usertest;
 //Test con mock del UserService y su repo
 import java.util.Optional;
 
@@ -15,8 +15,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import com.example.proyect.auth.Exceptions.InvalidCredentialsException;
-import com.example.proyect.auth.Exceptions.UserAlreadyExistsException;
+import com.example.proyect.auth.exceptions.InvalidCredentialsException;
+import com.example.proyect.auth.exceptions.UserAlreadyExistsException;
 import com.example.proyect.auth.security.PasswordHasher;
 import com.example.proyect.auth.service.UserService;
 import com.example.proyect.persistence.classes.User;

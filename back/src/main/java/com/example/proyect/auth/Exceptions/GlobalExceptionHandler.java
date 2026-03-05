@@ -1,4 +1,4 @@
-package com.example.proyect.auth.Exceptions;
+package com.example.proyect.auth.exceptions;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

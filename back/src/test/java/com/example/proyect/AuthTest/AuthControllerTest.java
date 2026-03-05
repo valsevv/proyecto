@@ -18,8 +18,8 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
-import com.example.proyect.auth.Exceptions.InvalidCredentialsException;
-import com.example.proyect.auth.Exceptions.UserAlreadyExistsException;
+import com.example.proyect.auth.exceptions.InvalidCredentialsException;
+import com.example.proyect.auth.exceptions.UserAlreadyExistsException;
 import com.example.proyect.auth.api.AuthController;
 import com.example.proyect.auth.security.JwtService;
 import com.example.proyect.auth.service.UserService;
