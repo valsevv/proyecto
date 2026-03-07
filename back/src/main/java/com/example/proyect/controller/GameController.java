@@ -10,6 +10,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import jakarta.annotation.PostConstruct;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,6 +21,7 @@ import com.example.proyect.VOs.GameResult;
 import com.example.proyect.auth.service.GameService;
 import com.example.proyect.auth.service.RankingService;
 import com.example.proyect.game.GameRoom;
+import com.example.proyect.game.config.UnitBalanceRegistry;
 import com.example.proyect.game.PlayerState;
 import com.example.proyect.game.units.Unit.HexCoord;
 import com.example.proyect.game.units.drone.AerialDrone;
@@ -46,11 +49,38 @@ public class GameController {
     @Value("${game.actions-per-turn:10}")
     private int actionsPerTurn;
 
-    @Value("${game.vision-range-aereo:4}")
+    @Value("${game.units.aereo.vision-range:${game.vision-range-aereo:6}}")
     private int aerialVisionRange;
 
-    @Value("${game.vision-range-naval:3}")
+    @Value("${game.units.naval.vision-range:${game.vision-range-naval:4}}")
     private int navalVisionRange;
+
+    @Value("${game.units.aereo.max-hp:100}")
+    private int aerialDroneMaxHp;
+
+    @Value("${game.units.aereo.movement-range:2}")
+    private int aerialDroneMovementRange;
+
+    @Value("${game.units.aereo.max-fuel:10}")
+    private int aerialDroneMaxFuel;
+
+    @Value("${game.units.aereo.ammo:1}")
+    private int aerialDroneAmmo;
+
+    @Value("${game.units.naval.max-hp:100}")
+    private int navalDroneMaxHp;
+
+    @Value("${game.units.naval.movement-range:2}")
+    private int navalDroneMovementRange;
+
+    @Value("${game.units.naval.max-fuel:10}")
+    private int navalDroneMaxFuel;
+
+    @Value("${game.units.naval.weapon-ammo:10}")
+    private int navalDroneWeaponAmmo;
+
+    @Value("${game.units.naval.missiles:2}")
+    private int navalDroneMissiles;
 
     @Value("${game.missile.max-distance:15}")
     private int missileMaxDistance;
@@ -63,6 +93,18 @@ public class GameController {
 
     @Value("${game.carrier-hits-to-destroy:5}")
     private int carrierHitsToDestroy;
+
+    @Value("${game.units.aereo.carrier-hp:6}")
+    private int aerialCarrierHitsToDestroy;
+
+    @Value("${game.units.aereo.carrier-movement-range:3}")
+    private int aerialCarrierMovementRange;
+
+    @Value("${game.units.naval.carrier-hp:3}")
+    private int navalCarrierHitsToDestroy;
+
+    @Value("${game.units.naval.carrier-movement-range:1}")
+    private int navalCarrierMovementRange;
 
     // Must match frontend HexGrid size (front/scenes/MainScene.js -> new HexGrid(this, 35, ...))
     private static final double HEX_SIZE_PX = 35.0;
@@ -99,6 +141,27 @@ public class GameController {
         this.rankingService = rankingService;
         this.userRepository = userRepository;
     }
+
+    @PostConstruct
+    public void configureUnitBalance() {
+        UnitBalanceRegistry.configure(
+            aerialDroneMaxHp,
+            aerialDroneMovementRange,
+            aerialVisionRange,
+            aerialDroneMaxFuel,
+            aerialDroneAmmo,
+            navalDroneMaxHp,
+            navalDroneMovementRange,
+            navalVisionRange,
+            navalDroneMaxFuel,
+            navalDroneWeaponAmmo,
+            navalDroneMissiles,
+            aerialCarrierHitsToDestroy,
+            aerialCarrierMovementRange,
+            navalCarrierHitsToDestroy,
+            navalCarrierMovementRange
+        );
+    }
     public void bindSessionUser(String sessionId, Long userId) { //vincula sesion websocket con userid para trazabilidad
         if (sessionId != null && userId != null) {
             sessionToUserId.put(sessionId, userId);
@@ -115,7 +178,15 @@ public class GameController {
         return rooms.computeIfAbsent(
             lobby.getLobbyId(),
             id -> {
-                GameRoom newRoom = new GameRoom(id, actionsPerTurn, aerialVisionRange, navalVisionRange, carrierHitsToDestroy);
+                GameRoom newRoom = new GameRoom(
+                    id,
+                    actionsPerTurn,
+                    aerialVisionRange,
+                    navalVisionRange,
+                    carrierHitsToDestroy,
+                    aerialCarrierHitsToDestroy,
+                    navalCarrierHitsToDestroy
+                );
                 log.info("Created game room {} from lobby {}", id, lobby.getLobbyId());
                 return newRoom;
             }

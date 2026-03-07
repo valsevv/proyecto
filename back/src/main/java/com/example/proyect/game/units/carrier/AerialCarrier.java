@@ -1,15 +1,14 @@
 package com.example.proyect.game.units.carrier;
 
-public class AerialCarrier extends Carrier {
+import com.example.proyect.game.config.UnitBalanceRegistry;
 
-    private static final int DEFAULT_MAX_HP = 400;
-    private static final int DEFAULT_SPEED = 3;
+public class AerialCarrier extends Carrier {
 
     public AerialCarrier() {
         super();
 
-        setCarrierSpeed(DEFAULT_SPEED);
-        initializeHealth(DEFAULT_MAX_HP);
+        setCarrierSpeed(UnitBalanceRegistry.getAerialCarrierMovementRange());
+        initializeHealth(UnitBalanceRegistry.getAerialCarrierMaxHp());
     }
 
     private void initializeHealth(int maxHp) {
