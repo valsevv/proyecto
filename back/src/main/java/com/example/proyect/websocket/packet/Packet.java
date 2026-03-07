@@ -44,6 +44,13 @@ public class Packet {
         return new Packet(PacketType.GAME_SAVED, payload);
     }
 
+    public static Packet gameForfeited(int forfeitingPlayerIndex, int winnerPlayerIndex) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("forfeitingPlayerIndex", forfeitingPlayerIndex);
+        payload.put("winnerPlayerIndex", winnerPlayerIndex);
+        return new Packet(PacketType.GAME_FORFEITED, payload);
+    }
+
     public int getInt(String key) {
         Object value = payload.get(key);
         if (value instanceof Number) {

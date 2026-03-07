@@ -1,11 +1,5 @@
 package com.example.proyect.RankingTest;
 
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
 import java.time.OffsetDateTime;
 import java.util.List;
 
@@ -15,6 +9,11 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.web.servlet.MockMvc;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.example.proyect.auth.RankingTopDTO;
@@ -42,7 +41,7 @@ class RankingControllerTest {
         org.springframework.test.util.ReflectionTestUtils.setField(ranking, "id", 1L);
         ranking.setReachedAt(OffsetDateTime.now());
 
-        org.mockito.Mockito.when(rankingService.createSnapshot(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyInt())).thenReturn(ranking);
+        org.mockito.Mockito.when(rankingService.createSnapshot(org.mockito.ArgumentMatchers.anyLong())).thenReturn(ranking);
 
         mockMvc.perform(post("/api/ranking/snapshot")
                 .param("userId", "1")
@@ -55,7 +54,7 @@ class RankingControllerTest {
 
     @Test
     void createSnapshot_userNotFound_shouldReturnNotFound() throws Exception {
-        org.mockito.Mockito.when(rankingService.createSnapshot(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyInt()))
+        org.mockito.Mockito.when(rankingService.createSnapshot(org.mockito.ArgumentMatchers.anyLong()))
                 .thenThrow(new EntityNotFoundException("User not found"));
 
         mockMvc.perform(post("/api/ranking/snapshot")

@@ -104,13 +104,17 @@ public class User {
         this.lastConnection = OffsetDateTime.now();
     }
 
-    public void registerWin(int points) {
+    public void registerWin() {
         this.wins++;
-        this.score += Math.max(0, points);
+        recalculateScore();
     }
 
-    public void registerLoss(int penalty) {
+    public void registerLoss() {
         this.losses++;
-        this.score = Math.max(0, this.score - Math.max(0, penalty));
+        recalculateScore();
+    }
+
+    private void recalculateScore() {
+        this.score = Math.abs(this.wins - this.losses) * 10;
     }
 }

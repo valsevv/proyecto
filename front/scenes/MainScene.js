@@ -171,9 +171,13 @@ export default class MainScene extends Phaser.Scene {
 
         // Click on empty space to move (if in move mode)
         this.input.on('pointerup', (pointer) => {
-            if (this.isDragging) return;
-            if (!this.isMyTurn) return;
-            if (this.gameFinished) return;
+            // Clear drag state on release so HUD buttons are not blocked by stale isDragging=true.
+            if (this.isDragging) {
+                this.isDragging = false;
+                return;
+            }
+            if (!this.isMyTurn || this.gameFinished) return;
+
 
             const nearest = this.hexGrid.getNearestCenter(pointer.worldX, pointer.worldY);
 
@@ -280,7 +284,8 @@ export default class MainScene extends Phaser.Scene {
         this.setupNetwork();
         
         // Launch the HUD scene FIRST so it can receive events
-        this.scene.launch('HudScene');
+        this.scene.stop('HudScene');
+        this.scene.launch('HudScene', { mode: 'game' });
         
         // Small delay to ensure HudScene finishes its create() method
         // and sets up event listeners before we emit events

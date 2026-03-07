@@ -107,9 +107,29 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             case ATTACK      -> handleAttack(session, packet);
             case END_TURN    -> handleEndTurn(session);
             case SAVE_AND_EXIT -> handleSaveAndExit(session);
+            case FORFEIT_GAME -> handleForfeitGame(session);
             case LOAD_GAME -> handleLoadGame(session, packet);
             case RECALL      -> handleRecall(session, packet);
             default          -> sendError(session, "Unknown message type");
+        }
+    }
+
+    private void handleForfeitGame(WebSocketSession session) throws IOException {
+        java.util.List<String> roomSessions = gameController.getSessionsInSameRoom(session.getId());
+
+        GameResult result = gameController.forfeitGame(session.getId());
+
+        if (!result.isSuccess()) {
+            send(session, result.getPacket());
+            return;
+        }
+
+        String json = PacketSerializer.serialize(result.getPacket());
+        for (String sid : roomSessions) {
+            WebSocketSession s = sessions.get(sid);
+            if (s != null && s.isOpen()) {
+                s.sendMessage(new TextMessage(json));
+            }
         }
     }
 

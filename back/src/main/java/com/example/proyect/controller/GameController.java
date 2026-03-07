@@ -31,8 +31,8 @@ import com.example.proyect.persistence.classes.Game;
 import com.example.proyect.persistence.classes.GameState;
 import com.example.proyect.persistence.classes.GameStatus;
 import com.example.proyect.persistence.classes.User;
-import com.example.proyect.websocket.packet.Packet;
 import com.example.proyect.persistence.repos.UserRepository;
+import com.example.proyect.websocket.packet.Packet;
 
 //vseverio Clase principal controladora de partida en tiempo real, salas, turnos, movimientos, ataques, guardado/cargado y estado por sesion
 @Service
@@ -382,8 +382,29 @@ public class GameController {
             return -1;
         }
 
+        PlayerState leavingPlayer = room.getPlayerBySession(sessionId);
+        boolean gameFinished = isPersistedGameFinished(room);
+        PlayerState winnerOnDisconnect = null;
+        Long winnerOnDisconnectUserId = null;
+        Long loserOnDisconnectUserId = null;
+
+        if (room.isGameStarted() && !gameFinished && leavingPlayer != null) {
+            winnerOnDisconnect = room.getPlayers().stream()
+                .filter(player -> player.getPlayerIndex() != leavingPlayer.getPlayerIndex())
+                .findFirst()
+                .orElse(null);
+            winnerOnDisconnectUserId = resolveUserId(room, winnerOnDisconnect);
+            loserOnDisconnectUserId = resolveUserId(room, leavingPlayer);
+        }
+
         PlayerState removed = room.removePlayer(sessionId);
         if (removed != null) {
+            if (winnerOnDisconnect != null && winnerOnDisconnectUserId != null && loserOnDisconnectUserId != null) {
+                markGameAsFinished(room, winnerOnDisconnect.getPlayerIndex());
+                registerMatchResult(winnerOnDisconnectUserId, loserOnDisconnectUserId);
+                log.info("Player {} disconnected from active game {}. Winner by forfeit: {}", sessionId, room.getRoomId(), winnerOnDisconnect.getPlayerIndex());
+            }
+
             log.info("Player {} (index {}) left room {}", sessionId, removed.getPlayerIndex(), room.getRoomId());
             sessionToRoom.remove(sessionId);
             sessionToUserId.remove(sessionId);
@@ -461,6 +482,55 @@ public class GameController {
         log.info("Game room {} saved and closed by player {}. Persisted gameId={}", roomId, actor.getPlayerIndex(), gameToSave.getId());
         
         return GameResult.ok(Packet.gameSaved(gameToSave.getId(), actor.getPlayerIndex()));
+    }
+
+    public GameResult forfeitGame(String sessionId) {
+        GameRoom room = getRoomForSession(sessionId);
+        if (room == null) {
+            return GameResult.error("You are not in a game room");
+        }
+
+        PlayerState forfeitingPlayer = room.getPlayerBySession(sessionId);
+        if (forfeitingPlayer == null) {
+            return GameResult.error("You are not in the game");
+        }
+
+        PlayerState winnerPlayer = room.getPlayers().stream()
+            .filter(player -> player.getPlayerIndex() != forfeitingPlayer.getPlayerIndex())
+            .findFirst()
+            .orElse(null);
+
+        if (winnerPlayer == null) {
+            return GameResult.error("Cannot forfeit without an opponent");
+        }
+
+        Long loserUserId = resolveUserId(room, forfeitingPlayer);
+        if (loserUserId == null) {
+            return GameResult.error("Cannot resolve forfeiting user");
+        }
+
+        Long winnerUserId = resolveUserId(room, winnerPlayer);
+        if (winnerUserId == null) {
+            return GameResult.error("Cannot resolve winner user");
+        }
+
+        markGameAsFinished(room, winnerPlayer.getPlayerIndex());
+        registerMatchResult(winnerUserId, loserUserId);
+
+        String roomId = room.getRoomId();
+        Long linkedGameId = roomToGame.get(roomId);
+        clearLoadedGameMapping(linkedGameId, roomId);
+
+        List<String> sessionsInRoom = getSessionsInSameRoom(sessionId);
+        sessionToRoom.entrySet().removeIf(entry -> roomId.equals(entry.getValue()));
+        for (String sid : sessionsInRoom) {
+            sessionToUserId.remove(sid);
+        }
+
+        room.reset();
+        cleanupEmptyRooms();
+
+        return GameResult.ok(Packet.gameForfeited(forfeitingPlayer.getPlayerIndex(), winnerPlayer.getPlayerIndex()));
     }
 
 
@@ -753,7 +823,9 @@ public class GameController {
             winnerPlayerIndex = attacker.getPlayerIndex();
             gameFinished = true;
             markGameAsFinished(room, winnerPlayerIndex);
-            registerWinForSession(room.getPlayerByIndex(winnerPlayerIndex));
+            PlayerState winner = room.getPlayerByIndex(winnerPlayerIndex);
+            PlayerState loser = room.getPlayerByIndex(targetPlayerIndex);
+            registerMatchResult(resolveUserId(room, winner), resolveUserId(room, loser));
             log.info("Player {} has been defeated in room {}. Winner: {}", targetPlayerIndex, room.getRoomId(), winnerPlayerIndex);
         }
 
@@ -1129,15 +1201,76 @@ public class GameController {
         gameService.saveGame(game.getPlayer1Id(), game.getPlayer2Id(), game);
     }
 
-    private void registerWinForSession(PlayerState winner) {
-        if (winner == null) return;
-        Long winnerUserId = sessionToUserId.get(winner.getSessionId());
+    private void registerMatchResult(Long winnerUserId, Long loserUserId) {
+        registerWinForUserId(winnerUserId);
+        registerLossForUserId(loserUserId);
+    }
+
+    private Long resolveUserId(GameRoom room, PlayerState player) {
+        if (room == null || player == null) return null;
+
+        if (player.getSessionId() != null) {
+            Long bySession = sessionToUserId.get(player.getSessionId());
+            if (bySession != null) {
+                return bySession;
+            }
+        }
+
+        Long gameId = roomToGame.get(room.getRoomId());
+        if (gameId == null) {
+            return null;
+        }
+
+        Game game = games.get(gameId);
+        if (game == null) {
+            game = gameService.getById(gameId);
+            games.put(gameId, game);
+        }
+
+        if (player.getPlayerIndex() == 0) {
+            return game.getPlayer1Id();
+        }
+        if (player.getPlayerIndex() == 1) {
+            return game.getPlayer2Id();
+        }
+        return null;
+    }
+
+    private boolean isPersistedGameFinished(GameRoom room) {
+        Long gameId = roomToGame.get(room.getRoomId());
+        if (gameId == null) {
+            return false;
+        }
+
+        Game game = games.get(gameId);
+        if (game == null) {
+            game = gameService.getById(gameId);
+            games.put(gameId, game);
+        }
+
+        GameState state = game.getState();
+        return state != null && state.getStatus() == GameStatus.FINISHED;
+    }
+
+    private void registerWinForUserId(Long winnerUserId) {
+        log.info("registerWinForUserIdfor user: {}", winnerUserId);
         if (winnerUserId == null) return;
 
         userRepository.findById(winnerUserId).ifPresent(user -> {
-            user.registerWin(10);
+            user.registerWin();
             User savedUser = userRepository.save(user);
-            rankingService.createSnapshot(savedUser.getUserId(), savedUser.getScore());
+            rankingService.createSnapshot(savedUser.getUserId());
+        });
+    }
+
+    private void registerLossForUserId(Long loserUserId) {
+        log.info("registerLossForUserId for user: {}", loserUserId);
+        if (loserUserId == null) return;
+
+        userRepository.findById(loserUserId).ifPresent(user -> {
+            user.registerLoss();
+            User savedUser = userRepository.save(user);
+            rankingService.createSnapshot(savedUser.getUserId());
         });
     }
 

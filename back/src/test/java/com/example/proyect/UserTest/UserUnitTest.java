@@ -1,4 +1,4 @@
-package com.example.proyect.UserTest;
+package com.example.proyect.usertest;
 // Test unitario basico de la clase
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -40,42 +40,34 @@ class UserUnitTest {
     void shouldRegisterWinCorrectly() {
         User user = new User("alex", "alex@mail.com", "hash");
 
-        user.registerWin(10);
+        user.registerWin();
 
         assertEquals(1, user.getWins());
         assertEquals(10, user.getScore());
     }
 
-    @Test
-    void shouldNotAddNegativePointsOnWin() {
-        User user = new User("alex", "alex@mail.com", "hash");
-
-        user.registerWin(-50);
-
-        assertEquals(1, user.getWins());
-        assertEquals(0, user.getScore());
-    }
+   
 
     @Test
     void shouldRegisterLossCorrectly() {
         User user = new User("alex", "alex@mail.com", "hash");
 
-        user.registerWin(20);
-        user.registerLoss(5);
+        user.registerWin();
+        user.registerLoss();
 
         assertEquals(1, user.getWins());
         assertEquals(1, user.getLosses());
-        assertEquals(15, user.getScore());
+        assertEquals(0, user.getScore());
     }
 
     @Test
     void shouldNotAllowNegativeScore() {
         User user = new User("alex", "alex@mail.com", "hash");
 
-        user.registerLoss(50);
+        user.registerLoss();
 
         assertEquals(1, user.getLosses());
-        assertEquals(0, user.getScore());
+        assertEquals(10, user.getScore());
     }
 
     @Test

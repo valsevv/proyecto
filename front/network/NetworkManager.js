@@ -95,6 +95,11 @@ class NetworkManager {
         this.send({ type: 'saveAndExit' });
     }
 
+    forfeitGame() {
+        console.log('[net] === SENDING FORFEIT_GAME MESSAGE ===');
+        this.send({ type: 'forfeitGame' });
+    }
+
     loadGame(gameId) {
         console.log('[net] === SENDING LOAD_GAME MESSAGE ===');
         console.log('[net] Game ID:', gameId);

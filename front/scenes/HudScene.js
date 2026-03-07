@@ -11,16 +11,33 @@ const TEAM_COLORS = [0x00ff00, 0xff4444];
 export default class HudScene extends Phaser.Scene {
     constructor() {
         super('HudScene');
+        this.hudMode = 'game';
         this.isMyTurn = false;
         this.gameStarted = false;
         this.actionsRemaining = 0;
         this.actionsPerTurn = 10;
         this.selectionData = null;
+        this.forfeitPending = false;
+        this.forfeitRedirectFallback = null;
         /** Phaser objects comprising the deploy panel */
         this.deployPanelElements = [];
     }
 
-    create() {        
+    create(data = {}) {
+        this.hudMode = data?.mode === 'lobby' ? 'lobby' : 'game';
+        this.createBackButton();
+
+        if (this.hudMode === 'lobby') {
+            this._onLobbyResize = (gameSize) => this.layoutBackButton(gameSize.width, gameSize.height);
+            this.scale.on('resize', this._onLobbyResize);
+            this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+                if (this._onLobbyResize) {
+                    this.scale.off('resize', this._onLobbyResize);
+                }
+            });
+            return;
+        }
+
         const radius = 80;
         const margin = 20;
         this.minimap = new Minimap(
@@ -50,6 +67,13 @@ export default class HudScene extends Phaser.Scene {
             backgroundColor: '#000000db',
             padding: { x: 12, y: 6 }
         }).setOrigin(0.5, 0);
+
+        this.forfeitStatusText = this.add.text(this.scale.width / 2, 62, '', {
+            fontSize: '16px',
+            fill: '#ffd166',
+            backgroundColor: '#2b1f00dd',
+            padding: { x: 10, y: 5 }
+        }).setOrigin(0.5, 0).setVisible(false);
 
         // Drone info text (shows selected drone's available actions)
         this.droneInfoText = this.add.text(this.scale.width / 2, 55, '', {
@@ -96,6 +120,10 @@ export default class HudScene extends Phaser.Scene {
             if (this.sideImpactView) {
                 this.sideImpactView.reposition(margin + sideViewW / 2, h - reservedBottom - sideViewH / 2);
             }
+            if (this.forfeitStatusText) {
+                this.forfeitStatusText.setPosition(w / 2, 62);
+            }
+            this.layoutBackButton(w, h);
             this.layoutActionButtons();
             this.layoutSaveButton();
         });
@@ -105,7 +133,90 @@ export default class HudScene extends Phaser.Scene {
             if (this._onAttackAnimStart) mainScene.events.off('attackAnimStart', this._onAttackAnimStart, this);
             if (this._onAttackAnimImpact) mainScene.events.off('attackAnimImpact', this._onAttackAnimImpact, this);
             if (this._onAttackAnimEnd) mainScene.events.off('attackAnimEnd', this._onAttackAnimEnd, this);
+            if (this._onGameForfeited) networkManager.off('gameForfeited', this._onGameForfeited);
+            if (this._onNetworkError) networkManager.off('error', this._onNetworkError);
         });
+
+        this._onGameForfeited = () => {
+            this.clearForfeitPending();
+        };
+        this._onNetworkError = () => {
+            this.clearForfeitPending();
+        };
+        networkManager.on('gameForfeited', this._onGameForfeited);
+        networkManager.on('error', this._onNetworkError);
+    }
+
+    createBackButton() {
+        const isLobby = this.hudMode === 'lobby';
+        this.backBtnConfig = {
+            margin: 20,
+            width: 120,
+            height: 40,
+            radius: 6,
+            baseColor: isLobby ? 0x1b7a3a : 0x2476e2,
+            hoverColor: isLobby ? 0x20a24b : 0x2f90ff,
+            textColor: isLobby ? '#d9ffe3' : '#e2e9ea'
+        };
+
+        this.backBtnBg = this.add.graphics();
+        this.backBtnBg.setDepth(340);
+
+        this.backBtnText = this.add.text(0, 0, 'Volver', {
+            fontSize: '16px',
+            fill: this.backBtnConfig.textColor,
+            fontFamily: '"Orbitron", "Share Tech Mono", monospace'
+        }).setOrigin(0.5);
+        this.backBtnText.setDepth(342);
+        this.backBtnText.setScrollFactor(0);
+
+        this.backBtn = this.add.rectangle(0, 0, this.backBtnConfig.width, this.backBtnConfig.height, 0x000000, 0.001)
+            .setInteractive({ useHandCursor: true });
+        this.backBtn.setDepth(343);
+
+        this.backBtn.on('pointerover', () => {
+            this.drawRoundedButton(
+                this.backBtnBg,
+                this.backBtn.x - this.backBtnConfig.width / 2,
+                this.backBtn.y - this.backBtnConfig.height / 2,
+                this.backBtnConfig.width,
+                this.backBtnConfig.height,
+                this.backBtnConfig.radius,
+                this.backBtnConfig.hoverColor,
+                0.95
+            );
+        });
+
+        this.backBtn.on('pointerout', () => {
+            this.layoutBackButton();
+        });
+
+        this.backBtn.on('pointerup', () => {
+            window.location.href = '/menu';
+        });
+
+        this.layoutBackButton();
+    }
+
+    layoutBackButton(width = this.scale.width, height = this.scale.height) {
+        if (!this.backBtn || !this.backBtnBg || !this.backBtnText || !this.backBtnConfig) return;
+
+        const x = this.backBtnConfig.margin + this.backBtnConfig.width / 2;
+        const y = height - this.backBtnConfig.margin - this.backBtnConfig.height / 2;
+
+        this.drawRoundedButton(
+            this.backBtnBg,
+            x - this.backBtnConfig.width / 2,
+            y - this.backBtnConfig.height / 2,
+            this.backBtnConfig.width,
+            this.backBtnConfig.height,
+            this.backBtnConfig.radius,
+            this.backBtnConfig.baseColor,
+            0.85
+        );
+
+        this.backBtn.setPosition(x, y);
+        this.backBtnText.setPosition(x, y);
     }
 
     createActionButtons() {
@@ -276,6 +387,7 @@ export default class HudScene extends Phaser.Scene {
 
         // Save & Exit button (always visible during game, positioned at top-right)
         this.saveExitActiveColor = 0x995500;
+        this.forfeitActiveColor = 0x8f1f1f;
         const saveExitX = this.scale.width - margin - btnWidth / 2;
         const saveExitY = margin + btnHeight / 2;
 
@@ -290,9 +402,39 @@ export default class HudScene extends Phaser.Scene {
         this.saveExitBtn = this.add.rectangle(saveExitX, saveExitY, btnWidth, btnHeight, 0x000000, 0.001)
             .setInteractive({ useHandCursor: true });
 
-        this.saveExitBtn.on('pointerdown', () => {
+        this.saveExitBtn.on('pointerup', () => {
             if (confirm('¿Guardar y salir de la partida?')) {
                 networkManager.saveAndExit();
+            }
+        });
+
+        const forfeitX = saveExitX - btnWidth - gap;
+        const forfeitY = saveExitY;
+
+        this.forfeitBtnBg = this.add.graphics();
+        this.drawRoundedButton(this.forfeitBtnBg, forfeitX - btnWidth / 2, forfeitY - btnHeight / 2, btnWidth, btnHeight, btnRadius, this.forfeitActiveColor);
+
+        this.forfeitBtnText = this.add.text(forfeitX, forfeitY, 'Abandonar', {
+            fontSize: '16px',
+            fill: '#ffffff'
+        }).setOrigin(0.5);
+
+        this.forfeitBtn = this.add.rectangle(forfeitX, forfeitY, btnWidth, btnHeight, 0x000000, 0.001)
+            .setInteractive({ useHandCursor: true });
+
+        this.forfeitBtn.on('pointerup', () => {
+            if (this.forfeitPending) return;
+            const message = 'Esta seguro que desea abandona la partida?, le sera contado como derrota';
+            if (confirm(message)) {
+                this.forfeitPending = true;
+                this.showForfeitPendingStatus();
+                if (this.forfeitRedirectFallback) {
+                    this.forfeitRedirectFallback.remove(false);
+                }
+                this.forfeitRedirectFallback = this.time.delayedCall(4500, () => {
+                    window.location.href = '/menu';
+                });
+                networkManager.forfeitGame();
             }
         });
 
@@ -349,6 +491,9 @@ export default class HudScene extends Phaser.Scene {
         };
         const saveExitX = this.scale.width - margin - btnWidth / 2;
         const saveExitY = margin + btnHeight / 2;
+        const gap = this.actionBtnConfig?.gap ?? 10;
+        const forfeitX = saveExitX - btnWidth - gap;
+        const forfeitY = saveExitY;
 
         this.drawRoundedButton(
             this.saveExitBtnBg,
@@ -361,6 +506,24 @@ export default class HudScene extends Phaser.Scene {
         );
         this.saveExitBtn.setPosition(saveExitX, saveExitY);
         this.saveExitBtnText.setPosition(saveExitX, saveExitY);
+
+        if (this.forfeitBtnBg) {
+            this.drawRoundedButton(
+                this.forfeitBtnBg,
+                forfeitX - btnWidth / 2,
+                forfeitY - btnHeight / 2,
+                btnWidth,
+                btnHeight,
+                btnRadius,
+                this.forfeitActiveColor
+            );
+        }
+        if (this.forfeitBtn) {
+            this.forfeitBtn.setPosition(forfeitX, forfeitY);
+        }
+        if (this.forfeitBtnText) {
+            this.forfeitBtnText.setPosition(forfeitX, forfeitY);
+        }
     }
 
     drawRoundedButton(graphics, x, y, width, height, radius, color, alpha = 1) {
@@ -596,7 +759,7 @@ export default class HudScene extends Phaser.Scene {
 
         const closeHit = this.add.rectangle(panelX + panelW - 18, panelY + 17, 22, 22, 0x000000, 0.001)
             .setInteractive({ useHandCursor: true }).setDepth(203);
-        closeHit.on('pointerdown', (ptr) => {
+        closeHit.on('pointerup', (ptr) => {
             ptr.event.stopPropagation();
             mainScene.events.emit('deployPanelClose');
         });
@@ -752,6 +915,30 @@ export default class HudScene extends Phaser.Scene {
         this.saveExitBtn.setVisible(visible);
         this.saveExitBtnBg.setVisible(visible);
         this.saveExitBtnText.setVisible(visible);
+        if (this.forfeitBtn) this.forfeitBtn.setVisible(visible);
+        if (this.forfeitBtnBg) this.forfeitBtnBg.setVisible(visible);
+        if (this.forfeitBtnText) this.forfeitBtnText.setVisible(visible);
+    }
+
+    clearForfeitPending() {
+        this.forfeitPending = false;
+        this.hideForfeitPendingStatus();
+        if (this.forfeitRedirectFallback) {
+            this.forfeitRedirectFallback.remove(false);
+            this.forfeitRedirectFallback = null;
+        }
+    }
+
+    showForfeitPendingStatus() {
+        if (!this.forfeitStatusText) return;
+        this.forfeitStatusText.setText('Abandono confirmado. Redirigiendo al menu...');
+        this.forfeitStatusText.setVisible(true);
+    }
+
+    hideForfeitPendingStatus() {
+        if (!this.forfeitStatusText) return;
+        this.forfeitStatusText.setVisible(false);
+        this.forfeitStatusText.setText('');
     }
 
     update() {

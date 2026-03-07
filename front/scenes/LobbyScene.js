@@ -1,5 +1,4 @@
 import Network from '../network/NetworkManager.js';
-import { VIEW_WIDTH, VIEW_HEIGHT } from '../shared/constants.js';
 
 export default class LobbyScene extends Phaser.Scene {
     constructor() {
@@ -19,6 +18,11 @@ export default class LobbyScene extends Phaser.Scene {
 
     create() {
         this.startLobbyTtlTimer();
+        const { width: viewWidth, height: viewHeight } = this.scale;
+
+        this.scene.stop('HudScene');
+        this.scene.launch('HudScene', { mode: 'lobby' });
+
         // Start background music loop (persists across scene transitions)
         if (!this.sound.get('bg_music')) {
             const bgMusic = this.sound.add('bg_music', { loop: true, volume: 0.2 });
@@ -26,11 +30,11 @@ export default class LobbyScene extends Phaser.Scene {
         }
 
         // Background
-        const bg = this.add.image(VIEW_WIDTH / 2, VIEW_HEIGHT / 2, 'mar');
-        bg.setDisplaySize(VIEW_WIDTH, VIEW_HEIGHT);
+        this.bgImage = this.add.image(viewWidth / 2, viewHeight / 2, 'mar');
+        this.bgImage.setDisplaySize(viewWidth, viewHeight);
 
         // Title (save reference to hide if player 1)
-        this.titleText = this.add.text(VIEW_WIDTH / 2, 80, 'SELECCIONA TU FACCIÓN', {
+        this.titleText = this.add.text(viewWidth / 2, 80, 'SELECCIONA TU FACCIÓN', {
             fontSize: '36px',
             fontFamily: 'Arial',
             fontStyle: 'bold',
@@ -40,9 +44,10 @@ export default class LobbyScene extends Phaser.Scene {
         }).setOrigin(0.5);
 
         // Container for buttons
-        const leftX = VIEW_WIDTH / 2 - 200;
-        const rightX = VIEW_WIDTH / 2 + 200;
-        const centerY = VIEW_HEIGHT / 2;
+        const sideOffset = Math.min(220, Math.max(140, viewWidth * 0.18));
+        const leftX = viewWidth / 2 - sideOffset;
+        const rightX = viewWidth / 2 + sideOffset;
+        const centerY = viewHeight / 2;
 
         // FIX: Assets swapped. Bomb drone belongs to Aereo; Missile drone belongs to Naval.
 
@@ -55,13 +60,36 @@ export default class LobbyScene extends Phaser.Scene {
             'Dron Bomba\n\nAlto daño\nCorto alcance\nMovimiento lento');
 
         // Status text (hidden by default, only shown for player 1)
-        this.statusText = this.add.text(VIEW_WIDTH / 2, VIEW_HEIGHT - 100, '', {
+        this.statusText = this.add.text(viewWidth / 2, viewHeight - 100, '', {
             fontSize: '24px',
             fontFamily: 'Arial',
             fill: '#ffff00',
             align: 'center'
         }).setOrigin(0.5);
         this.statusText.setVisible(false); // Hidden by default
+
+        this.scale.on('resize', (gameSize) => {
+            const w = gameSize.width;
+            const h = gameSize.height;
+            const dynamicOffset = Math.min(220, Math.max(120, w * 0.18));
+
+            if (this.bgImage) {
+                this.bgImage.setPosition(w / 2, h / 2);
+                this.bgImage.setDisplaySize(w, h);
+            }
+            if (this.titleText) {
+                this.titleText.setPosition(w / 2, 80);
+            }
+            if (this.navalButton) {
+                this.navalButton.setPosition(w / 2 - dynamicOffset, h / 2);
+            }
+            if (this.aereoButton) {
+                this.aereoButton.setPosition(w / 2 + dynamicOffset, h / 2);
+            }
+            if (this.statusText) {
+                this.statusText.setPosition(w / 2, h - 100);
+            }
+        });
 
         // Setup network handlers
         this.setupNetwork();

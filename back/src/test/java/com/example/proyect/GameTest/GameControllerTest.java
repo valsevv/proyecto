@@ -1,32 +1,33 @@
 package com.example.proyect.GameTest;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
 import java.util.List;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.example.proyect.VOs.GameResult;
 import com.example.proyect.auth.service.GameService;
+import com.example.proyect.auth.service.RankingService;
 import com.example.proyect.controller.GameController;
 import com.example.proyect.lobby.Lobby;
 import com.example.proyect.lobby.service.LobbyService;
 import com.example.proyect.persistence.classes.Game;
-import com.example.proyect.websocket.packet.Packet;
+import com.example.proyect.persistence.classes.User;
+import com.example.proyect.persistence.repos.UserRepository;
+import com.example.proyect.websocket.packet.PacketType;
 
 @ExtendWith(MockitoExtension.class)
 class GameControllerTest {
@@ -36,6 +37,12 @@ class GameControllerTest {
 
     @Mock
     private GameService gameService;
+
+    @Mock
+    private RankingService rankingService;
+
+    @Mock
+    private UserRepository userRepository;
 
     @InjectMocks
     private GameController gameController;
@@ -48,6 +55,8 @@ class GameControllerTest {
         ReflectionTestUtils.setField(gameController, "navalVisionRange", 3);
         ReflectionTestUtils.setField(gameController, "missileMaxDistance", 15);
         ReflectionTestUtils.setField(gameController, "missileDamagePercentOnNaval", 0.5);
+        ReflectionTestUtils.setField(gameController, "carrierHitsToDestroy", 5);
+        ReflectionTestUtils.setField(gameController, "aerialAttackFuelCost", 2);
         
         // Mock gameService.createGame to return a valid game (lenient for tests that don't use it)
         Game mockGame = new Game();
@@ -203,6 +212,45 @@ class GameControllerTest {
     }
 
     @Test
+    void removePlayer_duringActiveGame_shouldCountDisconnectAsLossAndPersist() {
+        Lobby lobby = new Lobby("lobby-1", "player1");
+        lobby.addPlayer(1L);
+        lobby.addPlayer(2L);
+
+        Game game = new Game();
+        game.setId(10L);
+        game.setPlayer1Id(1L);
+        game.setPlayer2Id(2L);
+
+        User user1 = new User("user1", "user1@test.com", "hash");
+        User user2 = new User("user2", "user2@test.com", "hash");
+        ReflectionTestUtils.setField(user1, "userid", 1L);
+        ReflectionTestUtils.setField(user2, "userid", 2L);
+
+        when(lobbyService.getLobbyById("lobby-1")).thenReturn(Optional.of(lobby));
+        when(gameService.createGame(anyLong(), anyLong())).thenReturn(game);
+        when(gameService.saveGame(anyLong(), anyLong(), any(Game.class))).thenAnswer(invocation -> invocation.getArgument(2));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user1));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(user2));
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        gameController.joinGame("session-1", "lobby-1", 1L);
+        gameController.joinGame("session-2", "lobby-1", 2L);
+        gameController.selectSide("session-1", "Naval");
+        gameController.selectSide("session-2", "Aereo");
+
+        int removedIndex = gameController.removePlayer("session-1");
+
+        assertThat(removedIndex).isEqualTo(0);
+        assertThat(user1.getLosses()).isEqualTo(1);
+        assertThat(user2.getWins()).isEqualTo(1);
+        verify(userRepository).save(user1);
+        verify(userRepository).save(user2);
+        verify(rankingService).createSnapshot(1L);
+        verify(rankingService).createSnapshot(2L);
+    }
+
+    @Test
     void endTurn_notPlayerTurn_shouldReturnError() {
         Lobby lobby = new Lobby("lobby-1", "player1");
         lobby.addPlayer(1L);
@@ -297,5 +345,49 @@ class GameControllerTest {
         var state = gameController.getGameState("session-999");
 
         assertThat(state).isEmpty();
+    }
+
+    @Test
+    void forfeitGame_shouldAwardWinAndLossAndReturnGameForfeitedPacket() {
+        Lobby lobby = new Lobby("lobby-1", "player1");
+        lobby.addPlayer(1L);
+        lobby.addPlayer(2L);
+
+        Game game = new Game();
+        game.setId(10L);
+        game.setPlayer1Id(1L);
+        game.setPlayer2Id(2L);
+
+        User user1 = new User("user1", "user1@test.com", "hash");
+        User user2 = new User("user2", "user2@test.com", "hash");
+        ReflectionTestUtils.setField(user1, "userid", 1L);
+        ReflectionTestUtils.setField(user2, "userid", 2L);
+
+        when(lobbyService.getLobbyById("lobby-1")).thenReturn(Optional.of(lobby));
+        when(gameService.createGame(anyLong(), anyLong())).thenReturn(game);
+        when(gameService.saveGame(anyLong(), anyLong(), any(Game.class))).thenAnswer(invocation -> invocation.getArgument(2));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user1));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(user2));
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        gameController.joinGame("session-1", "lobby-1", 1L);
+        gameController.joinGame("session-2", "lobby-1", 2L);
+        gameController.selectSide("session-1", "Naval");
+        gameController.selectSide("session-2", "Aereo");
+
+        GameResult result = gameController.forfeitGame("session-1");
+
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.getPacket()).isNotNull();
+        assertThat(result.getPacket().getType()).isEqualTo(PacketType.GAME_FORFEITED);
+        assertThat(result.getPacket().getInt("forfeitingPlayerIndex")).isEqualTo(0);
+        assertThat(result.getPacket().getInt("winnerPlayerIndex")).isEqualTo(1);
+
+        verify(userRepository).save(user1);
+        verify(userRepository).save(user2);
+        verify(rankingService).createSnapshot(1L);
+        verify(rankingService).createSnapshot(2L);
+        assertThat(user1.getLosses()).isEqualTo(1);
+        assertThat(user2.getWins()).isEqualTo(1);
     }
 }

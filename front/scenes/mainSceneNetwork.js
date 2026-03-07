@@ -1,5 +1,6 @@
 import Network from '../network/NetworkManager.js';
 import { showPlayerLeftOverlay } from './mainSceneOverlays.js';
+import { showGameForfeitOverlay } from './mainSceneOverlays.js';
 
 export function attachNetworkHandlers(scene, options = {}) {
     const modeMove = options.modeMove ?? 'move';
@@ -241,6 +242,20 @@ export function attachNetworkHandlers(scene, options = {}) {
     Network.on('gameSaved', () => {
         alert('Partida guardada correctamente');
         window.location.href = '/menu';
+    });
+
+    Network.on('gameForfeited', (msg) => {
+        if (scene.gameFinished) {
+            return;
+        }
+        scene.gameFinished = true;
+        scene.isMyTurn = false;
+        scene.clearTargetHighlights();
+        scene.clearSelections();
+        scene.events.emit('turnChanged', { isMyTurn: false });
+
+        const isLocalForfeiter = msg.forfeitingPlayerIndex === Network.playerIndex;
+        showGameForfeitOverlay(scene, isLocalForfeiter);
     });
 
     Network.on('droneRecalled', (msg) => {

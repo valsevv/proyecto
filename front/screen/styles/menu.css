@@ -10,6 +10,12 @@ body {
     font-size: clamp(14px, 2.6vw, 16px);
 }
 
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
 body::before {
     content: "";
     position: fixed;
@@ -52,6 +58,7 @@ body::after {
     border-radius: 10px;
 
     background: rgba(5, 20, 40, 0.75);
+    -webkit-backdrop-filter: blur(8px);
     backdrop-filter: blur(8px);
 
     border: 2px solid rgba(0,255,255,0.7);
@@ -61,7 +68,8 @@ body::after {
 
     color: #7ef9ff;
     max-height: 90vh;
-    overflow-y: auto;
+    overflow-y: hidden;
+    overflow-x: hidden;
 }
 
 /* Esquinas tipo marco HUD */
@@ -126,7 +134,7 @@ body::after {
     box-shadow:
         0 0 10px #0059ff,
         0 0 25px rgba(0, 89, 255, 0.6);
-    transform: scale(1.03);
+    transform: none;
 }
 
 /* Botón música */

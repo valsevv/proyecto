@@ -12,6 +12,7 @@ public enum PacketType {
     ATTACK("attack"),
     END_TURN("endTurn"),
     SAVE_AND_EXIT("saveAndExit"),
+    FORFEIT_GAME("forfeitGame"),
     LOAD_GAME("loadGame"),
     RECALL("recall"),
 
@@ -26,6 +27,7 @@ public enum PacketType {
     ATTACK_RESULT("attackResult"),
     PLAYER_LEFT("playerLeft"),
     GAME_SAVED("gameSaved"),
+    GAME_FORFEITED("gameForfeited"),
     GAME_LOADED("gameLoaded"),
     LOBBY_CREATED("lobbyCreated"),
     DRONE_RECALLED("droneRecalled"),

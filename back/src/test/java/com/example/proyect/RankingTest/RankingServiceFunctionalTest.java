@@ -32,7 +32,7 @@ class RankingServiceFunctionalTest {
 
         User user = userService.register("alexis", "alexis@mail.com", "123456");
 
-        Ranking ranking = rankingService.createSnapshot(user.getUserId(), 100);
+        Ranking ranking = rankingService.createSnapshot(user.getUserId());
 
         assertNotNull(ranking.getId());
         assertEquals(100, ranking.getPoints());
@@ -43,9 +43,9 @@ class RankingServiceFunctionalTest {
 
        User user = userService.register("alexis", "alexis@mail.com", "123456");
 
-        rankingService.createSnapshot(user.getUserId(), 50);
-        rankingService.createSnapshot(user.getUserId(), 200);
-        rankingService.createSnapshot(user.getUserId(), 150);
+        rankingService.createSnapshot(user.getUserId());
+        rankingService.createSnapshot(user.getUserId());
+        rankingService.createSnapshot(user.getUserId());
 
         Ranking best = rankingService.getBestByUserId(user.getUserId());
 
@@ -59,9 +59,9 @@ class RankingServiceFunctionalTest {
         User u2 = userService.register("test_top2_" + timestamp, "test2" + timestamp + "@mail.com", "12345689");
         User u3 = userService.register("test_top3_" + timestamp, "test3" + timestamp + "@mail.com", "12345689");
 
-        rankingService.createSnapshot(u1.getUserId(), 100);
-        rankingService.createSnapshot(u2.getUserId(), 300);
-        rankingService.createSnapshot(u3.getUserId(), 200);
+        rankingService.createSnapshot(u1.getUserId());
+        rankingService.createSnapshot(u2.getUserId());
+        rankingService.createSnapshot(u3.getUserId());
 
         List<RankingTopDTO> top = rankingService.getTop(100); // Get more to ensure we find our users
 

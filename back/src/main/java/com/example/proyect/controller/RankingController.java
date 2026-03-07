@@ -38,7 +38,7 @@ public class RankingController {
             @RequestParam Long userId,
             @RequestParam int points) {
         try {
-            Ranking ranking = rankingService.createSnapshot(userId, points);
+            Ranking ranking = rankingService.createSnapshot(userId);
             return ResponseEntity.status(HttpStatus.CREATED).body(ranking);
         } catch (EntityNotFoundException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();

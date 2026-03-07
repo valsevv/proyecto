@@ -17,6 +17,7 @@ import org.springframework.data.domain.Pageable;
 import com.example.proyect.auth.RankingTopDTO;
 import com.example.proyect.auth.service.RankingService;
 import com.example.proyect.persistence.classes.Ranking;
+import com.example.proyect.persistence.classes.User;
 import com.example.proyect.persistence.repos.RankingRepository;
 import com.example.proyect.persistence.repos.UserRepository;
 
@@ -37,14 +38,18 @@ class RankingServiceTest {
     void createSnapshot_success() {
         RankingService service = new RankingService(rankingRepository, userRepository);
 
-        when(userRepository.existsById(1L)).thenReturn(true);
+        User user = new User("alex", "alex@mail.com", "hash");
+        user.registerWin();
+        user.registerWin();
+        user.registerLoss();
+        when(userRepository.findById(1L)).thenReturn(java.util.Optional.of(user));
         when(rankingRepository.save(any(Ranking.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        Ranking result = service.createSnapshot(1L, 100);
+        Ranking result = service.createSnapshot(1L);
 
         assertThat(result.getUserId()).isEqualTo(1L);
-        assertThat(result.getPoints()).isEqualTo(100);
+        assertThat(result.getPoints()).isEqualTo(10);
         assertThat(result.getReachedAt()).isNotNull();
 
         verify(rankingRepository).save(any(Ranking.class));
@@ -54,9 +59,9 @@ class RankingServiceTest {
     void createSnapshot_userNotFound_throws() {
         RankingService service = new RankingService(rankingRepository, userRepository);
 
-        when(userRepository.existsById(1L)).thenReturn(false);
+        when(userRepository.findById(1L)).thenReturn(java.util.Optional.empty());
 
-        assertThatThrownBy(() -> service.createSnapshot(1L, 100))
+        assertThatThrownBy(() -> service.createSnapshot(1L))
                 .isInstanceOf(EntityNotFoundException.class);
 
         verify(rankingRepository, never()).save(any());
