@@ -49,10 +49,10 @@ public class AuthController {
 
         ResponseCookie cookie = ResponseCookie.from("authToken", token)
                 .httpOnly(true)
-                .secure(false) // En produccion deberia ir TRUE si es HTTPS
+                .secure(true) // Required for HTTPS (ngrok)
                 .path("/")
                 .maxAge(3600) // 1 hora de duracion
-                .sameSite("Strict")
+                .sameSite("None") // Required for cross-origin cookies
                 .build();
 
         return ResponseEntity.ok()
@@ -76,10 +76,10 @@ public class AuthController {
 
         ResponseCookie cookie = ResponseCookie.from("authToken", token)
                 .httpOnly(true)
-                .secure(false) // En produccion deberia ir TRUE si es HTTPS
+                .secure(true) // Required for HTTPS (ngrok)
                 .path("/")
                 .maxAge(3600) // 1 hora de duracion
-                .sameSite("Strict")
+                .sameSite("None") // Required for cross-origin cookies
                 .build();
         
         return ResponseEntity.ok()
@@ -99,10 +99,10 @@ public class AuthController {
     public ResponseEntity<Map<String, String>> logout() {
         ResponseCookie cookie = ResponseCookie.from("authToken", "")
                 .httpOnly(true)
-                .secure(false)
+                .secure(true)
                 .path("/")
                 .maxAge(0) // Expire immediately
-                .sameSite("Strict")
+                .sameSite("None")
                 .build();
         
         return ResponseEntity.ok()

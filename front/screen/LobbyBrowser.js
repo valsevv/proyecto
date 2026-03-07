@@ -1,6 +1,3 @@
-// LobbyBrowser.js - Handles lobby list and creation
-
-const API_BASE = 'http://localhost:8080/api';
 let refreshInterval = null;
 
 // Fetch and display lobbies
@@ -8,7 +5,7 @@ async function fetchLobbies() {
     if (!await checkAuth()) return;
 
     try {
-        const response = await fetch(`${API_BASE}/lobby/list`, {
+        const response = await fetch(`/api/lobby/list`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json'
@@ -81,7 +78,7 @@ async function createLobby() {
     if (!await checkAuth()) return;
 
     try {
-        const response = await fetch(`${API_BASE}/lobby/create`, {
+        const response = await fetch(`/api/lobby/create`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -110,7 +107,7 @@ async function joinLobby(lobbyId) {
     if (!await checkAuth()) return;
 
     try {
-        const response = await fetch(`${API_BASE}/lobby/join/${lobbyId}`, {
+        const response = await fetch(`/api/lobby/join/${lobbyId}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'

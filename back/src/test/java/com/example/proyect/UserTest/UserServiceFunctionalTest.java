@@ -1,6 +1,6 @@
 //Test Funcional del servicio UserService. Prueba el servicio y tambien el repositorio
 
-package com.example.proyect.usertest;
+package com.example.proyect.UserTest;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;

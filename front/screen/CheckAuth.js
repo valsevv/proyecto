@@ -2,7 +2,7 @@
 
 async function checkAuth() {
     try {
-        const response = await fetch(`${API_BASE}/users/me`, {
+        const response = await fetch(`/api/users/me`, {
             method: 'GET',
             credentials: 'include'
         });

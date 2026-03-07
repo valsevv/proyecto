@@ -1,4 +1,4 @@
-package com.example.proyect.usertest;
+package com.example.proyect.UserTest;
 //Test con mock del UserService y su repo
 import java.util.Optional;
 

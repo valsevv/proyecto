@@ -1,4 +1,4 @@
-package com.example.proyect.usertest;
+package com.example.proyect.UserTest;
 // Test unitario basico de la clase
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;

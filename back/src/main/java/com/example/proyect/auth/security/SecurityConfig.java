@@ -111,14 +111,14 @@ public class SecurityConfig {
             "http://localhost:3000",
             "http://127.0.0.1:3000",
             "http://localhost:5173",
-            "http://127.0.0.1:5173"
-            // "https://tu-frontend.com" // para prod
+            "http://127.0.0.1:5173",
+            "https://camilla-traplike-scribbly.ngrok-free.dev"
         ));
         cfg.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         cfg.setAllowedHeaders(List.of(
             "Authorization", "Content-Type", "X-Requested-With", "Accept", "Origin"
         ));
-        cfg.setExposedHeaders(List.of("Authorization", "Location"));
+        cfg.setExposedHeaders(List.of("Authorization", "Location", "Set-Cookie"));
         cfg.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

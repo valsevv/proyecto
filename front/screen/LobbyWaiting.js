@@ -1,11 +1,10 @@
-const API_BASE = 'http://localhost:8080/api';
 let checkInterval = null;
 
 async function checkLobbyStatus() {
     if (!await checkAuth()) return;
 
     try {
-        const response = await fetch(`${API_BASE}/lobby/my-lobby`, {
+        const response = await fetch(`api/lobby/my-lobby`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json'
@@ -59,7 +58,7 @@ async function leaveLobby() {
     }
 
     try {
-        const response = await fetch(`${API_BASE}/lobby/leave`, {
+        const response = await fetch(`/api/lobby/leave`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'

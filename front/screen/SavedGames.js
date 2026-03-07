@@ -1,5 +1,3 @@
-const API_BASE = 'http://localhost:8080';
-
 const gamesList = document.getElementById('gamesList');
 
 // Load saved games on page load
@@ -16,7 +14,7 @@ async function loadSavedGames() {
     gamesList.innerHTML = '<p class="loading">Cargando partidas...</p>';
     
     try {
-        const response = await fetch(`${API_BASE}/api/games/saved`, {
+        const response = await fetch(`/api/games/saved`, {
             method: 'GET',
             credentials: 'include'
         });
@@ -70,7 +68,7 @@ function displayGames(games) {
 async function loadGame(gameId) {
     try {
         // Create a load-game lobby via REST API
-        const response = await fetch(`${API_BASE}/api/lobby/load-game/${gameId}`, {
+        const response = await fetch(`/api/lobby/load-game/${gameId}`, {
             method: 'POST',
             credentials: 'include'
         });
@@ -101,7 +99,7 @@ async function deleteGame(id) {
     if (!confirm('¿Eliminar esta partida?')) return;
 
     try {
-        const response = await fetch(`${API_BASE}/api/games/${id}`, {
+        const response = await fetch(`/api/games/${id}`, {
             method: 'DELETE',
             credentials: 'include'
         });

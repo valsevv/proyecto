@@ -3,9 +3,6 @@ const toggleMode = document.getElementById("toggleMode");
 const statusText = document.getElementById("status");
 const emailInput = document.getElementById("email");
 
-// ⚠️ Ajustá este valor al puerto/host real de tu backend
-const BASE_URL = "http://localhost:8080";
-
 let isLogin = true;
 
 toggleMode.onclick = () => {
@@ -30,10 +27,7 @@ actionBtn.onclick = async () => {
     return;
   }
 
-
-
-  const endpointPath = isLogin ? "/api/auth/login" : "/api/auth/register";
-  const endpoint = `${BASE_URL}${endpointPath}`;
+  const endpoint = isLogin ? "/api/auth/login" : "/api/auth/register";
 
   const body = isLogin
     ? { username, password }
@@ -83,35 +77,35 @@ actionBtn.onclick = async () => {
   }
 };
 
-  window.addEventListener("DOMContentLoaded", async () => {
+window.addEventListener("DOMContentLoaded", async () => {
 
-    const statusText = document.getElementById("status");
+  const statusText = document.getElementById("status");
 
-    try {
-      const response = await fetch("http://localhost:8080/api/auth/me", {
-        method: "GET",
-        credentials: "include"
-      });
+  try {
+    const response = await fetch("/api/users/me", {
+      method: "GET",
+      credentials: "include"
+    });
 
-      if (response.ok) {
-        statusText.textContent = "Sesión detectada...";
-        statusText.style.color = "#00ff88";
-        statusText.style.opacity = "1";
+    if (response.ok) {
+      statusText.textContent = "Sesión detectada...";
+      statusText.style.color = "#00ff88";
+      statusText.style.opacity = "1";
 
-        setTimeout(() => {
-          document.body.style.transition = "opacity 0.6s";
-          document.body.style.opacity = "0";
-        }, 800);
+      setTimeout(() => {
+        document.body.style.transition = "opacity 0.6s";
+        document.body.style.opacity = "0";
+      }, 800);
 
-        setTimeout(() => {
-          window.location.href = "/menu";
-        }, 1200);
+      setTimeout(() => {
+        window.location.href = "/menu";
+      }, 1200);
 
-        return;
-      }
-
-    } catch (e) {
-      // No autenticado → no hacer nada
+      return;
     }
 
-  });
+  } catch (e) {
+    // No autenticado → no hacer nada
+  }
+
+});
