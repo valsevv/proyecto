@@ -1,5 +1,6 @@
 package com.example.proyect.game.units.drone;
 
+import com.example.proyect.game.config.UnitBalanceRegistry;
 import com.example.proyect.game.units.weapons.BombWeapon;
 
 public class AerialDrone extends Drone {
@@ -7,11 +8,12 @@ public class AerialDrone extends Drone {
     public AerialDrone() {
         super();
 
-        // Ajustes típicos (podés tunear)
-        setMovementRange(2);
-        setVisionRange(4);
+        setMaxHp(UnitBalanceRegistry.getAerialDroneMaxHp());
+        setMovementRange(UnitBalanceRegistry.getAerialDroneMovementRange());
+        setVisionRange(UnitBalanceRegistry.getAerialDroneVisionRange());
+        setMaxFuel(UnitBalanceRegistry.getAerialDroneMaxFuel());
+        setFuel(UnitBalanceRegistry.getAerialDroneMaxFuel());
 
-        // Arma por defecto: bombas
-        setWeapon(new BombWeapon(1, 45, 1, 0.60, 4));
+        setWeapon(new BombWeapon(UnitBalanceRegistry.getAerialDroneAmmo(), 45, 1, 0.60, 4));
     }
 }

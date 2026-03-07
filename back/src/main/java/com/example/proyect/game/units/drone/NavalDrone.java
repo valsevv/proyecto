@@ -1,23 +1,29 @@
 package com.example.proyect.game.units.drone;
 
+import com.example.proyect.game.config.UnitBalanceRegistry;
 import com.example.proyect.game.units.weapons.MissileWeapon;
 
 public class NavalDrone extends Drone {
 
-    public static final int DEFAULT_MISSILES = 2;
+    public static final int DEFAULT_MISSILES = UnitBalanceRegistry.DEFAULT_NAVAL_DRONE_MISSILES;
 
     private int missiles;
 
     public NavalDrone() {
         super();
 
-        // Ajustes típicos (podés tunear)
-        setMovementRange(2);
-        setVisionRange(2);
+        setMaxHp(UnitBalanceRegistry.getNavalDroneMaxHp());
+        setMovementRange(UnitBalanceRegistry.getNavalDroneMovementRange());
+        setVisionRange(UnitBalanceRegistry.getNavalDroneVisionRange());
+        setMaxFuel(UnitBalanceRegistry.getNavalDroneMaxFuel());
+        setFuel(UnitBalanceRegistry.getNavalDroneMaxFuel());
 
-        // Arma por defecto: misiles
-        setWeapon(new MissileWeapon(10, 50, 1, 0.75, 8));
-        this.missiles = DEFAULT_MISSILES;
+        setWeapon(new MissileWeapon(UnitBalanceRegistry.getNavalDroneWeaponAmmo(), 50, 1, 0.75, 8));
+        this.missiles = UnitBalanceRegistry.getNavalDroneMissiles();
+    }
+
+    public static int getConfiguredDefaultMissiles() {
+        return UnitBalanceRegistry.getNavalDroneMissiles();
     }
 
     public int getMissiles() {
