@@ -32,10 +32,6 @@ public class Weapon {
         setRange(range);
     }
 
-    // =========================
-    // Getters
-    // =========================
-
     public int getAmmo() {
         return ammo;
     }
@@ -55,10 +51,6 @@ public class Weapon {
     public int getRange() {
         return range;
     }
-
-    // =========================
-    // Setters controlados
-    // =========================
 
     public void setAmmo(int ammo) {
         if (ammo < 0) throw new IllegalArgumentException("ammo no puede ser negativo");
@@ -85,10 +77,6 @@ public class Weapon {
         if (range <= 0) throw new IllegalArgumentException("range debe ser > 0");
         this.range = range;
     }
-
-    // =========================
-    // Comportamiento de dominio
-    // =========================
 
     public boolean hasAmmo() {
         return ammo > 0;

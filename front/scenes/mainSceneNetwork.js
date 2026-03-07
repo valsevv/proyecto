@@ -166,7 +166,8 @@ export function attachNetworkHandlers(scene, options = {}) {
         }
 
         if (!hit && msg.attackerPlayer === Network.playerIndex) {
-            scene.showCombatMessage('El ataque fallo');
+            scene.events.emit('combatMessage', 'El ataque fallo');
+            scene.showCombatMessage?.('El ataque fallo');
         }
         if (attackerDrone && msg.attackerPlayer === Network.playerIndex) {
             attackerDrone.hasAttacked = true;

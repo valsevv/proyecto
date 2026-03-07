@@ -103,6 +103,7 @@ export default class HudScene extends Phaser.Scene {
         mainScene.events.on('selectionChanged', this.onSelectionChanged, this);
         mainScene.events.on('deployPanelOpen', this.onDeployPanelOpen, this);
         mainScene.events.on('deployPanelClose', this.onDeployPanelClose, this);
+        mainScene.events.on('combatMessage', this.onCombatMessage, this);
 
         // Attack side-view events
         this._onAttackAnimStart = (payload) => this.sideImpactView?.onAttackStart(payload);
@@ -133,6 +134,7 @@ export default class HudScene extends Phaser.Scene {
             if (this._onAttackAnimStart) mainScene.events.off('attackAnimStart', this._onAttackAnimStart, this);
             if (this._onAttackAnimImpact) mainScene.events.off('attackAnimImpact', this._onAttackAnimImpact, this);
             if (this._onAttackAnimEnd) mainScene.events.off('attackAnimEnd', this._onAttackAnimEnd, this);
+            mainScene.events.off('combatMessage', this.onCombatMessage, this);
             if (this._onGameForfeited) networkManager.off('gameForfeited', this._onGameForfeited);
             if (this._onNetworkError) networkManager.off('error', this._onNetworkError);
         });
@@ -552,6 +554,45 @@ export default class HudScene extends Phaser.Scene {
             frame.lineStyle(1, frameColor, 0.35);
             frame.strokeRoundedRect(x + 2, y + 2, width - 4, height - 4, Math.max(4, radius - 2));
         }
+    }
+
+    onCombatMessage(message) {
+        if (!message) return;
+
+        if (this.combatMessageTween) {
+            this.combatMessageTween.stop();
+            this.combatMessageTween = null;
+        }
+        if (this.combatMessageText) {
+            this.combatMessageText.destroy();
+            this.combatMessageText = null;
+        }
+
+        const text = this.add.text(this.scale.width / 2, this.scale.height * 0.22, message, {
+            fontSize: '34px',
+            fill: '#ffd54f',
+            fontStyle: 'bold',
+            fontFamily: this.btnFontFamily || 'monospace',
+            stroke: '#000000',
+            strokeThickness: 6,
+            align: 'center'
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(1100);
+
+        this.combatMessageText = text;
+        this.combatMessageTween = this.tweens.add({
+            targets: text,
+            alpha: { from: 1, to: 0 },
+            y: text.y - 28,
+            duration: 1500,
+            ease: 'Quad.easeOut',
+            onComplete: () => {
+                text.destroy();
+                if (this.combatMessageText === text) {
+                    this.combatMessageText = null;
+                }
+                this.combatMessageTween = null;
+            }
+        });
     }
 
     updateButtonStates() {

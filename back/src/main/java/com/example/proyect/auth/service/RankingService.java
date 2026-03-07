@@ -60,7 +60,7 @@ public class RankingService {
     }
 
     public List<RankingTopDTO> getTop(int limit) { //trae top N global del ranking con paginacion simple
-        return rankingRepository.findTopWithUsername(PageRequest.of(0, limit));
+        return rankingRepository.findTopUniquePlayersWithUsername(PageRequest.of(0, limit));
     }
 
     @Transactional

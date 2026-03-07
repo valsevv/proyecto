@@ -345,6 +345,48 @@ export default class MainScene extends Phaser.Scene {
         attachNetworkHandlers(this, { modeMove: MODE_MOVE });
     }
 
+    showCombatMessage(message) {
+        if (!message) return;
+
+        if (this.combatMessageTween) {
+            this.combatMessageTween.stop();
+            this.combatMessageTween = null;
+        }
+        if (this.combatMessageText) {
+            this.combatMessageText.destroy();
+            this.combatMessageText = null;
+        }
+
+        const camera = this.cameras.main;
+        const text = this.add.text(camera.midPoint.x, camera.midPoint.y - 110, message, {
+            fontSize: '32px',
+            fill: '#ffd54f',
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 5
+        });
+
+        text.setOrigin(0.5);
+        text.setScrollFactor(0);
+        text.setDepth(1200);
+
+        this.combatMessageText = text;
+        this.combatMessageTween = this.tweens.add({
+            targets: text,
+            alpha: { from: 1, to: 0 },
+            y: text.y - 35,
+            duration: 1400,
+            ease: 'Quad.easeOut',
+            onComplete: () => {
+                text.destroy();
+                if (this.combatMessageText === text) {
+                    this.combatMessageText = null;
+                }
+                this.combatMessageTween = null;
+            }
+        });
+    }
+
     //Se agrega esta cola para destuir al dron luego e la accion que haga, si se mueve o ataca consuma su combustible luego de la accion
     queueDroneDestroyAfterAction(drone, destroyFn) {
         if (!drone || typeof destroyFn !== 'function') return;

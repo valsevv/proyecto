@@ -975,6 +975,10 @@ public class GameController {
                 return new AttackResolution(0, false);
             }
             attackerDrone.getWeapon().consumeAmmo(1);
+            boolean hit = Math.random() <= attackerDrone.getWeapon().getAccuracy();
+            if (!hit) {
+                return new AttackResolution(0, false);
+            }
             return new AttackResolution(attackerDrone.getWeapon().getDamage(), true);
         }
 

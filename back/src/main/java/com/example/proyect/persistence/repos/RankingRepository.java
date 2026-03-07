@@ -28,7 +28,17 @@ public interface RankingRepository extends JpaRepository<Ranking, Long> {
         )
         FROM Ranking r
         JOIN User u ON u.userid = r.userId
-        ORDER BY r.points DESC
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM Ranking r2
+            WHERE r2.userId = r.userId
+              AND (
+                    r2.points > r.points
+                 OR (r2.points = r.points AND r2.reachedAt > r.reachedAt)
+                 OR (r2.points = r.points AND r2.reachedAt = r.reachedAt AND r2.id > r.id)
+              )
+        )
+        ORDER BY r.points DESC, r.reachedAt ASC, r.id ASC
     """)
-    List<RankingTopDTO> findTopWithUsername(Pageable pageable);
+    List<RankingTopDTO> findTopUniquePlayersWithUsername(Pageable pageable);
  }

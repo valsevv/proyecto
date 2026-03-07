@@ -113,13 +113,13 @@ class RankingServiceTest {
 
         RankingTopDTO r1 = new RankingTopDTO(1L, "alex", 10, 2, 200);
 
-        when(rankingRepository.findTopWithUsername(any(Pageable.class)))
+        when(rankingRepository.findTopUniquePlayersWithUsername(any(Pageable.class)))
                 .thenReturn(List.of(r1));
 
         List<RankingTopDTO> result = service.getTop(5);
 
         assertThat(result).hasSize(1);
-        verify(rankingRepository).findTopWithUsername(any(Pageable.class));
+        verify(rankingRepository).findTopUniquePlayersWithUsername(any(Pageable.class));
     }
 
     // ---------------- DELETE ----------------
