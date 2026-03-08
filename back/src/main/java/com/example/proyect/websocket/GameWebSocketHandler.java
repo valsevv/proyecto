@@ -108,9 +108,24 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             case END_TURN    -> handleEndTurn(session);
             case SAVE_AND_EXIT -> handleSaveAndExit(session);
             case FORFEIT_GAME -> handleForfeitGame(session);
+            case LEAVE_GAME -> handleLeaveGame(session);
             case LOAD_GAME -> handleLoadGame(session, packet);
             case RECALL      -> handleRecall(session, packet);
             default          -> sendError(session, "Unknown message type");
+        }
+    }
+
+    private void handleLeaveGame(WebSocketSession session) throws IOException {
+        java.util.List<String> roomSessions = gameController.getSessionsInSameRoom(session.getId());
+        int removedIndex = gameController.removePlayerWithoutForfeit(session.getId());
+
+        if (removedIndex >= 0) {
+            broadcastToSessions(roomSessions, Packet.playerLeft(removedIndex), session.getId());
+        }
+
+        sessions.remove(session.getId());
+        if (session.isOpen()) {
+            session.close(CloseStatus.NORMAL);
         }
     }
 
@@ -439,6 +454,24 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             broadcast(packet);
         } catch (IOException e) {
             log.error("Error broadcasting message", e);
+        }
+    }
+
+    private void broadcastToSessions(java.util.List<String> sessionIds, Packet packet, String excludedSessionId) throws IOException {
+        if (sessionIds == null || sessionIds.isEmpty()) {
+            return;
+        }
+
+        String json = PacketSerializer.serialize(packet);
+        for (String sid : sessionIds) {
+            if (excludedSessionId != null && excludedSessionId.equals(sid)) {
+                continue;
+            }
+
+            WebSocketSession s = sessions.get(sid);
+            if (s != null && s.isOpen()) {
+                s.sendMessage(new TextMessage(json));
+            }
         }
     }
 }

@@ -39,7 +39,7 @@ export function showPlayerLeftOverlay(scene) {
     }).setOrigin(0.5);
     overlay.add(bannerText);
 
-    const subText = scene.add.text(cx, cy + 25, 'Volviendo al lobby en unos segundos...', {
+    const subText = scene.add.text(cx, cy + 25, 'Volviendo al menu en 3 segundos...', {
         fontSize: '16px',
         fill: '#9bb3ad',
         fontFamily: '"Share Tech Mono", monospace'
@@ -50,7 +50,7 @@ export function showPlayerLeftOverlay(scene) {
 
     // Automatic redirection after 3 seconds
     scene.time.delayedCall(3000, () => {
-        window.location.href = '/lobby-browser';
+        window.location.href = '/menu';
     });
 }
 

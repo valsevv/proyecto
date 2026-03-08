@@ -73,7 +73,7 @@ public class RankingController {
 
     @GetMapping("/top")
     public ResponseEntity<List<RankingTopDTO>> getTop(
-            @RequestParam(defaultValue = "10") int limit) {
+            @RequestParam(defaultValue = "5") int limit) {
         List<RankingTopDTO> top = rankingService.getTop(limit);
         return ResponseEntity.ok(top);
     }

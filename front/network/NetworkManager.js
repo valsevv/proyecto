@@ -100,6 +100,11 @@ class NetworkManager {
         this.send({ type: 'forfeitGame' });
     }
 
+    leaveGame() {
+        console.log('[net] === SENDING LEAVE_GAME MESSAGE ===');
+        this.send({ type: 'leaveGame' });
+    }
+
     loadGame(gameId) {
         console.log('[net] === SENDING LOAD_GAME MESSAGE ===');
         console.log('[net] Game ID:', gameId);

@@ -13,6 +13,7 @@ public enum PacketType {
     END_TURN("endTurn"),
     SAVE_AND_EXIT("saveAndExit"),
     FORFEIT_GAME("forfeitGame"),
+    LEAVE_GAME("leaveGame"),
     LOAD_GAME("loadGame"),
     RECALL("recall"),
 

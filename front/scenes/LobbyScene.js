@@ -304,28 +304,13 @@ export default class LobbyScene extends Phaser.Scene {
 
         Network.on('playerLeft', () => {
             if (this.statusText && this.statusText.active && this.statusText.scene) {
-                this.statusText.setText('El oponente se desconectó');
+                this.statusText.setVisible(true);
+                this.statusText.setText('El oponente se desconecto. Volviendo al menu...');
             }
-            this.sideSelected = false;
-            this.waitingForOpponent = false;
-
-            // Re-enable buttons and reset their appearance
-            if (this.navalButton && this.navalButton.active) {
-                const navBg = this.navalButton.getAt(0);
-                if (navBg && navBg.active) {
-                    navBg.setInteractive({ useHandCursor: true });
-                    navBg.setFillStyle(0x001122, 0.8);
-                    navBg.setStrokeStyle(3, 0x00ffff);
-                }
-            }
-            if (this.aereoButton && this.aereoButton.active) {
-                const aerBg = this.aereoButton.getAt(0);
-                if (aerBg && aerBg.active) {
-                    aerBg.setInteractive({ useHandCursor: true });
-                    aerBg.setFillStyle(0x001122, 0.8);
-                    aerBg.setStrokeStyle(3, 0x00ffff);
-                }
-            }
+            this.clearLobbyTtlTimer();
+            this.time.delayedCall(3000, () => {
+                window.location.href = '/menu';
+            });
         });
 
         Network.on('error', (msg) => {

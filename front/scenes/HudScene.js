@@ -194,6 +194,14 @@ export default class HudScene extends Phaser.Scene {
         });
 
         this.backBtn.on('pointerup', () => {
+            if (this._backNavigationPending) return;
+            this._backNavigationPending = true;
+
+            if (this.hudMode === 'game') {
+                this.leaveGameAndReturnToMenu();
+                return;
+            }
+
             window.location.href = '/menu';
         });
 
@@ -219,6 +227,37 @@ export default class HudScene extends Phaser.Scene {
 
         this.backBtn.setPosition(x, y);
         this.backBtnText.setPosition(x, y);
+    }
+
+    leaveGameAndReturnToMenu() {
+        if (this._leaveInProgress) return;
+        this._leaveInProgress = true;
+
+        const cleanupLeaveHandlers = () => {
+            if (this._leaveDisconnectHandler) {
+                networkManager.off('disconnect', this._leaveDisconnectHandler);
+                this._leaveDisconnectHandler = null;
+            }
+            if (this._leaveFallbackTimer) {
+                this._leaveFallbackTimer.remove(false);
+                this._leaveFallbackTimer = null;
+            }
+        };
+
+        this._leaveDisconnectHandler = () => {
+            cleanupLeaveHandlers();
+            window.location.href = '/menu';
+        };
+
+        networkManager.on('disconnect', this._leaveDisconnectHandler);
+
+        // Fallback in case the close event is delayed or dropped.
+        this._leaveFallbackTimer = this.time.delayedCall(3500, () => {
+            cleanupLeaveHandlers();
+            window.location.href = '/menu';
+        });
+
+        networkManager.leaveGame();
     }
 
     createActionButtons() {

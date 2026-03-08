@@ -41,7 +41,7 @@ musicToggleBtn.addEventListener('click', async () => {
 // Logout 
 document.getElementById('logoutBtn').addEventListener('click', async () => {
     try {
-        const response = await fetch(`/auth/logout`, {
+        const response = await fetch(`/api/auth/logout`, {
             method: 'POST',
             credentials: 'include'
         });

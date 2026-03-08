@@ -1,6 +1,7 @@
 package com.example.proyect.GameTest;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -56,6 +57,8 @@ class GameControllerTest {
         ReflectionTestUtils.setField(gameController, "missileMaxDistance", 15);
         ReflectionTestUtils.setField(gameController, "missileDamagePercentOnNaval", 0.5);
         ReflectionTestUtils.setField(gameController, "carrierHitsToDestroy", 5);
+        ReflectionTestUtils.setField(gameController, "aerialCarrierHitsToDestroy", 6);
+        ReflectionTestUtils.setField(gameController, "navalCarrierHitsToDestroy", 3);
         ReflectionTestUtils.setField(gameController, "aerialAttackFuelCost", 2);
         
         // Mock gameService.createGame to return a valid game (lenient for tests that don't use it)
@@ -91,11 +94,12 @@ class GameControllerTest {
         lobby.addPlayer(2L); // Different user
 
         when(lobbyService.getLobbyById("lobby-1")).thenReturn(Optional.of(lobby));
+        when(lobbyService.getLobbyByUserId(1L)).thenReturn(Optional.empty());
 
         GameResult result = gameController.joinGame("session-1", "lobby-1", 1L);
 
         assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getErrorMessage()).contains("not in this lobby");
+        assertThat(result.getErrorMessage()).contains("Lobby not found");
     }
 
     @Test
@@ -191,6 +195,49 @@ class GameControllerTest {
     }
 
     @Test
+    void selectSide_player1BeforePlayer0_shouldReturnError() {
+        Lobby lobby = new Lobby("lobby-1", "player1");
+        lobby.addPlayer(1L);
+        lobby.addPlayer(2L);
+
+        when(lobbyService.getLobbyById("lobby-1")).thenReturn(Optional.of(lobby));
+
+        gameController.joinGame("session-1", "lobby-1", 1L);
+        gameController.joinGame("session-2", "lobby-1", 2L);
+
+        GameResult result = gameController.selectSide("session-2", "Aereo");
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getErrorMessage()).contains("Second player must wait");
+    }
+
+    @Test
+    void selectSide_player1ShouldBeAutoAssignedOppositeSide() {
+        Lobby lobby = new Lobby("lobby-1", "player1");
+        lobby.addPlayer(1L);
+        lobby.addPlayer(2L);
+
+        Game game = new Game();
+        game.setId(10L);
+        game.setPlayer1Id(1L);
+        game.setPlayer2Id(2L);
+
+        when(lobbyService.getLobbyById("lobby-1")).thenReturn(Optional.of(lobby));
+        when(gameService.createGame(anyLong(), anyLong())).thenReturn(game);
+
+        gameController.joinGame("session-1", "lobby-1", 1L);
+        gameController.joinGame("session-2", "lobby-1", 2L);
+
+        GameResult p0 = gameController.selectSide("session-1", "Naval");
+        GameResult p1 = gameController.selectSide("session-2", "Naval");
+
+        assertThat(p0.isSuccess()).isTrue();
+        assertThat(p1.isSuccess()).isTrue();
+        assertThat(p1.getPacket().getString("side")).isEqualTo("Aereo");
+        assertThat(gameController.isGameStarted("session-1")).isTrue();
+    }
+
+    @Test
     void removePlayer_playerNotInRoom_shouldReturnNegative() {
         int removedIndex = gameController.removePlayer("session-999");
 
@@ -248,6 +295,29 @@ class GameControllerTest {
         verify(userRepository).save(user2);
         verify(rankingService).createSnapshot(1L);
         verify(rankingService).createSnapshot(2L);
+    }
+
+    @Test
+    void joinGame_shouldTakeOverWhenPreviousSessionIsOrphaned() {
+        Lobby lobby = new Lobby("lobby-1", "player1");
+        lobby.addPlayer(1L);
+
+        when(lobbyService.getLobbyById("lobby-1")).thenReturn(Optional.of(lobby));
+
+        GameResult firstJoin = gameController.joinGame("session-old", "lobby-1", 1L);
+        assertThat(firstJoin.isSuccess()).isTrue();
+
+        @SuppressWarnings("unchecked")
+        Map<String, Long> sessionToUserId = (Map<String, Long>) ReflectionTestUtils.getField(gameController, "sessionToUserId");
+        assertThat(sessionToUserId).isNotNull();
+        sessionToUserId.remove("session-old");
+
+        GameResult secondJoin = gameController.joinGame("session-new", "lobby-1", 1L);
+
+        assertThat(secondJoin.isSuccess()).isTrue();
+        assertThat(secondJoin.getPacket()).isNotNull();
+        assertThat(secondJoin.getPacket().getType()).isEqualTo(PacketType.WELCOME);
+        assertThat(gameController.getRoomId("session-new")).isEqualTo("lobby-1");
     }
 
     @Test

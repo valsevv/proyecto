@@ -22,6 +22,10 @@ const NAVAL_VISION_RANGE = 2;
 const AEREO_VISION_RANGE = NAVAL_VISION_RANGE * 2;
 const CARRIER_EDGE_MARGIN = 320;
 const CARRIER_SPAWN_Y_MARGIN = 240;
+const INITIAL_CAMERA_ZOOM = 0.8;
+const MIN_CAMERA_ZOOM = 0.6;
+const MAX_CAMERA_ZOOM = 1.3;
+const CAMERA_ZOOM_STEP = 0.0005;
 
 // Action modes
 const MODE_MOVE = 'move';
@@ -140,6 +144,7 @@ export default class MainScene extends Phaser.Scene {
         // Camera bounds and initial position
         this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
         this.cameras.main.centerOn(WORLD_WIDTH / 2, WORLD_HEIGHT / 2);
+        this.cameras.main.setZoom(INITIAL_CAMERA_ZOOM);
 
         // --- Drag to pan camera ---
         this.input.on('pointerdown', (pointer) => {
@@ -167,6 +172,28 @@ export default class MainScene extends Phaser.Scene {
                 this.dragStartX = pointer.x;
                 this.dragStartY = pointer.y;
             }
+        });
+
+        // Mouse wheel zoom (keeps world point under cursor stable while zooming)
+        this.input.on('wheel', (pointer, _gameObjects, _deltaX, deltaY) => {
+            const camera = this.cameras.main;
+            const oldZoom = camera.zoom;
+            const newZoom = Phaser.Math.Clamp(
+                oldZoom - (deltaY * CAMERA_ZOOM_STEP),
+                MIN_CAMERA_ZOOM,
+                MAX_CAMERA_ZOOM
+            );
+
+            if (newZoom === oldZoom) {
+                return;
+            }
+
+            const worldPointBefore = camera.getWorldPoint(pointer.x, pointer.y);
+            camera.setZoom(newZoom);
+            const worldPointAfter = camera.getWorldPoint(pointer.x, pointer.y);
+
+            camera.scrollX += worldPointBefore.x - worldPointAfter.x;
+            camera.scrollY += worldPointBefore.y - worldPointAfter.y;
         });
 
         // Click on empty space to move (if in move mode)
@@ -1003,7 +1030,7 @@ Volvé al lobby para iniciar otra partida`;
         this.selectedDrone = drone;
         drone.select();
         drone.sprite.setTint(0xfff176);
-        this._playSelectionSound('dron_sound', 0.1);
+        this._playSelectionSound('dron_sound', 0.4);
 
         const droneNumber = this.myDrones.indexOf(drone) + 1;
         this.events.emit('selectionChanged', {

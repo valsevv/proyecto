@@ -57,6 +57,18 @@ public class Lobby {
         status = (playerIds.size() == 2) ? LobbyStatus.READY : LobbyStatus.WAITING;
     }
 
+    public void removePlayer(long playerId) {
+        if (!playerIds.remove(playerId)) return;
+
+        if (playerIds.isEmpty()) {
+            status = LobbyStatus.WAITING;
+            return;
+        }
+
+        // If one player leaves, lobby goes back to waiting state.
+        status = LobbyStatus.WAITING;
+    }
+
     public boolean isReady() {
         return status == LobbyStatus.READY;
     }

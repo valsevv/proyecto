@@ -14,22 +14,27 @@
         }
         body {
             background: #000;
-            position: relative;
+            min-height: 100vh;
+        }
+
+        #game-container {
+            width: 100vw;
             height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         canvas {
             display: block;
-            position: fixed;
-            inset: 0;
-            width: 100vw !important;
-            height: 100vh !important;
         }
     </style>
    <script src="/lib/phaser.js"></script>
    <script type="module" src="/game.js"></script>
 </head>
 
-<body></body>
+<body>
+    <div id="game-container"></div>
+</body>
 
 </html>

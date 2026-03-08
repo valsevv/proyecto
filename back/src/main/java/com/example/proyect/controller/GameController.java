@@ -10,8 +10,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-import jakarta.annotation.PostConstruct;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,8 +19,8 @@ import com.example.proyect.VOs.GameResult;
 import com.example.proyect.auth.service.GameService;
 import com.example.proyect.auth.service.RankingService;
 import com.example.proyect.game.GameRoom;
-import com.example.proyect.game.config.UnitBalanceRegistry;
 import com.example.proyect.game.PlayerState;
+import com.example.proyect.game.config.UnitBalanceRegistry;
 import com.example.proyect.game.units.Unit.HexCoord;
 import com.example.proyect.game.units.drone.AerialDrone;
 import com.example.proyect.game.units.drone.Drone;
@@ -36,6 +34,8 @@ import com.example.proyect.persistence.classes.GameStatus;
 import com.example.proyect.persistence.classes.User;
 import com.example.proyect.persistence.repos.UserRepository;
 import com.example.proyect.websocket.packet.Packet;
+
+import jakarta.annotation.PostConstruct;
 
 //vseverio Clase principal controladora de partida en tiempo real, salas, turnos, movimientos, ataques, guardado/cargado y estado por sesion
 @Service
@@ -448,6 +448,14 @@ public class GameController {
 
 
     public int removePlayer(String sessionId) { //eliminar player de un room
+        return removePlayerInternal(sessionId, true);
+    }
+
+    public int removePlayerWithoutForfeit(String sessionId) {
+        return removePlayerInternal(sessionId, false);
+    }
+
+    private int removePlayerInternal(String sessionId, boolean countAsForfeitOnDisconnect) {
         GameRoom room = getRoomForSession(sessionId);
         if (room == null) {
             return -1;
@@ -459,7 +467,7 @@ public class GameController {
         Long winnerOnDisconnectUserId = null;
         Long loserOnDisconnectUserId = null;
 
-        if (room.isGameStarted() && !gameFinished && leavingPlayer != null) {
+        if (countAsForfeitOnDisconnect && room.isGameStarted() && !gameFinished && leavingPlayer != null) {
             winnerOnDisconnect = room.getPlayers().stream()
                 .filter(player -> player.getPlayerIndex() != leavingPlayer.getPlayerIndex())
                 .findFirst()

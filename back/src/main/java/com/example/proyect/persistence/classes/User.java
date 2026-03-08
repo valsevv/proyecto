@@ -53,6 +53,7 @@ public class User {
     protected User() {}
 
     public User(String username, String email, String passwordHash) {
+        //se hace asi por las validaciones que hace el constructor, si se hiciera directo con los campos no se validaria nada
         setUsername(username);
         setEmail(email);
         setPasswordHash(passwordHash);
@@ -60,7 +61,6 @@ public class User {
     }
 
     // Getters
-
     public Long getUserId() { return userid; }
     public String getUsername() { return username; }
     public String getEmail() { return email; }
@@ -115,6 +115,6 @@ public class User {
     }
 
     private void recalculateScore() {
-        this.score = Math.abs(this.wins - this.losses) * 10;
+        this.score = this.wins * 11 - this.losses * 5;
     }
 }

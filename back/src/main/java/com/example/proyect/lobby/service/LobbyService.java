@@ -159,10 +159,10 @@ public class LobbyService {
         if (lobbyId != null) {
             Lobby lobby = lobbies.get(lobbyId);
             if (lobby != null) {
-                // If lobby is empty after user leaves, remove it
-                // Note: Current Lobby class doesn't have removePlayer, so we'll just clean the mapping
-                // The lobby will be cleaned up when it's empty or times out
-                if (lobby.getPlayerIds().size() == 1 && lobby.getPlayerIds().contains(userId)) {
+                lobby.removePlayer(userId);
+
+                // If lobby is empty after user leaves, remove it fully.
+                if (lobby.getPlayerIds().isEmpty()) {
                     lobbies.remove(lobbyId);
                 }
             }

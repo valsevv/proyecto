@@ -19,11 +19,19 @@ async function checkLobbyStatus() {
             return;
         }
 
+        const expectedLobbyId = sessionStorage.getItem('currentLobbyId');
+        if (expectedLobbyId && result.lobbyId && result.lobbyId !== expectedLobbyId) {
+            console.warn('Lobby mismatch detected. Keeping expected lobby:', expectedLobbyId, 'Server returned:', result.lobbyId);
+            return;
+        }
+
         displayLobbyInfo(result);
 
         if (result.playerCount >= 2 || result.status === 'READY') {
             console.log('Lobby ready! Starting game...');
-            sessionStorage.setItem('currentLobbyId', result.lobbyId);
+            if (!expectedLobbyId && result.lobbyId) {
+                sessionStorage.setItem('currentLobbyId', result.lobbyId);
+            }
             window.location.href = '/game';
         }
     } catch (error) {
