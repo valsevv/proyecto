@@ -49,19 +49,18 @@ public class GameConfigController {
 
     @GetMapping("/config")
     public Map<String, Object> getGameConfig() {
-        return Map.of(
-            "actionsPerTurn", actionsPerTurn,
-            "aerialVisionRange", aerialVisionRange,
-            "navalVisionRange", navalVisionRange,
-            "aerialDroneMovementRange", aerialDroneMovementRange,
-            "navalDroneMovementRange", navalDroneMovementRange,
-            "aerialDroneMaxFuel", aerialDroneMaxFuel,
-            "navalDroneMaxFuel", navalDroneMaxFuel,
-            "aerialDroneAmmo", aerialDroneAmmo,
-            "navalDroneMissiles", navalDroneMissiles,
-            "aerialCarrierMovementRange", aerialCarrierMovementRange,
-            "navalCarrierMovementRange", navalCarrierMovementRange,
-            "missileMaxDistance", missileMaxDistance
-        );
+        return Map.ofEntries(
+                Map.entry("actionsPerTurn", actionsPerTurn),
+                Map.entry("aerialVisionRange", aerialVisionRange),
+                Map.entry("navalVisionRange", navalVisionRange),
+                Map.entry("aerialDroneMovementRange", aerialDroneMovementRange),
+                Map.entry("navalDroneMovementRange", navalDroneMovementRange),
+                Map.entry("aerialDroneMaxFuel", aerialDroneMaxFuel),
+                Map.entry("navalDroneMaxFuel", navalDroneMaxFuel),
+                Map.entry("aerialDroneAmmo", aerialDroneAmmo),
+                Map.entry("navalDroneMissiles", navalDroneMissiles),
+                Map.entry("aerialCarrierMovementRange", aerialCarrierMovementRange),
+                Map.entry("navalCarrierMovementRange", navalCarrierMovementRange),
+                Map.entry("missileMaxDistance", missileMaxDistance));
     }
 }

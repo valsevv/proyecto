@@ -457,7 +457,7 @@ export default class HudScene extends Phaser.Scene {
         this.forfeitBtnBg = this.add.graphics();
         this.drawRoundedButton(this.forfeitBtnBg, forfeitX - btnWidth / 2, forfeitY - btnHeight / 2, btnWidth, btnHeight, btnRadius, this.forfeitActiveColor);
 
-        this.forfeitBtnText = this.add.text(forfeitX, forfeitY, 'Abandonar', {
+        this.forfeitBtnText = this.add.text(forfeitX, forfeitY, 'Rendirse', {
             fontSize: '16px',
             fill: '#ffffff'
         }).setOrigin(0.5);

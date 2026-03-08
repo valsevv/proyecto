@@ -13,7 +13,8 @@ export default class SideImpactView {
 
         // Fondo con imagen proporcionada para la vista lateral
         this.bgImage = scene.add.image(0, 0, 'vista_lateral_fondo');
-        this.bgImage.setDisplaySize(this.width, this.height);
+        // Reduce size to fit within the border (accounting for 10px border + padding)
+        this.bgImage.setDisplaySize(this.width - 20, this.height - 20);
         this.bgImage.setOrigin(0.5);
         this.container.add(this.bgImage);
         this.frameBorder = scene.add.graphics();
@@ -36,9 +37,11 @@ export default class SideImpactView {
 
     _ensureSea() {
         const w = this.width;
-        const seaH = 90;
+        const h = this.height;
+        const seaH = 70; // Reduced height to fit within bounds
         const seaW = w - 24;
-        const seaCenterY = this.groundY + seaH / 2 + 8;
+        // Position to stay within the border (height/2 - border - seaH/2)
+        const seaCenterY = (h / 2) - 15 - (seaH / 2);
 
         if (this.sea) {
             this.sea.setSize(seaW, seaH);
@@ -245,12 +248,12 @@ export default class SideImpactView {
         const kind = payload?.kind;
         if (kind !== this._attackKind) return;
 
-        // Hide promptly after the attack finishes.
+        // Hide after the attack finishes with a longer delay for better visibility.
         if (this._pendingHideTimer) {
             clearTimeout(this._pendingHideTimer);
         }
         this._pendingHideTimer = setTimeout(() => {
             this.hide();
-        }, 150);
+        }, 1000);
     }
 }
