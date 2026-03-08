@@ -20,10 +20,10 @@ public class GameConfigController {
     @Value("${game.units.naval.vision-range:${game.vision-range-naval:4}}")
     private int navalVisionRange;
 
-    @Value("${game.units.aereo.movement-range:2}")
+    @Value("${game.units.aereo.movement-range:4}")
     private int aerialDroneMovementRange;
 
-    @Value("${game.units.naval.movement-range:2}")
+    @Value("${game.units.naval.movement-range:6}")
     private int navalDroneMovementRange;
 
     @Value("${game.units.aereo.max-fuel:10}")
@@ -35,8 +35,20 @@ public class GameConfigController {
     @Value("${game.units.aereo.ammo:1}")
     private int aerialDroneAmmo;
 
+    @Value("${game.units.aereo.max-hp:100}")
+    private int aerialDroneMaxHp;
+
     @Value("${game.units.naval.missiles:2}")
     private int navalDroneMissiles;
+
+    @Value("${game.units.naval.max-hp:100}")
+    private int navalDroneMaxHp;
+
+    @Value("${game.units.aereo.carrier-hp:6}")
+    private int aerialCarrierMaxHp;
+
+    @Value("${game.units.naval.carrier-hp:3}")
+    private int navalCarrierMaxHp;
 
     @Value("${game.units.aereo.carrier-movement-range:3}")
     private int aerialCarrierMovementRange;
@@ -57,8 +69,12 @@ public class GameConfigController {
                 Map.entry("navalDroneMovementRange", navalDroneMovementRange),
                 Map.entry("aerialDroneMaxFuel", aerialDroneMaxFuel),
                 Map.entry("navalDroneMaxFuel", navalDroneMaxFuel),
+                Map.entry("aerialDroneMaxHp", aerialDroneMaxHp),
+                Map.entry("navalDroneMaxHp", navalDroneMaxHp),
                 Map.entry("aerialDroneAmmo", aerialDroneAmmo),
                 Map.entry("navalDroneMissiles", navalDroneMissiles),
+                Map.entry("aerialCarrierMaxHp", aerialCarrierMaxHp),
+                Map.entry("navalCarrierMaxHp", navalCarrierMaxHp),
                 Map.entry("aerialCarrierMovementRange", aerialCarrierMovementRange),
                 Map.entry("navalCarrierMovementRange", navalCarrierMovementRange),
                 Map.entry("missileMaxDistance", missileMaxDistance));

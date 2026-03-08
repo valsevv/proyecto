@@ -17,12 +17,15 @@ export default class Drone {
         this.isLocal = interactive;
 
         // Combat stats
-        this.health = stats.health ?? 100;
-        this.maxHealth = stats.maxHealth ?? 100;
-        this.attackDamage = stats.attackDamage ?? 25;
-        this.attackRange = stats.attackRange ?? 3;
         this.droneType = stats.droneType ?? 'Aereo';
         const runtimeConfig = getGameConfig();
+        const defaultMaxHealth = this.droneType === 'Naval'
+            ? runtimeConfig.navalDroneMaxHp
+            : runtimeConfig.aerialDroneMaxHp;
+        this.health = stats.health ?? defaultMaxHealth;
+        this.maxHealth = stats.maxHealth ?? defaultMaxHealth;
+        this.attackDamage = stats.attackDamage ?? 25;
+        this.attackRange = stats.attackRange ?? 3;
         const defaultMovementRange = this.droneType === 'Naval'
             ? runtimeConfig.navalDroneMovementRange
             : runtimeConfig.aerialDroneMovementRange;

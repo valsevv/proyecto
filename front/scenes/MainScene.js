@@ -352,7 +352,7 @@ export default class MainScene extends Phaser.Scene {
                 }
             }
 
-            this.actionsPerTurn = data.gameState.actionsPerTurn ?? 10;
+            this.actionsPerTurn = data.gameState.actionsPerTurn ?? getGameConfig().actionsPerTurn;
             this.events.emit('actionsUpdated', {
                 actionsRemaining: initialActions,
                 actionsPerTurn: this.actionsPerTurn
@@ -571,7 +571,10 @@ export default class MainScene extends Phaser.Scene {
                 : { x: undefined, y: player.drones?.[0]?.y ?? null };
             this.createCarrierForPlayer(player.playerIndex, side, spawnHint);
             if (this.carriers[player.playerIndex]) {
-                this.carriers[player.playerIndex].maxHealth = player.carrierMaxHealth ?? 5;
+                const sideCarrierFallback = side === 'Naval'
+                    ? getGameConfig().navalCarrierMaxHp
+                    : getGameConfig().aerialCarrierMaxHp;
+                this.carriers[player.playerIndex].maxHealth = player.carrierMaxHealth ?? sideCarrierFallback;
                 this.carriers[player.playerIndex].health = player.carrierHealth ?? this.carriers[player.playerIndex].maxHealth;
                 this.carriers[player.playerIndex].destroyed = player.carrierDestroyed === true || this.carriers[player.playerIndex].health <= 0;
                 if (this.carriers[player.playerIndex].destroyed) {
