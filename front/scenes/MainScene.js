@@ -10,16 +10,10 @@ import {
     updateVision
 } from './mainSceneVision.js';
 import { WORLD_WIDTH, WORLD_HEIGHT } from '../shared/constants.js';
+import { getGameConfig } from '../shared/gameConfig.js';
 
 const TEAM_COLORS = [0x00ff00, 0xff4444]; // green = player 0, red = player 1
-const MAX_MOVE_DISTANCE = 6; // hexes per turn
-const MAX_CARRIER_MOVE_DISTANCE = 3; // hexes per turn (parametrizable)
-const MAX_MANUAL_ATTACK_DISTANCE = 15; // max range in hexes for manual missile aiming (parametrizable)
-
-// Vision ranges (in hexes). Aereo must see 2x Naval.
-// Adjust NAVAL_VISION_RANGE to tune both.
-const NAVAL_VISION_RANGE = 2;
-const AEREO_VISION_RANGE = NAVAL_VISION_RANGE * 2;
+const DEFAULT_MAX_MOVE_DISTANCE = 2;
 const CARRIER_EDGE_MARGIN = 320;
 const CARRIER_SPAWN_Y_MARGIN = 240;
 const INITIAL_CAMERA_ZOOM = 0.8;
@@ -55,18 +49,25 @@ export default class MainScene extends Phaser.Scene {
         /** { playerIndex: 'Naval' | 'Aereo' } */
         this.playerSides = {};
         this.localSide = 'Aereo';
+        const runtimeConfig = getGameConfig();
 
         // Carrier for which the deploy panel is currently open
         this.deployPanelCarrier = null;
 
         // Vision ranges (in hexes). Defaults are overridden by server gameState when available.
-        this.navalVisionRange = NAVAL_VISION_RANGE;
-        this.aereoVisionRange = AEREO_VISION_RANGE;
+        this.navalVisionRange = runtimeConfig.navalVisionRange;
+        this.aereoVisionRange = runtimeConfig.aerialVisionRange;
+        this.manualAttackMaxDistance = runtimeConfig.missileMaxDistance;
 
         // Turn state
         this.isMyTurn = false;
         this.actionMode = MODE_MOVE;
-        this.actionsPerTurn = 10;
+        this.actionsPerTurn = runtimeConfig.actionsPerTurn;
+
+        this.defaultAerialDroneMovementRange = runtimeConfig.aerialDroneMovementRange;
+        this.defaultNavalDroneMovementRange = runtimeConfig.navalDroneMovementRange;
+        this.defaultAerialCarrierMovementRange = runtimeConfig.aerialCarrierMovementRange;
+        this.defaultNavalCarrierMovementRange = runtimeConfig.navalCarrierMovementRange;
     }
 
 
@@ -286,8 +287,9 @@ export default class MainScene extends Phaser.Scene {
 
             if (distance < 1) return;
 
-            if (distance > MAX_MOVE_DISTANCE) {
-                console.warn(`Move too far: ${distance} hexes (max ${MAX_MOVE_DISTANCE})`);
+            const maxMoveDistance = this.getDroneMoveDistance(this.selectedDrone);
+            if (distance > maxMoveDistance) {
+                console.warn(`Move too far: ${distance} hexes (max ${maxMoveDistance})`);
                 return;
             }
 
@@ -479,6 +481,10 @@ export default class MainScene extends Phaser.Scene {
         healthBar.setDepth(7);
         healthBar.setOrigin(0, 0.5);
 
+        const carrierMaxMoveDistance = side === 'Naval'
+            ? this.defaultNavalCarrierMovementRange
+            : this.defaultAerialCarrierMovementRange;
+
         const carrier = {
             sprite,
             ring,
@@ -489,7 +495,7 @@ export default class MainScene extends Phaser.Scene {
             healthBarWidth,
             playerIndex,
             isLocal,
-            maxMoveDistance: MAX_CARRIER_MOVE_DISTANCE,
+            maxMoveDistance: carrierMaxMoveDistance,
             type: 'carrier',
             side,
             direction: 0,
@@ -589,6 +595,7 @@ export default class MainScene extends Phaser.Scene {
                     missiles: d.missiles,
                     fuel: d.fuel,
                     maxFuel: d.maxFuel,
+                    movementRange: d.movementRange,
                     playerIndex: player.playerIndex
                 });
                 drone.playerIndex = player.playerIndex;
@@ -1036,7 +1043,7 @@ Volvé al lobby para iniciar otra partida`;
         this.events.emit('selectionChanged', {
             type: 'drone',
             droneNumber,
-            maxMoveDistance: MAX_MOVE_DISTANCE
+            maxMoveDistance: this.getDroneMoveDistance(drone)
         });
 
         // Reset to move mode when selecting a new drone
@@ -1406,7 +1413,7 @@ Volvé al lobby para iniciar otra partida`;
         const magnitude = Math.sqrt(dx * dx + dy * dy);
         if (magnitude === 0) return;
 
-        const maxDistancePixels = this.hexGrid.size * Math.sqrt(3) * MAX_MANUAL_ATTACK_DISTANCE;
+        const maxDistancePixels = this.hexGrid.size * Math.sqrt(3) * this.manualAttackMaxDistance;
         const clampedDistance = Math.min(magnitude, maxDistancePixels);
         const factor = clampedDistance / magnitude;
 
@@ -1635,7 +1642,9 @@ Volvé al lobby para iniciar otra partida`;
 
         const nearest = this.hexGrid.getNearestCenter(pointer.worldX, pointer.worldY);
         const selectedUnitSprite = this.selectedCarrier ? this.selectedCarrier.sprite : this.selectedDrone.sprite;
-        const maxDistance = this.selectedCarrier ? this.selectedCarrier.maxMoveDistance : MAX_MOVE_DISTANCE;
+        const maxDistance = this.selectedCarrier
+            ? this.selectedCarrier.maxMoveDistance
+            : this.getDroneMoveDistance(this.selectedDrone);
 
         // Calculate distance from selected unit
         const distance = this.hexGrid.getHexDistance(
@@ -1655,6 +1664,15 @@ Volvé al lobby para iniciar otra partida`;
 
         this.hexGrid.drawFilledHex(this.hexHighlight, nearest.x, nearest.y, color, alpha);
         this.lastHighlightedHex = nearest;
+    }
+
+    getDroneMoveDistance(drone) {
+        if (!drone) return DEFAULT_MAX_MOVE_DISTANCE;
+        if (typeof drone.movementRange === 'number' && drone.movementRange > 0) {
+            return drone.movementRange;
+        }
+        if (drone.droneType === 'Naval') return this.defaultNavalDroneMovementRange;
+        return this.defaultAerialDroneMovementRange;
     }
 
     update() {}

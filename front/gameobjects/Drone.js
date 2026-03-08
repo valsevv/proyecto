@@ -1,3 +1,5 @@
+import { getGameConfig } from '../shared/gameConfig.js';
+
 const DRONE_MOVE_DURATION_MS = 1200;
 
 export default class Drone {
@@ -20,9 +22,20 @@ export default class Drone {
         this.attackDamage = stats.attackDamage ?? 25;
         this.attackRange = stats.attackRange ?? 3;
         this.droneType = stats.droneType ?? 'Aereo';
-        this.maxFuel = stats.maxFuel ?? 10;
+        const runtimeConfig = getGameConfig();
+        const defaultMovementRange = this.droneType === 'Naval'
+            ? runtimeConfig.navalDroneMovementRange
+            : runtimeConfig.aerialDroneMovementRange;
+        const defaultMaxFuel = this.droneType === 'Naval'
+            ? runtimeConfig.navalDroneMaxFuel
+            : runtimeConfig.aerialDroneMaxFuel;
+        const defaultAmmo = this.droneType === 'Naval'
+            ? runtimeConfig.navalDroneMissiles
+            : runtimeConfig.aerialDroneAmmo;
+        this.movementRange = stats.movementRange ?? defaultMovementRange;
+        this.maxFuel = stats.maxFuel ?? defaultMaxFuel;
         this.fuel = stats.fuel ?? this.maxFuel;
-        this.missiles = stats.missiles ?? 0;
+        this.missiles = stats.missiles ?? defaultAmmo;
         this.destroyed = false;
         this.playerIndex = stats.playerIndex ?? 0;
 
