@@ -11,7 +11,8 @@ Cambiar la URL del ws en /game.js a
 > ws://localhost:8080/ws
 
 
-> Facción Aéreo (game.units.aereo.*)
+ Facción Aéreo (game.units.aereo.*) : Daño medio - Largo Alcance - Movimiento Rapido
+ 
 Vida: game.units.aereo.max-hp
 Movimiento (lugares que se puede mover): game.units.aereo.movement-range
 Combustibe: game.units.aereo.max-fuel
@@ -20,8 +21,9 @@ Munición (bombas de drone aéreo): game.units.aereo.ammo
 (Extra carrier) vida/movimiento de carrier aéreo:
 game.units.aereo.carrier-hp
 game.units.aereo.carrier-movement-range
-> 
-Facción Naval (game.units.naval.*)
+
+Facción Naval (game.units.naval.*) - Alto Daño - Corto Alcance - Movimiento lento
+
 Vida: game.units.naval.max-hp
 Movimiento: game.units.naval.movement-range
 Combustible: game.units.naval.max-fuel
