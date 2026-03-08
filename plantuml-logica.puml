@@ -1,0 +1,38 @@
+@startuml
+skinparam componentStyle rectangle
+skinparam shadowing false
+skinparam defaultFontName Consolas
+top to bottom direction
+
+actor "Jugador" as Player
+
+package "Capa de Presentacion" as L_PRESENTACION {
+  component "Pantallas HTML + JS\n(Login/Menu/Lobby/Ranking/SavedGames/Game)" as FE_UI
+  component "Motor de Juego (Phaser Scenes)" as FE_Game
+  component "WebSocket Client\n(NetworkManager.js)" as FE_WSClient
+  component "API REST\n(Auth/Lobby/Game/Ranking/Config)" as BE_REST
+  component "Gateway WebSocket\n(/ws + JWT handshake)" as BE_WS
+}
+
+package "Capa Negocio" as L_NEGOCIO {
+  component "Logica de Negocio\n(Partida, Lobby, Usuarios, Ranking)" as BE_DOMAIN
+}
+
+package "Capa de Datos" as L_DATOS {
+  component "Persistencia\n(Repositorios/Entidades)" as BE_PERSIST
+  database "PostgreSQL" as DB
+}
+
+Player --> FE_UI
+FE_UI --> FE_Game
+FE_Game --> FE_WSClient
+
+FE_UI --> BE_REST : HTTP (login/lobby/ranking/saved/config)
+FE_WSClient --> BE_WS : WS /ws (tiempo real)
+
+BE_REST --> BE_DOMAIN
+BE_WS --> BE_DOMAIN
+BE_DOMAIN --> BE_PERSIST
+BE_PERSIST --> DB
+
+@enduml
