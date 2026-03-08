@@ -36,7 +36,7 @@ game.u
 
 
 
-# Proyecto 2 - Manual de instalacion
+# Proyecto - Manual de instalacion
 
 Este proyecto usa:
 
