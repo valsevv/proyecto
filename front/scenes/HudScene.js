@@ -1,6 +1,7 @@
 import Minimap from '../ui/Minimap.js';
 import SideImpactView from '../ui/SideImpactView.js';
 import networkManager from '../network/NetworkManager.js';
+import { getGameConfig } from '../shared/gameConfig.js';
 
 const TEAM_COLORS = [0x00ff00, 0xff4444];
 
@@ -12,10 +13,11 @@ export default class HudScene extends Phaser.Scene {
     constructor() {
         super('HudScene');
         this.hudMode = 'game';
+        const runtimeConfig = getGameConfig();
         this.isMyTurn = false;
         this.gameStarted = false;
         this.actionsRemaining = 0;
-        this.actionsPerTurn = 10;
+        this.actionsPerTurn = runtimeConfig.actionsPerTurn;
         this.selectionData = null;
         this.forfeitPending = false;
         this.forfeitRedirectFallback = null;

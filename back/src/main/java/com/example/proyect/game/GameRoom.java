@@ -617,6 +617,7 @@ public class GameRoom {
                 dm.put("maxHealth", d.getMaxHp());
                 dm.put("attackDamage", d.getWeapon().getDamage());
                 dm.put("attackRange", d.getWeapon().getRange());
+                dm.put("movementRange", d.getMovementRange());
                 dm.put("visionRange", d.getVisionRange());
                 dm.put("alive", d.isAlive());
                 dm.put("fuel", d.getFuel());

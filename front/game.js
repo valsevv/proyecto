@@ -2,6 +2,7 @@ import LobbyScene from './scenes/LobbyScene.js';
 import MainScene from './scenes/MainScene.js';
 import HudScene from './scenes/HudScene.js';
 import { VIEW_WIDTH, VIEW_HEIGHT } from './shared/constants.js';
+import { loadGameConfig } from './shared/gameConfig.js';
 
 const config = {
     type: Phaser.AUTO,
@@ -17,4 +18,9 @@ const config = {
     scene: [LobbyScene, MainScene, HudScene]
 };
 
-new Phaser.Game(config);
+async function bootstrapGame() {
+    await loadGameConfig();
+    new Phaser.Game(config);
+}
+
+bootstrapGame();
