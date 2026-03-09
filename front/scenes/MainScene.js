@@ -4,6 +4,7 @@ import Network from '../network/NetworkManager.js'
 import { attachNetworkHandlers } from './mainSceneNetwork.js';
 import {
     getVisionRangeForSide,
+    getCarrierVisionRangeForSide,
     isDroneVisibleToLocal,
     isCarrierVisibleToLocal,
     updateFogOfWar,
@@ -67,6 +68,8 @@ export default class MainScene extends Phaser.Scene {
         // Vision ranges (in hexes). Defaults are overridden by server gameState when available.
         this.navalVisionRange = runtimeConfig.navalVisionRange;
         this.aereoVisionRange = runtimeConfig.aerialVisionRange;
+        this.navalCarrierVisionRange = runtimeConfig.navalCarrierVisionRange ?? this.navalVisionRange;
+        this.aereoCarrierVisionRange = runtimeConfig.aerialCarrierVisionRange ?? this.aereoVisionRange;
         this.manualAttackMaxDistance = runtimeConfig.missileMaxDistance;
 
         // Turn state
@@ -148,6 +151,8 @@ export default class MainScene extends Phaser.Scene {
 
         // Graphics for hex hover highlight
         this.hexHighlight = this.add.graphics();
+        this.moveRangeGraphics = this.add.graphics();
+        this.moveRangeGraphics.setDepth(9);
         this.missileGuideGraphics = this.add.graphics();
         this.manualTargetHex = null;
         this.pendingAerialTarget = null;
@@ -284,6 +289,7 @@ export default class MainScene extends Phaser.Scene {
 
                 if (distance > this.selectedCarrier.maxMoveDistance) {
                     console.warn(`Carrier move too far: ${distance} hexes (max ${this.selectedCarrier.maxMoveDistance})`);
+                    this.showRuleWarning('Movimiento fuera de rango');
                     return;
                 }
 
@@ -309,6 +315,7 @@ export default class MainScene extends Phaser.Scene {
             const maxMoveDistance = this.getDroneMoveDistance(this.selectedDrone);
             if (distance > maxMoveDistance) {
                 console.warn(`Move too far: ${distance} hexes (max ${maxMoveDistance})`);
+                this.showRuleWarning('Movimiento fuera de rango');
                 return;
             }
 
@@ -433,6 +440,12 @@ export default class MainScene extends Phaser.Scene {
                 this.combatMessageTween = null;
             }
         });
+    }
+
+    showRuleWarning(message) {
+        if (!message) return;
+        this.events.emit('combatMessage', message);
+        this.showCombatMessage(message);
     }
 
     //Se agrega esta cola para destuir al dron luego e la accion que haga, si se mueve o ataca consuma su combustible luego de la accion
@@ -580,6 +593,12 @@ export default class MainScene extends Phaser.Scene {
         }
         if (typeof state?.aerialVisionRange === 'number') {
             this.aereoVisionRange = state.aerialVisionRange;
+        }
+        if (typeof state?.navalCarrierVisionRange === 'number') {
+            this.navalCarrierVisionRange = state.navalCarrierVisionRange;
+        }
+        if (typeof state?.aerialCarrierVisionRange === 'number') {
+            this.aereoCarrierVisionRange = state.aerialCarrierVisionRange;
         }
         
         for (const player of state.players) {
@@ -737,6 +756,7 @@ export default class MainScene extends Phaser.Scene {
             this.selectedCarrier.sprite.clearTint();
             this.stopCarrierPulse(this.selectedCarrier);
             this.selectedCarrier = null;
+            this.clearMoveRangeIndicator();
             this.deployPanelCarrier = null;
             this.events.emit('deployPanelClose');
             this.events.emit('selectionChanged', { type: null });
@@ -744,6 +764,7 @@ export default class MainScene extends Phaser.Scene {
         }
 
         this.selectedCarrier = carrier;
+        this.clearMoveRangeIndicator();
         carrier.ring.setVisible(true);
         carrier.ring.setPosition(carrier.sprite.x, carrier.sprite.y);
         carrier.sprite.setTint(0xfff176);
@@ -1059,6 +1080,7 @@ Volvé al lobby para iniciar otra partida`;
             this.actionMode = MODE_MOVE;
             this.clearTargetHighlights();
             this.hexHighlight.clear();
+            this.clearMoveRangeIndicator();
             this.events.emit('selectionChanged', { type: null });
             return;
         }
@@ -1091,6 +1113,7 @@ Volvé al lobby para iniciar otra partida`;
 
         this.actionMode = MODE_ATTACK;
         this.hexHighlight.clear();
+        this.clearMoveRangeIndicator();
         this.manualTargetHex = null;
 
         if (this.selectedDrone.droneType === 'Naval') {
@@ -1177,6 +1200,10 @@ Volvé al lobby para iniciar otra partida`;
 
     getVisionRangeForSide(side) {
         return getVisionRangeForSide(this, side);
+    }
+
+    getCarrierVisionRangeForSide(side) {
+        return getCarrierVisionRangeForSide(this, side);
     }
 
     /** Returns true if the given drone should be visible to the local player. */
@@ -1295,6 +1322,7 @@ Volvé al lobby para iniciar otra partida`;
             console.log('[MainScene] Aereo attack distance check:', distance, 'range:', this.selectedDrone.attackRange);
             if (distance > (this.selectedDrone.attackRange ?? 0)) {
                 console.log('[MainScene] executeAttack early return: distance too far');
+                this.showRuleWarning('Objetivo fuera de rango para atacar');
                 return;
             }
         }
@@ -1557,9 +1585,14 @@ Volvé al lobby para iniciar otra partida`;
         }
 
         this._stopSelectionSound();
+        this.clearMoveRangeIndicator();
         this.deployPanelCarrier = null;
         this.events.emit('deployPanelClose');
         this.events.emit('selectionChanged', { type: null });
+    }
+
+    clearMoveRangeIndicator() {
+        this.moveRangeGraphics?.clear();
     }
 
     /** Start a looping selection sound, stopping any previously playing one. */
@@ -1666,6 +1699,7 @@ Volvé al lobby para iniciar otra partida`;
         // Only show highlight when we have a selected unit, it's our turn, and we're in move mode
         if ((!this.selectedDrone && !this.selectedCarrier) || !this.isMyTurn || this.actionMode !== MODE_MOVE) {
             this.lastHighlightedHex = null;
+            this.clearMoveRangeIndicator();
             return;
         }
 
@@ -1684,6 +1718,7 @@ Volvé al lobby para iniciar otra partida`;
         // Skip if on the same hex as the drone
         if (distance < 1) {
             this.lastHighlightedHex = null;
+            this.clearMoveRangeIndicator();
             return;
         }
 
@@ -1692,6 +1727,28 @@ Volvé al lobby para iniciar otra partida`;
         const alpha = 0.3;
 
         this.hexGrid.drawFilledHex(this.hexHighlight, nearest.x, nearest.y, color, alpha);
+
+        const lineColor = distance <= maxDistance ? 0x26c6da : 0xffc107;
+        this.moveRangeGraphics.clear();
+        this.moveRangeGraphics.lineStyle(3, lineColor, 0.9);
+        this.moveRangeGraphics.beginPath();
+        this.moveRangeGraphics.moveTo(selectedUnitSprite.x, selectedUnitSprite.y);
+        this.moveRangeGraphics.lineTo(nearest.x, nearest.y);
+        this.moveRangeGraphics.strokePath();
+
+        const hexWidth = Math.sqrt(3) * this.hexGrid.size;
+        const maxDistancePixels = maxDistance * hexWidth;
+        const dx = nearest.x - selectedUnitSprite.x;
+        const dy = nearest.y - selectedUnitSprite.y;
+        const magnitude = Math.sqrt(dx * dx + dy * dy);
+        if (magnitude > 0) {
+            const factor = Math.min(1, maxDistancePixels / magnitude);
+            const limitX = selectedUnitSprite.x + dx * factor;
+            const limitY = selectedUnitSprite.y + dy * factor;
+            this.moveRangeGraphics.fillStyle(0xffffff, 0.95);
+            this.moveRangeGraphics.fillCircle(limitX, limitY, 4);
+        }
+
         this.lastHighlightedHex = nearest;
     }
 

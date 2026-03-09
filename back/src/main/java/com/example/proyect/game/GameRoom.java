@@ -6,6 +6,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -254,7 +255,7 @@ public class GameRoom {
         Iterator<PlayerState> it = players.iterator();
         while (it.hasNext()) {
             PlayerState p = it.next();
-            if (p.getSessionId().equals(sessionId)) {
+            if (Objects.equals(p.getSessionId(), sessionId)) {
                 it.remove();
                 playerSpawnAnchors.remove(p.getPlayerIndex());
                 carrierHealthByPlayer.remove(p.getPlayerIndex());

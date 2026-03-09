@@ -38,6 +38,8 @@ public class GameConfigController {
                 Map.entry("navalCarrierMaxHp", UnitBalanceRegistry.getNavalCarrierMaxHp()),
                 Map.entry("aerialCarrierMovementRange", UnitBalanceRegistry.getAerialCarrierMovementRange()),
                 Map.entry("navalCarrierMovementRange", UnitBalanceRegistry.getNavalCarrierMovementRange()),
+                Map.entry("aerialCarrierVisionRange", gameBalanceProperties.getUnits().getAereo().getCarrierVisionRange()),
+                Map.entry("navalCarrierVisionRange", gameBalanceProperties.getUnits().getNaval().getCarrierVisionRange()),
                 Map.entry("missileMaxDistance", gameBalanceProperties.getMissileMaxDistance()),
                 Map.entry("aerialAttackFuelCost", gameBalanceProperties.getAerialAttackFuelCost()),
                 Map.entry("carrierHitsToDestroy", gameBalanceProperties.getCarrierHitsToDestroy()));

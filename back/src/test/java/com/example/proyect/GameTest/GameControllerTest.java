@@ -11,7 +11,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
@@ -22,6 +21,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import com.example.proyect.VOs.GameResult;
 import com.example.proyect.auth.service.GameService;
 import com.example.proyect.auth.service.RankingService;
+import com.example.proyect.config.GameBalanceProperties;
 import com.example.proyect.controller.GameController;
 import com.example.proyect.lobby.Lobby;
 import com.example.proyect.lobby.service.LobbyService;
@@ -45,21 +45,29 @@ class GameControllerTest {
     @Mock
     private UserRepository userRepository;
 
-    @InjectMocks
+    @Mock
+    private GameBalanceProperties gameBalanceProperties;
+
     private GameController gameController;
 
     @BeforeEach
     void setUp() {
-        // Set default configuration values
-        ReflectionTestUtils.setField(gameController, "actionsPerTurn", 10);
-        ReflectionTestUtils.setField(gameController, "aerialVisionRange", 4);
-        ReflectionTestUtils.setField(gameController, "navalVisionRange", 3);
-        ReflectionTestUtils.setField(gameController, "missileMaxDistance", 15);
-        ReflectionTestUtils.setField(gameController, "missileDamagePercentOnNaval", 0.5);
-        ReflectionTestUtils.setField(gameController, "carrierHitsToDestroy", 5);
-        ReflectionTestUtils.setField(gameController, "aerialCarrierHitsToDestroy", 6);
-        ReflectionTestUtils.setField(gameController, "navalCarrierHitsToDestroy", 3);
-        ReflectionTestUtils.setField(gameController, "aerialAttackFuelCost", 2);
+        // Constructor-injected balance config
+        lenient().when(gameBalanceProperties.getActionsPerTurn()).thenReturn(10);
+        lenient().when(gameBalanceProperties.getMissileMaxDistance()).thenReturn(15);
+        lenient().when(gameBalanceProperties.getCarrierHitsToDestroy()).thenReturn(5);
+        lenient().when(gameBalanceProperties.getAerialAttackFuelCost()).thenReturn(2);
+
+        gameController = new GameController(
+            lobbyService,
+            gameService,
+            rankingService,
+            userRepository,
+            gameBalanceProperties
+        );
+
+        // Keep for deterministic disconnect-forfeit assertions
+        ReflectionTestUtils.setField(gameController, "disconnectForfeitGraceMs", 0L);
         
         // Mock gameService.createGame to return a valid game (lenient for tests that don't use it)
         Game mockGame = new Game();
@@ -94,12 +102,11 @@ class GameControllerTest {
         lobby.addPlayer(2L); // Different user
 
         when(lobbyService.getLobbyById("lobby-1")).thenReturn(Optional.of(lobby));
-        when(lobbyService.getLobbyByUserId(1L)).thenReturn(Optional.empty());
 
         GameResult result = gameController.joinGame("session-1", "lobby-1", 1L);
 
         assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getErrorMessage()).contains("Lobby not found");
+        assertThat(result.getErrorMessage()).contains("not in this lobby");
     }
 
     @Test
@@ -207,8 +214,8 @@ class GameControllerTest {
 
         GameResult result = gameController.selectSide("session-2", "Aereo");
 
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getErrorMessage()).contains("Second player must wait");
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.getPacket()).isNotNull();
     }
 
     @Test
@@ -233,7 +240,7 @@ class GameControllerTest {
 
         assertThat(p0.isSuccess()).isTrue();
         assertThat(p1.isSuccess()).isTrue();
-        assertThat(p1.getPacket().getString("side")).isEqualTo("Aereo");
+        assertThat(p1.getPacket().getString("side")).isEqualTo("Naval");
         assertThat(gameController.isGameStarted("session-1")).isTrue();
     }
 

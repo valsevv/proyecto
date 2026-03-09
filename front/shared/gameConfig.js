@@ -12,8 +12,10 @@ const DEFAULT_GAME_CONFIG = {
     navalDroneMissiles: 2,
     aerialCarrierMaxHp: 6,
     navalCarrierMaxHp: 3,
-    aerialCarrierMovementRange: 2,
-    navalCarrierMovementRange: 1,
+    aerialCarrierMovementRange: 6,
+    navalCarrierMovementRange: 3,
+    aerialCarrierVisionRange: 6,
+    navalCarrierVisionRange: 6,
     missileMaxDistance: 15
 };
 

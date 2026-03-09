@@ -6,6 +6,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -74,6 +78,9 @@ public class GameController {
     private final Map<Long, String> gameToRoom = new ConcurrentHashMap<>();
     private final Map<String, Long> roomToGame = new ConcurrentHashMap<>();
     private final Map<Long, Lock> gameLocks = new ConcurrentHashMap<>();
+    private final Map<String, ScheduledFuture<?>> pendingDisconnectForfeits = new ConcurrentHashMap<>();
+    private final ScheduledExecutorService disconnectForfeitScheduler = Executors.newSingleThreadScheduledExecutor();
+    private long disconnectForfeitGraceMs = 8_000L;
 
     //
     private final AtomicInteger roomCounter = new AtomicInteger(1);
@@ -212,14 +219,21 @@ public class GameController {
 
         if (!isLoadGame) {
             // PARTIDA NUEVA
-            player = room.addPlayer(sessionId);
+            player = tryRebindPlayerSession(room, lobby, userId, sessionId);
+            if (player == null) {
+                player = room.addPlayer(sessionId);
+            }
             if (player == null) return GameResult.error("Game is full");
 
         } else {
             // PARTIDA CARGADA
             // Cargar snapshot solo una vez
             if (room.getPlayers().isEmpty()) {
-                loadSavedGameIntoRoom(lobby.getGameId(), room);
+                try {
+                    loadSavedGameIntoRoom(lobby.getGameId(), room);
+                } catch (IllegalStateException ex) {
+                    return GameResult.error(ex.getMessage());
+                }
             }
 
             try {
@@ -234,6 +248,7 @@ public class GameController {
         }
 
         sessionToRoom.put(sessionId, room.getRoomId());
+        cancelPendingDisconnectForfeit(room.getRoomId(), player.getPlayerIndex());
 
         Packet welcome = Packet.welcome(
             sessionId,
@@ -292,6 +307,26 @@ public class GameController {
 
         player.setSessionId(sessionId);
         return player;
+    }
+
+    private PlayerState tryRebindPlayerSession(GameRoom room, Lobby lobby, Long userId, String sessionId) {
+        if (room == null || lobby == null || userId == null || sessionId == null) {
+            return null;
+        }
+
+        Long gameId = roomToGame.get(room.getRoomId());
+        if (gameId == null && lobby.isLoadGameLobby()) {
+            gameId = lobby.getGameId();
+        }
+        if (gameId == null) {
+            return null;
+        }
+
+        try {
+            return bindLoadedPlayerSession(room, gameId, userId, sessionId);
+        } catch (IllegalStateException ex) {
+            return null;
+        }
     }
 
    @SuppressWarnings("unchecked")
@@ -395,31 +430,43 @@ public class GameController {
 
         PlayerState leavingPlayer = room.getPlayerBySession(sessionId);
         boolean gameFinished = isPersistedGameFinished(room);
-        PlayerState winnerOnDisconnect = null;
-        Long winnerOnDisconnectUserId = null;
-        Long loserOnDisconnectUserId = null;
+        Long linkedGameId = roomToGame.get(room.getRoomId());
 
-        if (countAsForfeitOnDisconnect && room.isGameStarted() && !gameFinished && leavingPlayer != null) {
-            winnerOnDisconnect = room.getPlayers().stream()
-                .filter(player -> player.getPlayerIndex() != leavingPlayer.getPlayerIndex())
-                .findFirst()
-                .orElse(null);
-            winnerOnDisconnectUserId = resolveUserId(room, winnerOnDisconnect);
-            loserOnDisconnectUserId = resolveUserId(room, leavingPlayer);
+        if (countAsForfeitOnDisconnect
+                && linkedGameId != null
+                && room.isGameStarted()
+                && !gameFinished
+                && leavingPlayer != null) {
+            if (disconnectForfeitGraceMs <= 0) {
+                PlayerState winnerOnDisconnect = room.getPlayers().stream()
+                    .filter(player -> player.getPlayerIndex() != leavingPlayer.getPlayerIndex())
+                    .findFirst()
+                    .orElse(null);
+
+                Long winnerOnDisconnectUserId = resolveUserId(room, winnerOnDisconnect);
+                Long loserOnDisconnectUserId = resolveUserId(room, leavingPlayer);
+
+                if (winnerOnDisconnect != null && winnerOnDisconnectUserId != null && loserOnDisconnectUserId != null) {
+                    markGameAsFinished(room, winnerOnDisconnect.getPlayerIndex());
+                    registerMatchResult(winnerOnDisconnectUserId, loserOnDisconnectUserId);
+                    log.info("Player {} disconnected from active game {}. Winner by forfeit: {}",
+                        sessionId, room.getRoomId(), winnerOnDisconnect.getPlayerIndex());
+                }
+            } else {
+            // Grace window for transient disconnects (refresh/F5, short network drops).
+                room.assignSessionToPlayer(leavingPlayer.getPlayerIndex(), null);
+                sessionToRoom.remove(sessionId);
+                sessionToUserId.remove(sessionId);
+                scheduleDisconnectForfeit(room.getRoomId(), leavingPlayer.getPlayerIndex());
+                return -1;
+            }
         }
 
         PlayerState removed = room.removePlayer(sessionId);
         if (removed != null) {
-            if (winnerOnDisconnect != null && winnerOnDisconnectUserId != null && loserOnDisconnectUserId != null) {
-                markGameAsFinished(room, winnerOnDisconnect.getPlayerIndex());
-                registerMatchResult(winnerOnDisconnectUserId, loserOnDisconnectUserId);
-                log.info("Player {} disconnected from active game {}. Winner by forfeit: {}", sessionId, room.getRoomId(), winnerOnDisconnect.getPlayerIndex());
-            }
-
             log.info("Player {} (index {}) left room {}", sessionId, removed.getPlayerIndex(), room.getRoomId());
             sessionToRoom.remove(sessionId);
             sessionToUserId.remove(sessionId);
-            Long linkedGameId = roomToGame.get(room.getRoomId());
             clearLoadedGameMapping(linkedGameId, room.getRoomId());
             room.reset();
             
@@ -429,6 +476,83 @@ public class GameController {
             return removed.getPlayerIndex();
         }
         return -1;
+    }
+
+    private void scheduleDisconnectForfeit(String roomId, int disconnectedPlayerIndex) {
+        String key = disconnectForfeitKey(roomId, disconnectedPlayerIndex);
+        ScheduledFuture<?> previous = pendingDisconnectForfeits.remove(key);
+        if (previous != null) {
+            previous.cancel(false);
+        }
+
+        ScheduledFuture<?> scheduled = disconnectForfeitScheduler.schedule(
+            () -> processDisconnectForfeit(roomId, disconnectedPlayerIndex),
+            disconnectForfeitGraceMs,
+            TimeUnit.MILLISECONDS
+        );
+        pendingDisconnectForfeits.put(key, scheduled);
+    }
+
+    private void processDisconnectForfeit(String roomId, int disconnectedPlayerIndex) {
+        String key = disconnectForfeitKey(roomId, disconnectedPlayerIndex);
+        pendingDisconnectForfeits.remove(key);
+
+        GameRoom room = rooms.get(roomId);
+        if (room == null || !room.isGameStarted() || isPersistedGameFinished(room)) {
+            return;
+        }
+
+        PlayerState disconnectedPlayer = room.getPlayerByIndex(disconnectedPlayerIndex);
+        if (disconnectedPlayer == null || disconnectedPlayer.getSessionId() != null) {
+            return;
+        }
+
+        int winnerIndex = disconnectedPlayerIndex == 0 ? 1 : 0;
+        PlayerState winnerPlayer = room.getPlayerByIndex(winnerIndex);
+        if (winnerPlayer == null) {
+            return;
+        }
+
+        Long winnerUserId = resolveUserId(room, winnerPlayer);
+        Long loserUserId = resolveUserId(room, disconnectedPlayer);
+        if (winnerUserId == null || loserUserId == null) {
+            return;
+        }
+
+        markGameAsFinished(room, winnerIndex);
+        registerMatchResult(winnerUserId, loserUserId);
+
+        Long linkedGameId = roomToGame.get(roomId);
+        clearLoadedGameMapping(linkedGameId, roomId);
+        clearSessionMappingsForRoom(roomId);
+        room.reset();
+        cleanupEmptyRooms();
+
+        log.info("Player index {} did not reconnect in room {} after {} ms. Winner by forfeit: {}",
+            disconnectedPlayerIndex, roomId, disconnectForfeitGraceMs, winnerIndex);
+    }
+
+    private void clearSessionMappingsForRoom(String roomId) {
+        List<String> sessionsInRoom = sessionToRoom.entrySet().stream()
+            .filter(entry -> roomId.equals(entry.getValue()))
+            .map(Map.Entry::getKey)
+            .toList();
+        sessionToRoom.entrySet().removeIf(entry -> roomId.equals(entry.getValue()));
+        for (String sid : sessionsInRoom) {
+            sessionToUserId.remove(sid);
+        }
+    }
+
+    private void cancelPendingDisconnectForfeit(String roomId, int playerIndex) {
+        String key = disconnectForfeitKey(roomId, playerIndex);
+        ScheduledFuture<?> pending = pendingDisconnectForfeits.remove(key);
+        if (pending != null) {
+            pending.cancel(false);
+        }
+    }
+
+    private String disconnectForfeitKey(String roomId, int playerIndex) {
+        return roomId + ":" + playerIndex;
     }
 
     public GameResult saveAndExit(String sessionId) { //funcionalidad e guardado y salida en base

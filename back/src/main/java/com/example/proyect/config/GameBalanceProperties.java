@@ -94,6 +94,7 @@ public class GameBalanceProperties {
         private double accuracy = UnitBalanceRegistry.DEFAULT_AERIAL_DRONE_ACCURACY;
         private int carrierHp = UnitBalanceRegistry.DEFAULT_AERIAL_CARRIER_MAX_HP;
         private int carrierMovementRange = UnitBalanceRegistry.DEFAULT_AERIAL_CARRIER_MOVEMENT_RANGE;
+        private int carrierVisionRange = UnitBalanceRegistry.DEFAULT_AERIAL_DRONE_VISION_RANGE;
 
         public int getMaxHp() {
             return maxHp;
@@ -158,6 +159,14 @@ public class GameBalanceProperties {
         public void setCarrierMovementRange(int carrierMovementRange) {
             this.carrierMovementRange = carrierMovementRange;
         }
+
+        public int getCarrierVisionRange() {
+            return carrierVisionRange;
+        }
+
+        public void setCarrierVisionRange(int carrierVisionRange) {
+            this.carrierVisionRange = carrierVisionRange;
+        }
     }
 
     public static class Naval {
@@ -170,6 +179,7 @@ public class GameBalanceProperties {
         private double accuracy = UnitBalanceRegistry.DEFAULT_NAVAL_DRONE_ACCURACY;
         private int carrierHp = UnitBalanceRegistry.DEFAULT_NAVAL_CARRIER_MAX_HP;
         private int carrierMovementRange = UnitBalanceRegistry.DEFAULT_NAVAL_CARRIER_MOVEMENT_RANGE;
+        private int carrierVisionRange = UnitBalanceRegistry.DEFAULT_NAVAL_DRONE_VISION_RANGE;
 
         public int getMaxHp() {
             return maxHp;
@@ -241,6 +251,14 @@ public class GameBalanceProperties {
 
         public void setCarrierMovementRange(int carrierMovementRange) {
             this.carrierMovementRange = carrierMovementRange;
+        }
+
+        public int getCarrierVisionRange() {
+            return carrierVisionRange;
+        }
+
+        public void setCarrierVisionRange(int carrierVisionRange) {
+            this.carrierVisionRange = carrierVisionRange;
         }
     }
 

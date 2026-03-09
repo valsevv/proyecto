@@ -4,23 +4,40 @@ export function getVisionRangeForSide(scene, side) {
     return side === 'Aereo' ? scene.aereoVisionRange : scene.navalVisionRange;
 }
 
+export function getCarrierVisionRangeForSide(scene, side) {
+    return side === 'Aereo' ? scene.aereoCarrierVisionRange : scene.navalCarrierVisionRange;
+}
+
+function getLocalVisionSources(scene) {
+    const sources = [];
+    const localSide = scene.localSide;
+    const droneVisionRange = getVisionRangeForSide(scene, localSide);
+    const carrierVisionRange = getCarrierVisionRangeForSide(scene, localSide);
+
+    const myDrones = scene.drones[Network.playerIndex] || [];
+    for (const d of myDrones) {
+        if (d?.isAlive() && d.sprite && d.deployed && droneVisionRange > 0) {
+            sources.push({ sprite: d.sprite, visionRange: droneVisionRange });
+        }
+    }
+
+    const myCarrier = scene.carriers?.[Network.playerIndex];
+    if (myCarrier?.sprite && !myCarrier.destroyed && carrierVisionRange > 0) {
+        sources.push({ sprite: myCarrier.sprite, visionRange: carrierVisionRange });
+    }
+
+    return sources;
+}
+
 export function isDroneVisibleToLocal(scene, drone) {
     if (!drone || !drone.isAlive()) return false;
     if (drone.playerIndex === Network.playerIndex) return true;
 
-    const visionRange = getVisionRangeForSide(scene, scene.localSide);
-    if (!visionRange || visionRange <= 0) return false;
+    const sources = getLocalVisionSources(scene);
+    if (!sources.length) return false;
 
-    const sources = [];
-    const myDrones = scene.drones[Network.playerIndex] || [];
-    for (const d of myDrones) {
-        if (d?.isAlive() && d.sprite && d.deployed) sources.push(d.sprite);
-    }
-
-    const myCarrier = scene.carriers?.[Network.playerIndex];
-    if (myCarrier?.sprite && !myCarrier.destroyed) sources.push(myCarrier.sprite);
-
-    for (const sourceSprite of sources) {
+    for (const source of sources) {
+        const sourceSprite = source.sprite;
         const distance = scene.hexGrid.getHexDistance(
             sourceSprite.x,
             sourceSprite.y,
@@ -28,7 +45,7 @@ export function isDroneVisibleToLocal(scene, drone) {
             drone.sprite.y
         );
 
-        if (distance <= visionRange) return true;
+        if (distance <= source.visionRange) return true;
     }
 
     return false;
@@ -38,19 +55,11 @@ export function isCarrierVisibleToLocal(scene, carrier) {
     if (!carrier?.sprite) return false;
     if (carrier.playerIndex === Network.playerIndex) return true;
 
-    const visionRange = getVisionRangeForSide(scene, scene.localSide);
-    if (!visionRange || visionRange <= 0) return false;
+    const sources = getLocalVisionSources(scene);
+    if (!sources.length) return false;
 
-    const sources = [];
-    const myDrones = scene.drones[Network.playerIndex] || [];
-    for (const d of myDrones) {
-        if (d?.isAlive() && d.sprite && d.deployed) sources.push(d.sprite);
-    }
-
-    const myCarrier = scene.carriers?.[Network.playerIndex];
-    if (myCarrier?.sprite && !myCarrier.destroyed) sources.push(myCarrier.sprite);
-
-    for (const sourceSprite of sources) {
+    for (const source of sources) {
+        const sourceSprite = source.sprite;
         const distance = scene.hexGrid.getHexDistance(
             sourceSprite.x,
             sourceSprite.y,
@@ -58,7 +67,7 @@ export function isCarrierVisibleToLocal(scene, carrier) {
             carrier.sprite.y
         );
 
-        if (distance <= visionRange) return true;
+        if (distance <= source.visionRange) return true;
     }
 
     return false;
@@ -70,28 +79,17 @@ export function updateFogOfWar(scene) {
     scene.fogRT.clear();
     scene.fogRT.fill(0x000000, scene.fogAlpha);
 
-    const visionRange = getVisionRangeForSide(scene, scene.localSide);
-    if (!visionRange || visionRange <= 0) {
-        return;
-    }
+    const sources = getLocalVisionSources(scene);
+    if (!sources.length) return;
 
     const hexWidth = Math.sqrt(3) * scene.hexGrid.size;
-    const radiusPx = visionRange * hexWidth;
 
-    scene.fogEraser.clear();
-    scene.fogEraser.fillStyle(0xffffff, 1);
-    scene.fogEraser.fillCircle(0, 0, radiusPx);
-
-    const sources = [];
-    const myDrones = scene.drones[Network.playerIndex] || [];
-    for (const d of myDrones) {
-        if (d?.isAlive() && d.sprite && d.deployed) sources.push(d.sprite);
-    }
-    const myCarrier = scene.carriers?.[Network.playerIndex];
-    if (myCarrier?.sprite && !myCarrier.destroyed) sources.push(myCarrier.sprite);
-
-    for (const s of sources) {
-        scene.fogRT.erase(scene.fogEraser, s.x, s.y);
+    for (const source of sources) {
+        const radiusPx = source.visionRange * hexWidth;
+        scene.fogEraser.clear();
+        scene.fogEraser.fillStyle(0xffffff, 1);
+        scene.fogEraser.fillCircle(0, 0, radiusPx);
+        scene.fogRT.erase(scene.fogEraser, source.sprite.x, source.sprite.y);
     }
 }
 
