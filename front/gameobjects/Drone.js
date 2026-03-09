@@ -1,6 +1,10 @@
 import { getGameConfig } from '../shared/gameConfig.js';
 
 const DRONE_MOVE_DURATION_MS = 1200;
+const DRONE_FLOAT_DISTANCE_PX = 10;
+const DRONE_FLOAT_DURATION_MS = 1100;
+const DRONE_DESTROYED_SHOW_MS = 380;
+const DRONE_DESTROYED_FADE_MS = 560;
 
 export default class Drone {
     /**
@@ -53,6 +57,9 @@ export default class Drone {
         this.isAttackQueued = false;
         this._moveQueueTimer = null;
         this._attackQueueTimer = null;
+        this.floatTweenBody = null;
+        this.floatTweenHealthBg = null;
+        this.floatTweenHealth = null;
 
         // UI offsets relative to sprite
         this.healthBarOffsetY = 16;
@@ -83,8 +90,7 @@ export default class Drone {
         // Invertir sprite si es necesario según la posición del equipo
         // Naval drones miran a la izquierda por defecto, así que invierten si están a la izquierda
         // Aereo drones miran a la derecha por defecto, así que invierten si están a la derecha
-        const shouldInvert = (this.playerIndex === 0 && this.droneType === 'Naval') ||
-                            (this.playerIndex === 1 && this.droneType === 'Aereo');
+        const shouldInvert = this.getShouldInvertForTeam();
         if (shouldInvert) {
             this.sprite.setFlipX(true);
         }
@@ -140,6 +146,8 @@ export default class Drone {
         this.sprite.setVisible(false);
         this.healthBarBg.setVisible(false);
         this.healthBar.setVisible(false);
+
+        this.startFloatingAnimation();
     }
 
     isBusy() {
@@ -221,6 +229,63 @@ export default class Drone {
         this.attackTweenReturn = null;
     }
 
+    startFloatingAnimation() {
+        if (this.destroyed || this.isMoving || this.isAttacking || !this.sprite?.active) return;
+        if (!this.deployed || !this.isVisibleToLocal) return;
+        if (this.floatTweenBody || this.floatTweenHealthBg || this.floatTweenHealth) return;
+
+        const startDelay = Phaser.Math.Between(0, 700);
+
+        this.floatTweenBody = this.scene.tweens.add({
+            targets: [this.sprite, this.ring, this.targetRing],
+            y: `-=${DRONE_FLOAT_DISTANCE_PX}`,
+            duration: DRONE_FLOAT_DURATION_MS,
+            ease: 'Sine.easeInOut',
+            yoyo: true,
+            repeat: -1,
+            delay: startDelay,
+            onStop: () => {
+                this.floatTweenBody = null;
+            }
+        });
+
+        this.floatTweenHealthBg = this.scene.tweens.add({
+            targets: this.healthBarBg,
+            y: `-=${DRONE_FLOAT_DISTANCE_PX}`,
+            duration: DRONE_FLOAT_DURATION_MS,
+            ease: 'Sine.easeInOut',
+            yoyo: true,
+            repeat: -1,
+            delay: startDelay,
+            onStop: () => {
+                this.floatTweenHealthBg = null;
+            }
+        });
+
+        this.floatTweenHealth = this.scene.tweens.add({
+            targets: this.healthBar,
+            y: `-=${DRONE_FLOAT_DISTANCE_PX}`,
+            duration: DRONE_FLOAT_DURATION_MS,
+            ease: 'Sine.easeInOut',
+            yoyo: true,
+            repeat: -1,
+            delay: startDelay,
+            onStop: () => {
+                this.floatTweenHealth = null;
+            }
+        });
+    }
+
+    stopFloatingAnimation() {
+        const tweensToStop = [this.floatTweenBody, this.floatTweenHealthBg, this.floatTweenHealth].filter(Boolean);
+        for (const tween of tweensToStop) {
+            tween.stop();
+        }
+        this.floatTweenBody = null;
+        this.floatTweenHealthBg = null;
+        this.floatTweenHealth = null;
+    }
+
     select() {
         this.syncUIPositions();
         this.ring.setVisible(true);
@@ -271,11 +336,18 @@ export default class Drone {
 
         // Selection ring is only meaningful for local drones; don't force it on.
         if (this.ring && !v) this.ring.setVisible(false);
+
+        if (v) {
+            this.startFloatingAnimation();
+        } else {
+            this.stopFloatingAnimation();
+        }
     }
 
     moveTo(x, y) {
         if (this.destroyed || this.isAttacking) return;
 
+        this.stopFloatingAnimation();
         // If there were prior tweens (e.g., interrupted movement), stop them.
         this.stopMotionTweens();
         this.isMoving = true;
@@ -316,6 +388,8 @@ export default class Drone {
                     this.scene.updateVision();
                 }
 
+                this.startFloatingAnimation();
+
                 this.moveTweenBody = null;
             }
         });
@@ -344,6 +418,39 @@ export default class Drone {
 
     }
 
+    getShouldInvertForTeam() {
+        // Render drone textures as-is without any horizontal flip.
+        return false;
+    }
+
+    getBaseFacingRight(direction = this.currentDirection) {
+        if (direction === 1) return false; // izquierda
+        if (direction === 2) return true;  // derecha
+        // En estado estático/vertical, Naval mira izquierda por defecto y Aereo derecha.
+        return this.droneType !== 'Naval';
+    }
+
+    getDestroyedTextureKey() {
+        const shouldInvert = this.getShouldInvertForTeam();
+        const baseFacingRight = this.getBaseFacingRight(this.currentDirection);
+        const facingRight = shouldInvert ? !baseFacingRight : baseFacingRight;
+
+        if (this.droneType === 'Naval') {
+            return facingRight ? 'dron_misil_destroyed_2' : 'dron_misil_destroyed_1';
+        }
+        return facingRight ? 'dron_bomba_destroyed_2' : 'dron_bomba_destroyed_1';
+    }
+
+    applyDestroyedVisual() {
+        if (!this.sprite?.active) return;
+        const textureKey = this.getDestroyedTextureKey();
+        if (!this.scene?.textures?.exists(textureKey)) return;
+        this.sprite.setTexture(textureKey);
+        this.sprite.setDisplaySize(128, 128);
+        this.sprite.setFlipX(false);
+        this.sprite.setAlpha(1);
+    }
+
     /**
      * Cambia el asset del dron según la dirección
      * @param {number} direction 0=estático, 1=izq, 2=der, 3=abajo, 4=arriba
@@ -362,8 +469,7 @@ export default class Drone {
         this.sprite.setDisplaySize(128, 128);
         
         // Reapply flip if needed when texture changes
-        const shouldInvert = (this.playerIndex === 0 && this.droneType === 'Naval') ||
-                            (this.playerIndex === 1 && this.droneType === 'Aereo');
+        const shouldInvert = this.getShouldInvertForTeam();
         this.sprite.setFlipX(shouldInvert);
     }
 
@@ -379,6 +485,7 @@ export default class Drone {
         if (this.droneType !== 'Aereo') return;
 
         this.isAttacking = true;
+        this.stopFloatingAnimation();
         this.stopMotionTweens();
         this.clearAttackLock();
         this.setDirection(0);
@@ -426,6 +533,7 @@ export default class Drone {
                             this.attackTweenReturn = null;
                             this.isAttacking = false;
                             this.syncUIPositions();
+                            this.startFloatingAnimation();
 
                             this.scene?.events?.emit('attackAnimEnd', { kind: 'bomb' });
                         }
@@ -502,6 +610,7 @@ export default class Drone {
         // FIX: Missile drone belongs to Naval.
         if (this.droneType !== 'Naval') return;
         this.isAttacking = true;
+        this.stopFloatingAnimation();
         this.stopMotionTweens();
         this.clearAttackLock();
 
@@ -548,6 +657,7 @@ export default class Drone {
             onComplete: () => {
                 missile.destroy();
                 this.isAttacking = false;
+                this.startFloatingAnimation();
 
                 this.scene?.events?.emit('attackAnimImpact', { kind: 'missile' });
                 this.scene?.events?.emit('attackAnimEnd', { kind: 'missile' });
@@ -606,52 +716,75 @@ export default class Drone {
 
     sinkAndDestroy() {
         if (this.destroyed) return;
+        this.stopFloatingAnimation();
         this.stopMotionTweens();
         this.destroyed = true;
         this.isMoving = false;
         this.health = 0;
         this.fuel = 0;
+        this.applyDestroyedVisual();
 
         this.scene.tweens.add({
-            targets: [this.sprite, this.ring, this.targetRing, this.healthBar, this.healthBarBg],
+            targets: [this.ring, this.targetRing, this.healthBar, this.healthBarBg],
             y: `+=20`,
             alpha: 0,
-            duration: 700,
+            duration: 320,
             ease: "Cubic.easeIn"
         });
-        this.scene.tweens.add({
-            targets: this.sprite,
-            angle: 15,
-            scaleX: 0.05,
-            scaleY: 0.05,
-            duration: 700,
-            ease: "Cubic.easeIn",
-            onComplete: () => {
-                this.sprite.destroy();
-                this.ring.destroy();
-                this.targetRing.destroy();
-                this.healthBar.destroy();
-                this.healthBarBg.destroy();
-            }
+
+        this.scene.time.delayedCall(DRONE_DESTROYED_SHOW_MS, () => {
+            if (!this.sprite?.active) return;
+            this.scene.tweens.add({
+                targets: this.sprite,
+                y: '+=14',
+                angle: 10,
+                scaleX: 0.2,
+                scaleY: 0.2,
+                alpha: 0,
+                duration: DRONE_DESTROYED_FADE_MS,
+                ease: "Cubic.easeIn",
+                onComplete: () => {
+                    this.sprite.destroy();
+                    this.ring.destroy();
+                    this.targetRing.destroy();
+                    this.healthBar.destroy();
+                    this.healthBarBg.destroy();
+                }
+            });
         });
     }
 
     destroy() {
         if (this.destroyed) return;
+        this.stopFloatingAnimation();
         this.destroyed = true;
         this.health = 0;
+        this.applyDestroyedVisual();
+
         this.scene.tweens.add({
-            targets: [this.sprite, this.ring, this.targetRing, this.healthBar, this.healthBarBg],
+            targets: [this.ring, this.targetRing, this.healthBar, this.healthBarBg],
             alpha: 0,
-            duration: 500,
+            duration: 260,
             ease: 'Power2',
-            onComplete: () => {
-                this.sprite.destroy();
-                this.ring.destroy();
-                this.targetRing.destroy();
-                this.healthBar.destroy();
-                this.healthBarBg.destroy();
-            }
+        });
+
+        this.scene.time.delayedCall(DRONE_DESTROYED_SHOW_MS, () => {
+            if (!this.sprite?.active) return;
+            this.scene.tweens.add({
+                targets: this.sprite,
+                y: '+=10',
+                angle: 8,
+                alpha: 0,
+                duration: DRONE_DESTROYED_FADE_MS,
+                ease: 'Power2',
+                onComplete: () => {
+                    this.sprite.destroy();
+                    this.ring.destroy();
+                    this.targetRing.destroy();
+                    this.healthBar.destroy();
+                    this.healthBarBg.destroy();
+                }
+            });
         });
     }
 }

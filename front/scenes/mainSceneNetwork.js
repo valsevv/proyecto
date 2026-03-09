@@ -102,9 +102,26 @@ export function attachNetworkHandlers(scene, options = {}) {
         const hit = msg.hit !== false;
         const attackerDrone = scene.drones[msg.attackerPlayer]?.[msg.attackerDrone];
         const targetCarrier = scene.carriers?.[msg.targetPlayer];
+        const attackerPlayerIndex = Number.isInteger(msg.attackerPlayer)
+            ? msg.attackerPlayer
+            : attackerDrone?.playerIndex;
+        const isLocalAttacker = attackerPlayerIndex === Network.playerIndex || attackerDrone?.isLocal === true;
         const attackerSide = scene.playerSides[msg.attackerPlayer];
         const isNavalAttacker = attackerSide === 'Naval' || attackerDrone?.droneType === 'Naval';
         const isAereoAttacker = attackerSide === 'Aereo' || attackerDrone?.droneType === 'Aereo';
+        let combatMessageShown = false;
+
+        const emitCombatMessageOnce = (message) => {
+            if (combatMessageShown || !message || !isLocalAttacker) return;
+            combatMessageShown = true;
+            scene.events.emit('combatMessage', message);
+            scene.showCombatMessage?.(message);
+        };
+
+        // Miss feedback should appear even if animation events are skipped/interrupted.
+        if (!hit) {
+            emitCombatMessageOnce('El ataque fallo');
+        }
 
         if (attackerDrone && typeof attackerDrone.clearAttackLock === 'function') {
             attackerDrone.clearAttackLock();
@@ -128,105 +145,152 @@ export function attachNetworkHandlers(scene, options = {}) {
             }
         }
 
-        if (targetDrone && hit) {
-            targetDrone.takeDamage(msg.damage, msg.remainingHealth);
-        }
-
-        if (targetCarrier) {
-            if (typeof msg.targetCarrierHealth === 'number') {
-                targetCarrier.health = msg.targetCarrierHealth;
-            }
-            if (typeof msg.targetCarrierDestroyed === 'boolean') {
-                targetCarrier.destroyed = msg.targetCarrierDestroyed;
-            } else if (typeof targetCarrier.health === 'number') {
-                targetCarrier.destroyed = targetCarrier.health <= 0;
+        const applyAttackOutcome = () => {
+            if (targetDrone && hit) {
+                targetDrone.takeDamage(msg.damage, msg.remainingHealth);
             }
 
-            if (targetCarrier.destroyed) {
-                scene.destroyCarrier?.(targetCarrier, true);
-            } else {
-                scene.updateCarrierHealthBar?.(targetCarrier);
-            }
-        }
+            if (targetCarrier) {
+                if (typeof msg.targetCarrierHealth === 'number') {
+                    targetCarrier.health = msg.targetCarrierHealth;
+                }
+                if (typeof msg.targetCarrierDestroyed === 'boolean') {
+                    targetCarrier.destroyed = msg.targetCarrierDestroyed;
+                } else if (typeof targetCarrier.health === 'number') {
+                    targetCarrier.destroyed = targetCarrier.health <= 0;
+                }
 
-        if (attackerDrone && msg.attackerDestroyed && attackerDrone.isAlive()) {
-            if (scene.selectedDrone === attackerDrone) {
-                scene.selectedDrone.deselect();
-                scene.selectedDrone = null;
-                scene.clearTargetHighlights();
-                scene.actionMode = modeMove;
-                scene.events.emit('selectionChanged', { type: null });
-            }
-            scene.queueDroneDestroyAfterAction(attackerDrone, () => attackerDrone.destroy());
-        } else if (attackerDrone && msg.attackerRemainingHealth !== undefined) {
-            if (attackerDrone.health !== msg.attackerRemainingHealth) {
-                attackerDrone.health = msg.attackerRemainingHealth;
-                attackerDrone.updateHealthBar();
-            }
-        }
-
-        if (!hit && msg.attackerPlayer === Network.playerIndex) {
-            scene.events.emit('combatMessage', 'El ataque fallo');
-            scene.showCombatMessage?.('El ataque fallo');
-        }
-        if (attackerDrone && msg.attackerPlayer === Network.playerIndex) {
-            attackerDrone.hasAttacked = true;
-            if (typeof msg.attackerAmmo === 'number') {
-                attackerDrone.missiles = msg.attackerAmmo;
-            } else {
-                if (typeof attackerDrone.consumeMissile === 'function') {
-                    attackerDrone.consumeMissile();
+                if (targetCarrier.destroyed) {
+                    scene.destroyCarrier?.(targetCarrier, true);
+                } else {
+                    scene.updateCarrierHealthBar?.(targetCarrier);
                 }
             }
-            const nextActions = typeof msg.actionsRemaining === 'number'
-                ? msg.actionsRemaining
-                : Math.max(0, (Network.actionsRemaining ?? 0) - 1);
-            Network.actionsRemaining = nextActions;
-            scene.events.emit('actionsUpdated', {
-                actionsRemaining: nextActions,
-                actionsPerTurn: scene.actionsPerTurn
-            });
-        }
-        scene.clearTargetHighlights();
-        scene.actionMode = modeMove;
-        scene.events.emit('attackModeEnded');
 
-        if (msg.gameFinished) {
-            scene.gameFinished = true;
-            scene.isMyTurn = false;
-            scene.clearSelections();
-            scene.events.emit('turnChanged', { isMyTurn: false });
-            const isLocalWinner = msg.winnerPlayerIndex === Network.playerIndex;
-            const winnerText = isLocalWinner ? '¡Ganaste la partida!' : 'Perdiste la partida';
+            if (attackerDrone && msg.attackerDestroyed && attackerDrone.isAlive()) {
+                if (scene.selectedDrone === attackerDrone) {
+                    scene.selectedDrone.deselect();
+                    scene.selectedDrone = null;
+                    scene.clearTargetHighlights();
+                    scene.actionMode = modeMove;
+                    scene.events.emit('selectionChanged', { type: null });
+                }
+                scene.queueDroneDestroyAfterAction(attackerDrone, () => attackerDrone.destroy());
+            } else if (attackerDrone && msg.attackerRemainingHealth !== undefined) {
+                if (attackerDrone.health !== msg.attackerRemainingHealth) {
+                    attackerDrone.health = msg.attackerRemainingHealth;
+                    attackerDrone.updateHealthBar();
+                }
+            }
 
-            const camera = scene.cameras.main;
-            const panelWidth = 620;
-            const panelHeight = 220;
-            const panelX = camera.midPoint.x;
-            const panelY = camera.midPoint.y;
+            if (isLocalAttacker) {
+                let combatMessage = 'El ataque fallo';
 
-            scene.add.rectangle(panelX, panelY, panelWidth, panelHeight, 0x04111f, 0.92)
-                .setStrokeStyle(4, 0xffdd57, 1)
-                .setScrollFactor(0)
-                .setDepth(1000);
+                if (hit) {
+                    const damage = Number.isFinite(msg.damage) ? msg.damage : 0;
+                    if (msg.targetCarrierDestroyed) {
+                        combatMessage = `Impacto! Portadrones destruido (${damage})`;
+                    } else if (targetDrone?.destroyed || (typeof msg.remainingHealth === 'number' && msg.remainingHealth <= 0)) {
+                        combatMessage = `Impacto! Dron destruido (${damage})`;
+                    } else {
+                        combatMessage = `Impacto confirmado (${damage})`;
+                    }
+                }
 
-            scene.add.text(panelX, panelY, `Finaliza partidas para ambos jugadores\n${winnerText}\nVolviendo al menú principal...`, {
-                fontSize: '30px',
-                fill: '#ffdd57',
-                align: 'center',
-                fontStyle: 'bold',
-                lineSpacing: 10
-            }).setOrigin(0.5).setScrollFactor(0).setDepth(1001);
+                emitCombatMessageOnce(combatMessage);
+            }
 
-            scene.time.delayedCall(2500, () => {
-                window.location.href = '/menu';
-            });
+            if (attackerDrone && msg.attackerPlayer === Network.playerIndex) {
+                attackerDrone.hasAttacked = true;
+                if (typeof msg.attackerAmmo === 'number') {
+                    attackerDrone.missiles = msg.attackerAmmo;
+                } else if (typeof attackerDrone.consumeMissile === 'function') {
+                    attackerDrone.consumeMissile();
+                }
+
+                const nextActions = typeof msg.actionsRemaining === 'number'
+                    ? msg.actionsRemaining
+                    : Math.max(0, (Network.actionsRemaining ?? 0) - 1);
+                Network.actionsRemaining = nextActions;
+                scene.events.emit('actionsUpdated', {
+                    actionsRemaining: nextActions,
+                    actionsPerTurn: scene.actionsPerTurn
+                });
+            }
+
+            scene.clearTargetHighlights();
+            scene.actionMode = modeMove;
+            scene.events.emit('attackModeEnded');
+
+            if (msg.gameFinished) {
+                scene.gameFinished = true;
+                scene.isMyTurn = false;
+                scene.clearSelections();
+                scene.events.emit('turnChanged', { isMyTurn: false });
+                const isLocalWinner = msg.winnerPlayerIndex === Network.playerIndex;
+                const winnerText = isLocalWinner ? '¡Ganaste la partida!' : 'Perdiste la partida';
+
+                const camera = scene.cameras.main;
+                const panelWidth = 620;
+                const panelHeight = 220;
+                const panelX = camera.midPoint.x;
+                const panelY = camera.midPoint.y;
+
+                scene.add.rectangle(panelX, panelY, panelWidth, panelHeight, 0x04111f, 0.92)
+                    .setStrokeStyle(4, 0xffdd57, 1)
+                    .setScrollFactor(0)
+                    .setDepth(1000);
+
+                scene.add.text(panelX, panelY, `Finaliza partidas para ambos jugadores\n${winnerText}\nVolviendo al menú principal...`, {
+                    fontSize: '30px',
+                    fill: '#ffdd57',
+                    align: 'center',
+                    fontStyle: 'bold',
+                    lineSpacing: 10
+                }).setOrigin(0.5).setScrollFactor(0).setDepth(1001);
+
+                scene.time.delayedCall(2500, () => {
+                    window.location.href = '/menu';
+                });
+                scene.updateVision();
+                return;
+            }
+
             scene.updateVision();
+            scene.checkDrawByNoDrones();
+        };
+
+        const hasAnimatedAttack = !!(
+            attackerDrone &&
+            (targetDrone || (typeof msg.lineX === 'number' && typeof msg.lineY === 'number')) &&
+            (isAereoAttacker || isNavalAttacker)
+        );
+
+        if (!hasAnimatedAttack) {
+            applyAttackOutcome();
             return;
         }
 
-        scene.updateVision();
-        scene.checkDrawByNoDrones();
+        let outcomeApplied = false;
+        const expectedKind = isAereoAttacker ? 'bomb' : 'missile';
+
+        const onImpact = (payload = {}) => {
+            if (outcomeApplied) return;
+            if (payload.kind !== expectedKind) return;
+            outcomeApplied = true;
+            scene.events.off('attackAnimImpact', onImpact);
+            if (fallbackTimer) fallbackTimer.remove(false);
+            applyAttackOutcome();
+        };
+
+        const fallbackTimer = scene.time.delayedCall(2300, () => {
+            if (outcomeApplied) return;
+            outcomeApplied = true;
+            scene.events.off('attackAnimImpact', onImpact);
+            applyAttackOutcome();
+        });
+
+        scene.events.on('attackAnimImpact', onImpact);
     });
 
     Network.on('playerLeft', () => {

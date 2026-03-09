@@ -10,6 +10,7 @@ public final class UnitBalanceRegistry {
     public static final double DEFAULT_AERIAL_DRONE_ACCURACY = 0.60;
 
     public static final int DEFAULT_NAVAL_DRONE_MAX_HP = 100;
+    public static final int DEFAULT_DRONE_ATTACK_DAMAGE = 1;
     public static final int DEFAULT_NAVAL_DRONE_MOVEMENT_RANGE = 2;
     public static final int DEFAULT_NAVAL_DRONE_VISION_RANGE = 3;
     public static final int DEFAULT_NAVAL_DRONE_MAX_FUEL = 10;
@@ -30,6 +31,7 @@ public final class UnitBalanceRegistry {
     private static volatile double aerialDroneAccuracy = DEFAULT_AERIAL_DRONE_ACCURACY;
 
     private static volatile int navalDroneMaxHp = DEFAULT_NAVAL_DRONE_MAX_HP;
+    private static volatile int droneAttackDamage = DEFAULT_DRONE_ATTACK_DAMAGE;
     private static volatile int navalDroneMovementRange = DEFAULT_NAVAL_DRONE_MOVEMENT_RANGE;
     private static volatile int navalDroneVisionRange = DEFAULT_NAVAL_DRONE_VISION_RANGE;
     private static volatile int navalDroneMaxFuel = DEFAULT_NAVAL_DRONE_MAX_FUEL;
@@ -53,6 +55,7 @@ public final class UnitBalanceRegistry {
             int configuredAerialDroneAmmo,
             double configuredAerialDroneAccuracy,
             int configuredNavalDroneMaxHp,
+            int configuredDroneAttackDamage,
             int configuredNavalDroneMovementRange,
             int configuredNavalDroneVisionRange,
             int configuredNavalDroneMaxFuel,
@@ -72,6 +75,7 @@ public final class UnitBalanceRegistry {
         aerialDroneAccuracy = requirePercent(configuredAerialDroneAccuracy, "aerialDroneAccuracy");
 
         navalDroneMaxHp = requirePositive(configuredNavalDroneMaxHp, "navalDroneMaxHp");
+        droneAttackDamage = requirePositive(configuredDroneAttackDamage, "droneAttackDamage");
         navalDroneMovementRange = requireNonNegative(configuredNavalDroneMovementRange, "navalDroneMovementRange");
         navalDroneVisionRange = requireNonNegative(configuredNavalDroneVisionRange, "navalDroneVisionRange");
         navalDroneMaxFuel = requireNonNegative(configuredNavalDroneMaxFuel, "navalDroneMaxFuel");
@@ -114,6 +118,7 @@ public final class UnitBalanceRegistry {
     public static double getAerialDroneAccuracy() { return aerialDroneAccuracy; }
 
     public static int getNavalDroneMaxHp() { return navalDroneMaxHp; }
+    public static int getDroneAttackDamage() { return droneAttackDamage; }
     public static int getNavalDroneMovementRange() { return navalDroneMovementRange; }
     public static int getNavalDroneVisionRange() { return navalDroneVisionRange; }
     public static int getNavalDroneMaxFuel() { return navalDroneMaxFuel; }

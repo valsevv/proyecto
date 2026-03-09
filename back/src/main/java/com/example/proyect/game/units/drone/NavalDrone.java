@@ -18,7 +18,13 @@ public class NavalDrone extends Drone {
         setMaxFuel(UnitBalanceRegistry.getNavalDroneMaxFuel());
         setFuel(UnitBalanceRegistry.getNavalDroneMaxFuel());
 
-        setWeapon(new MissileWeapon(UnitBalanceRegistry.getNavalDroneWeaponAmmo(), 50, 1, UnitBalanceRegistry.getNavalDroneAccuracy(), 8));
+        setWeapon(new MissileWeapon(
+            UnitBalanceRegistry.getNavalDroneWeaponAmmo(),
+            UnitBalanceRegistry.getDroneAttackDamage(),
+            1,
+            UnitBalanceRegistry.getNavalDroneAccuracy(),
+            8
+        ));
         this.missiles = UnitBalanceRegistry.getNavalDroneMissiles();
     }
 

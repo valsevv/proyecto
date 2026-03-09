@@ -32,6 +32,16 @@ const NAVAL_CARRIER_SPRITES = [
     'porta_drones_mar_4'
 ];
 
+
+
+const AEREAL_CARRIER_SPRITES = [
+    'porta_drones_aereo_0',
+    'porta_drones_aereo_1',
+    'porta_drones_aereo_2',
+    'porta_drones_aereo_3',
+    'porta_drones_aereo_4'
+];
+
 export default class MainScene extends Phaser.Scene {
     constructor() {
         super('MainScene');
@@ -80,18 +90,27 @@ export default class MainScene extends Phaser.Scene {
         this.load.image('dron_misil_2', 'assets/dron_misil/dron_misil_2.png'); // derecha
         this.load.image('dron_misil_3', 'assets/dron_misil/dron_misil_3.png'); // abajo
         this.load.image('dron_misil_4', 'assets/dron_misil/dron_misil_4.png'); // arriba
+        this.load.image('dron_misil_destroyed_1', 'assets/dron_misil/dron_missil_destroyed_1.png'); // destruido mirando izquierda
+        this.load.image('dron_misil_destroyed_2', 'assets/dron_misil/dron_missil_destroyed_2.png'); // destruido mirando derecha
         // Cargar los 5 assets de dron_bomba
         this.load.image('dron_bomba_0', 'assets/dron_bomba/dron_bomba_0.png'); // estático
         this.load.image('dron_bomba_1', 'assets/dron_bomba/dron_bomba_1.png'); // izquierda
         this.load.image('dron_bomba_2', 'assets/dron_bomba/dron_bomba_2.png'); // derecha
         this.load.image('dron_bomba_3', 'assets/dron_bomba/dron_bomba_3.png'); // abajo
         this.load.image('dron_bomba_4', 'assets/dron_bomba/dron_bomba_4.png'); // arriba
-        this.load.image('porta_drones_volador', 'assets/porta_drones_volador.png');
-        this.load.image('porta_drones_mar_0', 'assets/porta_drones_mar/porta_drones_mar_0.png');
-        this.load.image('porta_drones_mar_1', 'assets/porta_drones_mar/porta_drones_mar_1.png');
-        this.load.image('porta_drones_mar_2', 'assets/porta_drones_mar/porta_drones_mar_2.png');
-        this.load.image('porta_drones_mar_3', 'assets/porta_drones_mar/porta_drones_mar_3.png');
-        this.load.image('porta_drones_mar_4', 'assets/porta_drones_mar/porta_drones_mar_4.png');
+        this.load.image('dron_bomba_destroyed_1', 'assets/dron_bomba/dron_bomba_destroyed_1.png'); // destruido mirando izquierda
+        this.load.image('dron_bomba_destroyed_2', 'assets/dron_bomba/dron_bomba_destroyed_2.png'); // destruido mirando derecha
+        this.load.image('porta_drones_aereo_0', 'assets/porta_drones_aereo/porta_drones_aereo_0.png');// estático
+        this.load.image('porta_drones_aereo_1', 'assets/porta_drones_aereo/porta_drones_aereo_1.png');// izquierda
+        this.load.image('porta_drones_aereo_2', 'assets/porta_drones_aereo/porta_drones_aereo_2.png');// derecha
+        this.load.image('porta_drones_aereo_3', 'assets/porta_drones_aereo/porta_drones_aereo_3.png');//arriba
+        this.load.image('porta_drones_aereo_4', 'assets/porta_drones_aereo/porta_drones_aereo_4.png'); //abajo
+
+        this.load.image('porta_drones_mar_0', 'assets/porta_drones_mar/porta_drones_mar_0.png');// estático
+        this.load.image('porta_drones_mar_1', 'assets/porta_drones_mar/porta_drones_mar_1.png');// izquierda
+        this.load.image('porta_drones_mar_2', 'assets/porta_drones_mar/porta_drones_mar_2.png');// derecha
+        this.load.image('porta_drones_mar_3', 'assets/porta_drones_mar/porta_drones_mar_3.png');//arriba
+        this.load.image('porta_drones_mar_4', 'assets/porta_drones_mar/porta_drones_mar_4.png'); //abajo
         // Asset de la bomba para el dron bomba
         this.load.image('bomba', 'assets/dron_bomba/bomba.png');
         // Asset del cohete para el dron misil (directional variants)
@@ -443,8 +462,8 @@ export default class MainScene extends Phaser.Scene {
     createCarrierForPlayer(playerIndex, side, spawnHint = null) {
         const basePosition = spawnHint && typeof spawnHint.x === 'number' && typeof spawnHint.y === 'number'
             ? { x: spawnHint.x, y: spawnHint.y }
-            : this.getCarrierSpawnPosition(playerIndex, spawnHint?.y ?? null);
-        const spriteKey = side === 'Naval' ? NAVAL_CARRIER_SPRITES[0] : 'porta_drones_volador';
+            : this.getCarrierSpawnPosition(playerIndex, side, spawnHint?.y ?? null);
+        const spriteKey = side === 'Naval' ? NAVAL_CARRIER_SPRITES[0] : AEREAL_CARRIER_SPRITES[0];
 
         if (this.carriers[playerIndex]) {
             this.carriers[playerIndex].ring.destroy();
@@ -518,7 +537,7 @@ export default class MainScene extends Phaser.Scene {
     }
 
 
-    getCarrierSpawnPosition(playerIndex, spawnHintY = null) {
+    getCarrierSpawnPosition(playerIndex, side = null, spawnHintY = null) {
         const minY = CARRIER_SPAWN_Y_MARGIN;
         const maxY = Math.max(minY, WORLD_HEIGHT - CARRIER_SPAWN_Y_MARGIN);
         const fallbackY = Phaser.Math.Between(minY, maxY);
@@ -533,15 +552,19 @@ export default class MainScene extends Phaser.Scene {
             y
         };
 
+        if (side === 'Naval') return rightSpawn;
+        if (side === 'Aereo') return leftSpawn;
         return playerIndex === 0 ? leftSpawn : rightSpawn;
     }
 
     setCarrierSpriteDirection(carrier, directionIndex) {
-        if (!carrier || carrier.side !== 'Naval') return;
-        const clamped = Phaser.Math.Clamp(directionIndex, 0, NAVAL_CARRIER_SPRITES.length - 1);
+        if (!carrier) return;
+        const spriteSet = carrier.side === 'Naval' ? NAVAL_CARRIER_SPRITES : AEREAL_CARRIER_SPRITES;
+        if (!Array.isArray(spriteSet) || spriteSet.length === 0) return;
+        const clamped = Phaser.Math.Clamp(directionIndex, 0, spriteSet.length - 1);
         if (carrier.direction === clamped) return;
         carrier.direction = clamped;
-        carrier.sprite.setTexture(NAVAL_CARRIER_SPRITES[clamped]);
+        carrier.sprite.setTexture(spriteSet[clamped]);
     }
 
     getCarrierDirectionFromDelta(dx, dy) {
@@ -614,6 +637,9 @@ export default class MainScene extends Phaser.Scene {
                         if (drone.sprite) drone.sprite.setVisible(true);
                         if (drone.healthBarBg) drone.healthBarBg.setVisible(true);
                         if (drone.healthBar) drone.healthBar.setVisible(true);
+                        if (typeof drone.startFloatingAnimation === 'function') {
+                            drone.startFloatingAnimation();
+                        }
                     } else {
                         // Mark as destroyed so it is excluded from all game logic
                         drone.destroyed = true;

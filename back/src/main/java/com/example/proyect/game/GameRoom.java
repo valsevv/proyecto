@@ -155,6 +155,14 @@ public class GameRoom {
         PlayerState player = getPlayerByIndex(playerIndex);
         if (player == null) return;
 
+        playerSides.put(playerIndex, side);
+
+        HexCoord previousAnchor = playerSpawnAnchors.get(playerIndex);
+        Double yHint = previousAnchor != null ? previousAnchor.getY() : null;
+        HexCoord sideAnchor = getCarrierSpawnPosition(playerIndex, yHint);
+        playerSpawnAnchors.put(playerIndex, sideAnchor);
+        carrierPositions.put(playerIndex, sideAnchor);
+
         boolean isNaval = "Naval".equals(side);
         int droneCount = isNaval ? NAVAL_DRONES_PER_PLAYER : AERIAL_DRONES_PER_PLAYER;
         List<Drone> drones = new ArrayList<>();
@@ -172,7 +180,6 @@ public class GameRoom {
         player.getDrones().clear();
         player.getDrones().addAll(drones);
         player.setSide(side);
-        playerSides.put(playerIndex, side);
         carrierHealthByPlayer.put(playerIndex, getCarrierMaxHealth(playerIndex));
     }
 
@@ -205,14 +212,29 @@ public class GameRoom {
     }
 
     private HexCoord getCarrierSpawnPosition(int playerIndex) {
+        return getCarrierSpawnPosition(playerIndex, null);
+    }
+
+    private HexCoord getCarrierSpawnPosition(int playerIndex, Double spawnHintY) {
         double minY = CARRIER_SPAWN_Y_MARGIN;
         double maxY = Math.max(minY, WORLD_HEIGHT - CARRIER_SPAWN_Y_MARGIN);
-        double y = ThreadLocalRandom.current().nextDouble(minY, maxY + 1.0);
+        double randomY = ThreadLocalRandom.current().nextDouble(minY, maxY + 1.0);
+        double y = spawnHintY != null ? Math.max(minY, Math.min(maxY, spawnHintY)) : randomY;
 
         double leftX = CARRIER_EDGE_MARGIN;
         double rightX = Math.max(CARRIER_EDGE_MARGIN, WORLD_WIDTH - CARRIER_EDGE_MARGIN);
 
-        double x = playerIndex == 0 ? leftX : rightX;
+        String side = playerSides.get(playerIndex);
+        double x;
+        if ("Naval".equals(side)) {
+            x = rightX;
+        } else if ("Aereo".equals(side)) {
+            x = leftX;
+        } else {
+            // Fallback before side selection
+            x = playerIndex == 0 ? leftX : rightX;
+        }
+
         return new HexCoord(x, y);
     }
 

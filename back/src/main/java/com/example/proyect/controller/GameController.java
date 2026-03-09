@@ -12,12 +12,12 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import com.example.proyect.VOs.GameResult;
 import com.example.proyect.auth.service.GameService;
 import com.example.proyect.auth.service.RankingService;
+import com.example.proyect.config.GameBalanceProperties;
 import com.example.proyect.game.GameRoom;
 import com.example.proyect.game.PlayerState;
 import com.example.proyect.game.config.UnitBalanceRegistry;
@@ -35,8 +35,6 @@ import com.example.proyect.persistence.classes.User;
 import com.example.proyect.persistence.repos.UserRepository;
 import com.example.proyect.websocket.packet.Packet;
 
-import jakarta.annotation.PostConstruct;
-
 //vseverio Clase principal controladora de partida en tiempo real, salas, turnos, movimientos, ataques, guardado/cargado y estado por sesion
 @Service
 public class GameController {
@@ -46,71 +44,10 @@ public class GameController {
     private static final int NAVAL_ATTACK_ACTION_COST = 2;
     private static final double NAVAL_ATTACK_VERTICAL_OFFSET = 90.0;
 
-    @Value("${game.actions-per-turn:10}")
-    private int actionsPerTurn;
-
-    @Value("${game.units.aereo.vision-range:${game.vision-range-aereo:6}}")
-    private int aerialVisionRange;
-
-    @Value("${game.units.naval.vision-range:${game.vision-range-naval:4}}")
-    private int navalVisionRange;
-
-    @Value("${game.units.aereo.max-hp:100}")
-    private int aerialDroneMaxHp;
-
-    @Value("${game.units.aereo.movement-range:2}")
-    private int aerialDroneMovementRange;
-
-    @Value("${game.units.aereo.max-fuel:10}")
-    private int aerialDroneMaxFuel;
-
-    @Value("${game.units.aereo.ammo:1}")
-    private int aerialDroneAmmo;
-
-    @Value("${game.units.aereo.accuracy:0.60}")
-    private double aerialDroneAccuracy;
-
-    @Value("${game.units.naval.max-hp:100}")
-    private int navalDroneMaxHp;
-
-    @Value("${game.units.naval.movement-range:2}")
-    private int navalDroneMovementRange;
-
-    @Value("${game.units.naval.max-fuel:10}")
-    private int navalDroneMaxFuel;
-
-    @Value("${game.units.naval.weapon-ammo:10}")
-    private int navalDroneWeaponAmmo;
-
-    @Value("${game.units.naval.missiles:2}")
-    private int navalDroneMissiles;
-
-    @Value("${game.units.naval.accuracy:0.75}")
-    private double navalDroneAccuracy;
-
-    @Value("${game.missile.max-distance:15}")
-    private int missileMaxDistance;
-
-    @Value("${game.missile.damage-percent-on-naval:0.5}")
-    private double missileDamagePercentOnNaval;
-
-    @Value("${game.aerial-attack-fuel-cost:2}")
-    private int aerialAttackFuelCost;
-
-    @Value("${game.carrier-hits-to-destroy:5}")
-    private int carrierHitsToDestroy;
-
-    @Value("${game.units.aereo.carrier-hp:6}")
-    private int aerialCarrierHitsToDestroy;
-
-    @Value("${game.units.aereo.carrier-movement-range:3}")
-    private int aerialCarrierMovementRange;
-
-    @Value("${game.units.naval.carrier-hp:3}")
-    private int navalCarrierHitsToDestroy;
-
-    @Value("${game.units.naval.carrier-movement-range:1}")
-    private int navalCarrierMovementRange;
+    private final int actionsPerTurn;
+    private final int missileMaxDistance;
+    private final int aerialAttackFuelCost;
+    private final int carrierHitsToDestroy;
 
     // Must match frontend HexGrid size (front/scenes/MainScene.js -> new HexGrid(this, 35, ...))
     private static final double HEX_SIZE_PX = 35.0;
@@ -141,34 +78,21 @@ public class GameController {
     //
     private final AtomicInteger roomCounter = new AtomicInteger(1);
 
-    public GameController(LobbyService lobbyService, GameService gameService, RankingService rankingService, UserRepository userRepository) { //inicializa controlador
+    public GameController(
+            LobbyService lobbyService,
+            GameService gameService,
+            RankingService rankingService,
+            UserRepository userRepository,
+            GameBalanceProperties gameBalanceProperties
+    ) { //inicializa controlador
         this.lobbyService = lobbyService;
         this.gameService = gameService;
         this.rankingService = rankingService;
         this.userRepository = userRepository;
-    }
-
-    @PostConstruct
-    public void configureUnitBalance() {
-        UnitBalanceRegistry.configure(
-            aerialDroneMaxHp,
-            aerialDroneMovementRange,
-            aerialVisionRange,
-            aerialDroneMaxFuel,
-            aerialDroneAmmo,
-            aerialDroneAccuracy,
-            navalDroneMaxHp,
-            navalDroneMovementRange,
-            navalVisionRange,
-            navalDroneMaxFuel,
-            navalDroneWeaponAmmo,
-            navalDroneMissiles,
-            navalDroneAccuracy,
-            aerialCarrierHitsToDestroy,
-            aerialCarrierMovementRange,
-            navalCarrierHitsToDestroy,
-            navalCarrierMovementRange
-        );
+        this.actionsPerTurn = gameBalanceProperties.getActionsPerTurn();
+        this.missileMaxDistance = gameBalanceProperties.getMissileMaxDistance();
+        this.aerialAttackFuelCost = gameBalanceProperties.getAerialAttackFuelCost();
+        this.carrierHitsToDestroy = gameBalanceProperties.getCarrierHitsToDestroy();
     }
     public void bindSessionUser(String sessionId, Long userId) { //vincula sesion websocket con userid para trazabilidad
         if (sessionId != null && userId != null) {
@@ -189,11 +113,11 @@ public class GameController {
                 GameRoom newRoom = new GameRoom(
                     id,
                     actionsPerTurn,
-                    aerialVisionRange,
-                    navalVisionRange,
+                    UnitBalanceRegistry.getAerialDroneVisionRange(),
+                    UnitBalanceRegistry.getNavalDroneVisionRange(),
                     carrierHitsToDestroy,
-                    aerialCarrierHitsToDestroy,
-                    navalCarrierHitsToDestroy
+                    UnitBalanceRegistry.getAerialCarrierMaxHp(),
+                    UnitBalanceRegistry.getNavalCarrierMaxHp()
                 );
                 log.info("Created game room {} from lobby {}", id, lobby.getLobbyId());
                 return newRoom;
@@ -1102,12 +1026,11 @@ public class GameController {
             return new AttackResolution(0, false);
         }
 
-        if (!(targetDrone instanceof NavalDrone navalTarget)) {
+        if (!(targetDrone instanceof NavalDrone)) {
             return new AttackResolution(attackerDrone.getWeapon().getDamage(), true);
         }
 
-        int damage = (int) Math.round(navalTarget.getMaxHp() * missileDamagePercentOnNaval);
-        return new AttackResolution(Math.max(1, damage), true);
+        return new AttackResolution(attackerDrone.getWeapon().getDamage(), true);
     }
 
     private double distanceBetween(double x1, double y1, double x2, double y2) {

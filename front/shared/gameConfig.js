@@ -1,10 +1,10 @@
 const DEFAULT_GAME_CONFIG = {
-    actionsPerTurn: 10,
-    navalVisionRange: 4,
+    actionsPerTurn: 15,
+    navalVisionRange: 3,
     aerialVisionRange: 6,
-    aerialDroneMovementRange: 4,
-    navalDroneMovementRange: 6,
-    aerialDroneMaxFuel: 10,
+    aerialDroneMovementRange: 6,
+    navalDroneMovementRange: 3,
+    aerialDroneMaxFuel: 14,
     navalDroneMaxFuel: 10,
     aerialDroneMaxHp: 100,
     navalDroneMaxHp: 100,
@@ -12,7 +12,7 @@ const DEFAULT_GAME_CONFIG = {
     navalDroneMissiles: 2,
     aerialCarrierMaxHp: 6,
     navalCarrierMaxHp: 3,
-    aerialCarrierMovementRange: 3,
+    aerialCarrierMovementRange: 2,
     navalCarrierMovementRange: 1,
     missileMaxDistance: 15
 };
