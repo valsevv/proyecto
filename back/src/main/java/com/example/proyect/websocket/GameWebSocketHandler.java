@@ -106,7 +106,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             case MOVE_CARRIER -> handleCarrierMove(session, packet);
             case ATTACK      -> handleAttack(session, packet);
             case END_TURN    -> handleEndTurn(session);
-            case SAVE_AND_EXIT -> handleSaveAndExit(session);
+            case SAVE -> handleSave(session);
             case FORFEIT_GAME -> handleForfeitGame(session);
             case LEAVE_GAME -> handleLeaveGame(session);
             case LOAD_GAME -> handleLoadGame(session, packet);
@@ -300,10 +300,10 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
-    private void handleSaveAndExit(WebSocketSession session) throws IOException {
+    private void handleSave(WebSocketSession session) throws IOException {
         java.util.List<String> roomSessions = gameController.getSessionsInSameRoom(session.getId());
 
-        GameResult result = gameController.saveAndExit(session.getId());
+        GameResult result = gameController.save(session.getId());
 
         if (!result.isSuccess()) {
             send(session, result.getPacket());

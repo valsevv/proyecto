@@ -90,9 +90,9 @@ class NetworkManager {
         this.send({ type: 'endTurn' });
     }
 
-    saveAndExit() {
-        console.log('[net] === SENDING SAVE_AND_EXIT MESSAGE ===');
-        this.send({ type: 'saveAndExit' });
+    save() {
+        console.log('[net] === SENDING SAVE MESSAGE ===');
+        this.send({ type: 'save' });
     }
 
     forfeitGame() {

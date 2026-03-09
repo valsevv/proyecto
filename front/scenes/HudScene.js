@@ -450,8 +450,8 @@ export default class HudScene extends Phaser.Scene {
             .setInteractive({ useHandCursor: true });
 
         this.saveExitBtn.on('pointerup', () => {
-            if (confirm('¿Guardar y salir de la partida?')) {
-                networkManager.saveAndExit();
+            if (confirm('¿Guardar partida?')) {
+                networkManager.save();
             }
         });
 

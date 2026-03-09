@@ -11,7 +11,7 @@ public enum PacketType {
     MOVE_CARRIER("moveCarrier"),
     ATTACK("attack"),
     END_TURN("endTurn"),
-    SAVE_AND_EXIT("saveAndExit"),
+    SAVE("save"),
     FORFEIT_GAME("forfeitGame"),
     LEAVE_GAME("leaveGame"),
     LOAD_GAME("loadGame"),

@@ -555,11 +555,11 @@ public class GameController {
         return roomId + ":" + playerIndex;
     }
 
-    public GameResult saveAndExit(String sessionId) { //funcionalidad e guardado y salida en base
+    public GameResult save(String sessionId) { //funcionalidad e guardado y salida en base
 
-        log.info("[GameController] -> begin saveAndExit ");
+        log.info("[GameController] -> begin save ");
      
-        GameResult firstValidation = saveAndExitFirstValidation(sessionId);
+        GameResult firstValidation = saveFirstValidation(sessionId);
         if (firstValidation != null) {
             return firstValidation;
         }
@@ -602,19 +602,7 @@ public class GameController {
         }
 
         
-        clearLoadedGameMapping(gameToSave.getId(), roomId);
-        List<String> sessionsInRoom = getSessionsInSameRoom(sessionId);
-
-        sessionToRoom.entrySet().removeIf(entry -> roomId.equals(entry.getValue()));
-
-        for (String sid : sessionsInRoom) {
-            sessionToUserId.remove(sid);
-        }
-
-        room.reset();
-        cleanupEmptyRooms();
-
-        log.info("Game room {} saved and closed by player {}. Persisted gameId={}", roomId, actor.getPlayerIndex(), gameToSave.getId());
+        log.info("Game room {} saved by player {}. Persisted gameId={}", roomId, actor.getPlayerIndex(), gameToSave.getId());
         
         return GameResult.ok(Packet.gameSaved(gameToSave.getId(), actor.getPlayerIndex()));
     }
@@ -669,17 +657,17 @@ public class GameController {
     }
 
 
-    private GameResult saveAndExitFirstValidation(String sessionId ) { //valida antes de guardar
+    private GameResult saveFirstValidation(String sessionId ) { //valida antes de guardar
 
         GameRoom room = getRoomForSession(sessionId);
-        log.info("[GameController] -> saveAndExitFirstValidation, sessionId {}", sessionId);
+        log.info("[GameController] -> saveFirstValidation, sessionId {}", sessionId);
         
         if (room == null) {
             return GameResult.error("You are not in a game room");
         }
         
         PlayerState actor = room.getPlayerBySession(sessionId);
-        log.info("[GameController] -> saveAndExitFirstValidation, actor {}", actor);
+        log.info("[GameController] -> saveFirstValidation, actor {}", actor);
 
         if (actor == null) {
             return GameResult.error("You are not in the game");

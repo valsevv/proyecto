@@ -329,7 +329,6 @@ export function attachNetworkHandlers(scene, options = {}) {
 
     Network.on('gameSaved', () => {
         alert('Partida guardada correctamente');
-        window.location.href = '/menu';
     });
 
     Network.on('gameForfeited', (msg) => {
