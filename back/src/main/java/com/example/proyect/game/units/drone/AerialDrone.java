@@ -14,6 +14,6 @@ public class AerialDrone extends Drone {
         setMaxFuel(UnitBalanceRegistry.getAerialDroneMaxFuel());
         setFuel(UnitBalanceRegistry.getAerialDroneMaxFuel());
 
-        setWeapon(new BombWeapon(UnitBalanceRegistry.getAerialDroneAmmo(), 45, 1, 0.60, 4));
+        setWeapon(new BombWeapon(UnitBalanceRegistry.getAerialDroneAmmo(), 45, 1, UnitBalanceRegistry.getAerialDroneAccuracy(), 4));
     }
 }

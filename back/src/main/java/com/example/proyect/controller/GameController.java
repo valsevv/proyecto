@@ -67,6 +67,9 @@ public class GameController {
     @Value("${game.units.aereo.ammo:1}")
     private int aerialDroneAmmo;
 
+    @Value("${game.units.aereo.accuracy:0.60}")
+    private double aerialDroneAccuracy;
+
     @Value("${game.units.naval.max-hp:100}")
     private int navalDroneMaxHp;
 
@@ -81,6 +84,9 @@ public class GameController {
 
     @Value("${game.units.naval.missiles:2}")
     private int navalDroneMissiles;
+
+    @Value("${game.units.naval.accuracy:0.75}")
+    private double navalDroneAccuracy;
 
     @Value("${game.missile.max-distance:15}")
     private int missileMaxDistance;
@@ -150,12 +156,14 @@ public class GameController {
             aerialVisionRange,
             aerialDroneMaxFuel,
             aerialDroneAmmo,
+            aerialDroneAccuracy,
             navalDroneMaxHp,
             navalDroneMovementRange,
             navalVisionRange,
             navalDroneMaxFuel,
             navalDroneWeaponAmmo,
             navalDroneMissiles,
+            navalDroneAccuracy,
             aerialCarrierHitsToDestroy,
             aerialCarrierMovementRange,
             navalCarrierHitsToDestroy,
