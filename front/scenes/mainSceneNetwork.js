@@ -5,7 +5,50 @@ import { showGameForfeitOverlay } from './mainSceneOverlays.js';
 export function attachNetworkHandlers(scene, options = {}) {
     const modeMove = options.modeMove ?? 'move';
 
+    const showGameEndedOverlay = (winnerPlayerIndex) => {
+        if (scene.gameFinished) {
+            return;
+        }
+
+        scene.gameFinished = true;
+        scene.isMyTurn = false;
+        scene.clearTargetHighlights();
+        scene.clearSelections();
+        scene.events.emit('turnChanged', { isMyTurn: false });
+
+        const isLocalWinner = winnerPlayerIndex === Network.playerIndex;
+        const winnerText = isLocalWinner ? '¡Ganaste la partida!' : 'Has sido derrotado';
+
+        const camera = scene.cameras.main;
+        const panelWidth = 620;
+        const panelHeight = 220;
+        const panelX = camera.midPoint.x;
+        const panelY = camera.midPoint.y;
+
+        scene.add.rectangle(panelX, panelY, panelWidth, panelHeight, 0x04111f, 0.92)
+            .setStrokeStyle(4, 0xffdd57, 1)
+            .setScrollFactor(0)
+            .setDepth(1000);
+
+        scene.add.text(panelX, panelY, `Finaliza partidas para ambos jugadores\n${winnerText}\nVolviendo al menu principal...`, {
+            fontSize: '30px',
+            fill: '#ffdd57',
+            align: 'center',
+            fontStyle: 'bold',
+            lineSpacing: 10
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(1001);
+
+        scene.time.delayedCall(2500, () => {
+            window.location.href = '/menu';
+        });
+        scene.updateVision();
+    };
+
     Network.on('turnStart', (msg) => {
+        if (msg.gameFinished) {
+            showGameEndedOverlay(msg.winnerPlayerIndex);
+            return;
+        }
         if (scene.gameFinished) {
             return;
         }
@@ -37,6 +80,11 @@ export function attachNetworkHandlers(scene, options = {}) {
     });
 
     Network.on('moveDrone', (msg) => {
+        if (msg.gameFinished) {
+            showGameEndedOverlay(msg.winnerPlayerIndex);
+            return;
+        }
+
         const drone = scene.drones[msg.playerIndex]?.[msg.droneIndex];
         if (!drone) {
             return;
@@ -223,36 +271,7 @@ export function attachNetworkHandlers(scene, options = {}) {
             scene.events.emit('attackModeEnded');
 
             if (msg.gameFinished) {
-                scene.gameFinished = true;
-                scene.isMyTurn = false;
-                scene.clearSelections();
-                scene.events.emit('turnChanged', { isMyTurn: false });
-                const isLocalWinner = msg.winnerPlayerIndex === Network.playerIndex;
-                const winnerText = isLocalWinner ? '¡Ganaste la partida!' : 'Has sido derrotado';
-
-                const camera = scene.cameras.main;
-                const panelWidth = 620;
-                const panelHeight = 220;
-                const panelX = camera.midPoint.x;
-                const panelY = camera.midPoint.y;
-
-                scene.add.rectangle(panelX, panelY, panelWidth, panelHeight, 0x04111f, 0.92)
-                    .setStrokeStyle(4, 0xffdd57, 1)
-                    .setScrollFactor(0)
-                    .setDepth(1000);
-
-                scene.add.text(panelX, panelY, `Finaliza partidas para ambos jugadores\n${winnerText}\nVolviendo al menú principal...`, {
-                    fontSize: '30px',
-                    fill: '#ffdd57',
-                    align: 'center',
-                    fontStyle: 'bold',
-                    lineSpacing: 10
-                }).setOrigin(0.5).setScrollFactor(0).setDepth(1001);
-
-                scene.time.delayedCall(2500, () => {
-                    window.location.href = '/menu';
-                });
-                scene.updateVision();
+                showGameEndedOverlay(msg.winnerPlayerIndex);
                 return;
             }
 
