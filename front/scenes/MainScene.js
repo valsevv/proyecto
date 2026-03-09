@@ -913,7 +913,7 @@ export default class MainScene extends Phaser.Scene {
         this.clearSelections();
         this.events.emit('turnChanged', { isMyTurn: false });
 
-        const winnerText = isLocalWinner ? '¡Ganaste la partida!' : 'Perdiste la partida';
+        const winnerText = isLocalWinner ? '¡Ganaste la partida!' : 'Has sido derrotado';
         const message = `${winnerText}
 Volvé al lobby para iniciar otra partida`;
 
@@ -941,7 +941,9 @@ Volvé al lobby para iniciar otra partida`;
         const dy = worldY - carrier.sprite.y;
         const distancePx = Math.sqrt(dx * dx + dy * dy);
         const ringRadius = carrier.targetRing?.radius ?? 52;
-        return distancePx <= ringRadius ? carrier : null;
+        const spriteRadius = Math.min(carrier.sprite.displayWidth, carrier.sprite.displayHeight) * 0.42;
+        const effectiveHitRadius = Math.max(ringRadius, spriteRadius, 68);
+        return distancePx <= effectiveHitRadius ? carrier : null;
     }
 
     startCarrierPulse(carrier) {
@@ -1029,10 +1031,18 @@ Volvé al lobby para iniciar otra partida`;
     }
 
     /** Called when any drone is clicked */
-    onDroneClicked(drone) {
+    onDroneClicked(drone, pointer = null) {
         if (this.actionMode === MODE_ATTACK) {
             // Allow direct enemy click in attack mode as a valid manual shot direction.
             if (!drone.isLocal && drone.isAlive() && this.selectedDrone && this.isMyTurn) {
+                const carrierByAura = pointer
+                    ? this.findEnemyCarrierAtPoint(pointer.worldX, pointer.worldY)
+                    : null;
+                if (carrierByAura && carrierByAura.playerIndex === drone.playerIndex) {
+                    this.onCarrierClicked(carrierByAura);
+                    return;
+                }
+
                 if (this.selectedDrone.droneType === 'Naval') {
                     this.setManualAttackLine({ x: drone.sprite.x, y: drone.sprite.y });
                     this.executeAttack(drone);

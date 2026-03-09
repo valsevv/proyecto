@@ -126,6 +126,15 @@ public class LobbyController {
                     return map;
                 })
                 .collect(java.util.stream.Collectors.toList());
+
+            // If there is at least one visible resume invitation, show only those entries.
+            boolean hasLoadGameInvites = lobbyDtos.stream()
+                .anyMatch(dto -> Boolean.TRUE.equals(dto.get("isLoadGame")));
+            if (hasLoadGameInvites) {
+                lobbyDtos = lobbyDtos.stream()
+                    .filter(dto -> Boolean.TRUE.equals(dto.get("isLoadGame")))
+                    .collect(java.util.stream.Collectors.toList());
+            }
         
         return ResponseEntity.ok(lobbyDtos);
     }

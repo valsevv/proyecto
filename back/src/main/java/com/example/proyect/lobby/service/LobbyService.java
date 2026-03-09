@@ -180,8 +180,8 @@ public class LobbyService {
             throw new IllegalArgumentException("User is not part of this game");
         }
 
-        if (game.getState() == null || game.getState().getStatus() != GameStatus.SAVED) {
-            throw new IllegalArgumentException("Game is not in SAVED state");
+        if (game.getState() == null || game.getState().getStatus() != GameStatus.IN_PROGRESS) {
+            throw new IllegalArgumentException("Game is not in IN_PROGRESS state");
         }
 
         // Remove user from any existing lobby first

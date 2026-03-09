@@ -78,7 +78,7 @@ public class GameService {
     public List<Game> getPausedGamesOfUser(Long userId) { //Devuelve partidas del usuario cuyo estado guardado es Saved
         Objects.requireNonNull(userId, "user no puede ser null");
 
-        return gameRepository.findByUserIdAndStateStatus(userId, GameStatus.SAVED.name());
+        return gameRepository.findByUserIdAndStateStatus(userId, GameStatus.IN_PROGRESS.name());
     }
 
     public boolean canUserAccessGame(Long userId, Game game) { //verifica si el usuario participa en la partida

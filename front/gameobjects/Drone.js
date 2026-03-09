@@ -137,7 +137,7 @@ export default class Drone {
             // Only trigger if it wasn't a camera drag
             if (scene.isDragging) return;
             pointer.event.stopPropagation();
-            scene.onDroneClicked(this);
+            scene.onDroneClicked(this, pointer);
         });
 
         this.syncUIPositions();

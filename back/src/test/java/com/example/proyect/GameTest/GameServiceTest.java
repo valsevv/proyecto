@@ -1,21 +1,20 @@
 package com.example.proyect.GameTest;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -128,13 +127,13 @@ class GameServiceTest {
         Game game2 = new Game();
         game2.setId(2L);
 
-        when(gameRepository.findByUserIdAndStateStatus(1L, GameStatus.SAVED.name()))
+        when(gameRepository.findByUserIdAndStateStatus(1L, GameStatus.IN_PROGRESS.name()))
                 .thenReturn(List.of(game1, game2));
 
         List<Game> pausedGames = gameService.getPausedGamesOfUser(1L);
 
         assertThat(pausedGames).hasSize(2);
-        verify(gameRepository).findByUserIdAndStateStatus(1L, GameStatus.SAVED.name());
+        verify(gameRepository).findByUserIdAndStateStatus(1L, GameStatus.IN_PROGRESS.name());
     }
 
     @Test

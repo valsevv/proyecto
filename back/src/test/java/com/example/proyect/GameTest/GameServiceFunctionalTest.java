@@ -1,13 +1,12 @@
 package com.example.proyect.GameTest;
 
-import static org.junit.jupiter.api. Assertions.assertEquals;
+import java. util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-
-import java.util.List;
-
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -66,7 +65,7 @@ public class GameServiceFunctionalTest {
 
         Game game = new Game();
         GameState state = new GameState();
-        state.setStatus(GameStatus.SAVED);
+        state.setStatus(GameStatus.IN_PROGRESS);
         state.setTurn(5);
         game.setState(state);
 
@@ -89,7 +88,7 @@ public class GameServiceFunctionalTest {
         // Create saved game
         Game savedGame = new Game();
         GameState savedState = new GameState();
-        savedState.setStatus(GameStatus.SAVED);
+        savedState.setStatus(GameStatus.IN_PROGRESS);
         savedGame.setState(savedState);
         gameService.saveGame(user1.getUserId(), user2.getUserId(), savedGame);
 
@@ -104,7 +103,7 @@ public class GameServiceFunctionalTest {
 
         // Should only return the saved game, not the active one
         assertEquals(1, pausedGames.size());
-        assertEquals(GameStatus.SAVED, pausedGames.get(0).getState().getStatus());
+        assertEquals(GameStatus.IN_PROGRESS, pausedGames.get(0).getState().getStatus());
     }
 
     @Test

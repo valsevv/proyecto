@@ -228,7 +228,7 @@ export function attachNetworkHandlers(scene, options = {}) {
                 scene.clearSelections();
                 scene.events.emit('turnChanged', { isMyTurn: false });
                 const isLocalWinner = msg.winnerPlayerIndex === Network.playerIndex;
-                const winnerText = isLocalWinner ? '¡Ganaste la partida!' : 'Perdiste la partida';
+                const winnerText = isLocalWinner ? '¡Ganaste la partida!' : 'Has sido derrotado';
 
                 const camera = scene.cameras.main;
                 const panelWidth = 620;

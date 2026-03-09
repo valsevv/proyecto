@@ -334,9 +334,9 @@ public class GameController {
 
         log.info("[GameController] -> begin loadSavedGameIntoRoom ");
         Game game = gameService.getById(gameId);
-
-        if (game.getState() == null || game.getState().getStatus() != GameStatus.SAVED) {
-            throw new IllegalStateException("Game is not in SAVED state");
+       
+        if (game.getState() == null || game.getState().getStatus() != GameStatus.IN_PROGRESS) {
+            throw new IllegalStateException("Game is not in IN_PROGRESS state");
         }
 
         Map<String, Object> meta = game.getState().getMeta();
@@ -699,7 +699,7 @@ public class GameController {
 
         GameState persistedState = new GameState();
 
-        persistedState.setStatus(GameStatus.SAVED);
+        persistedState.setStatus(GameStatus.IN_PROGRESS);
         persistedState.setTurn(room.getCurrentTurn());
         
         //La meta dato en que va a ir guardada en jsonb
