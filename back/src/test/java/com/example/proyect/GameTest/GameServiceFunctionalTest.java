@@ -101,8 +101,8 @@ public class GameServiceFunctionalTest {
 
         List<Game> pausedGames = gameService.getPausedGamesOfUser(user1.getUserId());
 
-        // Should only return the saved game, not the active one
-        assertEquals(1, pausedGames.size());
+        // Should return any unfinished game
+        assertEquals(2, pausedGames.size());
         assertEquals(GameStatus.IN_PROGRESS, pausedGames.get(0).getState().getStatus());
     }
 

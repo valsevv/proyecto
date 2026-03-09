@@ -1,5 +1,6 @@
 const DEFAULT_GAME_CONFIG = {
     actionsPerTurn: 15,
+    turnDurationSeconds: 40,
     navalVisionRange: 3,
     aerialVisionRange: 6,
     aerialDroneMovementRange: 6,

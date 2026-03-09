@@ -18,6 +18,8 @@ export default class HudScene extends Phaser.Scene {
         this.gameStarted = false;
         this.actionsRemaining = 0;
         this.actionsPerTurn = runtimeConfig.actionsPerTurn;
+        this.turnDurationSeconds = Math.max(1, runtimeConfig.turnDurationSeconds ?? 40);
+        this.turnSecondsRemaining = this.turnDurationSeconds;
         this.selectionData = null;
         this.forfeitPending = false;
         this.forfeitRedirectFallback = null;
@@ -101,6 +103,7 @@ export default class HudScene extends Phaser.Scene {
         mainScene.events.on('gameStarted', this.onGameStarted, this);
         mainScene.events.on('turnChanged', this.onTurnChanged, this);
         mainScene.events.on('actionsUpdated', this.onActionsUpdated, this);
+        mainScene.events.on('turnTimerUpdated', this.onTurnTimerUpdated, this);
         mainScene.events.on('attackModeEnded', this.deselectAttackButton, this);
         mainScene.events.on('selectionChanged', this.onSelectionChanged, this);
         mainScene.events.on('deployPanelOpen', this.onDeployPanelOpen, this);
@@ -136,6 +139,7 @@ export default class HudScene extends Phaser.Scene {
             if (this._onAttackAnimStart) mainScene.events.off('attackAnimStart', this._onAttackAnimStart, this);
             if (this._onAttackAnimImpact) mainScene.events.off('attackAnimImpact', this._onAttackAnimImpact, this);
             if (this._onAttackAnimEnd) mainScene.events.off('attackAnimEnd', this._onAttackAnimEnd, this);
+            mainScene.events.off('turnTimerUpdated', this.onTurnTimerUpdated, this);
             mainScene.events.off('combatMessage', this.onCombatMessage, this);
             if (this._onGameForfeited) networkManager.off('gameForfeited', this._onGameForfeited);
             if (this._onNetworkError) networkManager.off('error', this._onNetworkError);
@@ -943,16 +947,16 @@ export default class HudScene extends Phaser.Scene {
         this.isMyTurn = isMyTurn;
 
         if (isMyTurn) {
-            this.turnText.setText(`Tu turno (${this.actionsRemaining}/${this.actionsPerTurn} acciones)`);
             this.turnText.setStyle({ fill: '#00ff00' });
             this.setButtonsVisible(true);
             this.updateButtonStates(); // Force refresh of colors when turn starts
         } else {
-            this.turnText.setText('Turno del oponente');
             this.turnText.setStyle({ fill: '#fc0f0f' });
             this.droneInfoText.setText('');
             this.setButtonsVisible(false);
         }
+
+        this.updateTurnText();
     }
 
 
@@ -962,9 +966,30 @@ export default class HudScene extends Phaser.Scene {
             this.actionsPerTurn = actionsPerTurn;
         }
 
-        if (this.isMyTurn) {
-            this.turnText.setText(`Tu turno (${this.actionsRemaining}/${this.actionsPerTurn} acciones)`);
+        this.updateTurnText();
+    }
+
+    onTurnTimerUpdated({ secondsRemaining, durationSeconds }) {
+        if (typeof durationSeconds === 'number' && durationSeconds > 0) {
+            this.turnDurationSeconds = durationSeconds;
         }
+        if (typeof secondsRemaining === 'number') {
+            this.turnSecondsRemaining = Math.max(0, Math.floor(secondsRemaining));
+        }
+        this.updateTurnText();
+    }
+
+    updateTurnText() {
+        if (!this.turnText) return;
+
+        if (this.isMyTurn) {
+            this.turnText.setText(
+                `Tu turno (${this.actionsRemaining}/${this.actionsPerTurn} acciones) | ${this.turnSecondsRemaining}s`
+            );
+            return;
+        }
+
+        this.turnText.setText('Turno del oponente');
     }
 
     setButtonsVisible(visible) {

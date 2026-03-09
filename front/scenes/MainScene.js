@@ -81,6 +81,11 @@ export default class MainScene extends Phaser.Scene {
         this.defaultNavalDroneMovementRange = runtimeConfig.navalDroneMovementRange;
         this.defaultAerialCarrierMovementRange = runtimeConfig.aerialCarrierMovementRange;
         this.defaultNavalCarrierMovementRange = runtimeConfig.navalCarrierMovementRange;
+
+        // Turn timer (seconds). HUD listens to `turnTimerUpdated` events.
+        this.turnDurationSeconds = Math.max(1, runtimeConfig.turnDurationSeconds ?? 40);
+        this.turnSecondsRemaining = this.turnDurationSeconds;
+        this.turnTimerEvent = null;
     }
 
 
@@ -388,6 +393,7 @@ export default class MainScene extends Phaser.Scene {
             this.events.emit('turnChanged', {
                 isMyTurn: this.isMyTurn
             });
+            this.resetTurnCountdown(this.isMyTurn);
         } else {
             console.error('[MainScene] === NO INITIAL GAME STATE PROVIDED! ===');
             console.error('[MainScene] This is a bug - game should not start without state');
@@ -398,6 +404,50 @@ export default class MainScene extends Phaser.Scene {
 
     setupNetwork() {
         attachNetworkHandlers(this, { modeMove: MODE_MOVE });
+    }
+
+    emitTurnTimerUpdated() {
+        this.events.emit('turnTimerUpdated', {
+            secondsRemaining: this.turnSecondsRemaining,
+            durationSeconds: this.turnDurationSeconds,
+            isMyTurn: this.isMyTurn
+        });
+    }
+
+    stopTurnCountdown() {
+        if (this.turnTimerEvent) {
+            this.turnTimerEvent.remove(false);
+            this.turnTimerEvent = null;
+        }
+    }
+
+    resetTurnCountdown(activate = false) {
+        this.stopTurnCountdown();
+        this.turnSecondsRemaining = this.turnDurationSeconds;
+        this.emitTurnTimerUpdated();
+
+        if (!activate || !this.isMyTurn || this.gameFinished) {
+            return;
+        }
+
+        this.turnTimerEvent = this.time.addEvent({
+            delay: 1000,
+            loop: true,
+            callback: () => {
+                if (!this.isMyTurn || this.gameFinished) {
+                    this.stopTurnCountdown();
+                    return;
+                }
+
+                this.turnSecondsRemaining = Math.max(0, this.turnSecondsRemaining - 1);
+                this.emitTurnTimerUpdated();
+
+                if (this.turnSecondsRemaining <= 0) {
+                    this.stopTurnCountdown();
+                    this.endTurn();
+                }
+            }
+        });
     }
 
     showCombatMessage(message) {
@@ -909,6 +959,9 @@ export default class MainScene extends Phaser.Scene {
 
         this.gameFinished = true;
         this.isMyTurn = false;
+        this.stopTurnCountdown();
+        this.turnSecondsRemaining = this.turnDurationSeconds;
+        this.emitTurnTimerUpdated();
         this.clearTargetHighlights();
         this.clearSelections();
         this.events.emit('turnChanged', { isMyTurn: false });
@@ -1654,6 +1707,9 @@ Volvé al lobby para iniciar otra partida`;
         if (!this.isMyTurn) return;
 
         this.isMyTurn = false;
+        this.stopTurnCountdown();
+        this.turnSecondsRemaining = this.turnDurationSeconds;
+        this.emitTurnTimerUpdated();
         this.actionMode = MODE_MOVE;
         this.clearTargetHighlights();
         this.clearSelections();

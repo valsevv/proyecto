@@ -4,10 +4,13 @@ export default class SideImpactView {
         this.width = width;
         this.height = height;
         this.groundY = 30 ; 
+        // Background image already includes ambience; keep sea overlay disabled unless explicitly enabled.
+        this.seaOverlayEnabled = false;
    
 
         this.container = scene.add.container(x, y);
-        this.container.setDepth(2000);
+        // Keep this overlay above any in-scene overlays/popups.
+        this.container.setDepth(20000);
         this.container.setScrollFactor(0);
         this.container.setVisible(false);
 
@@ -36,6 +39,14 @@ export default class SideImpactView {
     }
 
     _ensureSea() {
+        if (!this.seaOverlayEnabled) {
+            if (this.sea) {
+                this.sea.destroy();
+                this.sea = null;
+            }
+            return;
+        }
+
         const w = this.width;
         const h = this.height;
         const seaH = 70; // Reduced height to fit within bounds
@@ -113,6 +124,10 @@ export default class SideImpactView {
 
         this._attackKind = kind;
         this._clearContent();
+
+        // Ensure HUD scene is top-most so this overlay stays above MainScene popups.
+        this.scene?.scene?.bringToTop?.('HudScene');
+        this.container.setDepth(20000);
         this.container.setVisible(true);
 
         const w = this.width;

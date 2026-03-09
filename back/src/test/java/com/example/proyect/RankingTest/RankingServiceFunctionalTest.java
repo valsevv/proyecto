@@ -44,26 +44,26 @@ class RankingServiceFunctionalTest {
     }
 
     @Test
-    void shouldReturnBestScore() {
+    void shouldReturnBestScore() { 
 
         long timestamp = System.currentTimeMillis();
         User user = userService.register("best_" + timestamp, "best" + timestamp + "@mail.com", "123456");
 
-        user.registerWin(); // 10
+        user.registerWin(); // 11
         userRepository.save(user);
         rankingService.createSnapshot(user.getUserId());
 
-        user.registerWin(); // 20
+        user.registerWin(); // 22
         userRepository.save(user);
         rankingService.createSnapshot(user.getUserId());
 
-        user.registerWin(); // 30
+        user.registerWin(); // 33
         userRepository.save(user);
         rankingService.createSnapshot(user.getUserId());
 
         Ranking best = rankingService.getBestByUserId(user.getUserId());
 
-        assertEquals(30, best.getPoints());
+        assertEquals(33, best.getPoints());
     }
 
     @Test

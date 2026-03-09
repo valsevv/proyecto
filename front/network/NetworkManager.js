@@ -148,6 +148,11 @@ class NetworkManager {
         if (msg.type === 'welcome') {
             this.playerId = msg.playerId;
             this.playerIndex = msg.playerIndex;
+            try {
+                sessionStorage.setItem('playerIndex', String(msg.playerIndex));
+            } catch (_e) {
+                // Ignore storage errors (private mode / browser restrictions).
+            }
             console.log('[net] Updated playerId:', this.playerId);
             console.log('[net] Updated playerIndex:', this.playerIndex);
         }

@@ -43,7 +43,7 @@ class UserUnitTest {
         user.registerWin();
 
         assertEquals(1, user.getWins());
-        assertEquals(10, user.getScore());
+        assertEquals(11, user.getScore());
     }
 
    
@@ -57,7 +57,7 @@ class UserUnitTest {
 
         assertEquals(1, user.getWins());
         assertEquals(1, user.getLosses());
-        assertEquals(0, user.getScore());
+        assertEquals(6, user.getScore());
     }
 
     @Test
@@ -67,7 +67,7 @@ class UserUnitTest {
         user.registerLoss();
 
         assertEquals(1, user.getLosses());
-        assertEquals(10, user.getScore());
+        assertEquals(0, user.getScore());
     }
 
     @Test

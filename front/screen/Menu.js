@@ -74,3 +74,7 @@ document.getElementById('rankingBtn').addEventListener('click', async () => {
 
 });
 
+document.getElementById('creditsBtn').addEventListener('click', async () => {
+    window.location.href = '/credits';
+});
+

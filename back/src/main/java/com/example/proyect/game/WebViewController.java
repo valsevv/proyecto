@@ -76,6 +76,12 @@ public class WebViewController {
     public ResponseEntity<String> ranking() {
         return serveHtmlFile("Ranking.html");
     }
+
+    @GetMapping("/credits")
+    public ResponseEntity<String> credits() {
+        return serveHtmlFile("Credits.html");
+    }
+
     /**
      * Lobby waiting page - PROTECTED
      */

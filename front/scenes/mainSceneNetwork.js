@@ -12,6 +12,8 @@ export function attachNetworkHandlers(scene, options = {}) {
 
         scene.gameFinished = true;
         scene.isMyTurn = false;
+        scene.stopTurnCountdown?.();
+        scene.emitTurnTimerUpdated?.();
         scene.clearTargetHighlights();
         scene.clearSelections();
         scene.events.emit('turnChanged', { isMyTurn: false });
@@ -74,6 +76,8 @@ export function attachNetworkHandlers(scene, options = {}) {
         scene.events.emit('turnChanged', {
             isMyTurn: scene.isMyTurn
         });
+
+        scene.resetTurnCountdown?.(scene.isMyTurn);
 
         scene.updateVision();
         scene.checkDrawByNoDrones();
@@ -334,6 +338,8 @@ export function attachNetworkHandlers(scene, options = {}) {
         }
         scene.gameFinished = true;
         scene.isMyTurn = false;
+        scene.stopTurnCountdown?.();
+        scene.emitTurnTimerUpdated?.();
         scene.clearTargetHighlights();
         scene.clearSelections();
         scene.events.emit('turnChanged', { isMyTurn: false });

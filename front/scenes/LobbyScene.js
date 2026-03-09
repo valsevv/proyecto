@@ -6,6 +6,7 @@ export default class LobbyScene extends Phaser.Scene {
         this.sideSelected = false;
         this.waitingForOpponent = false;
         this.transitioning = false; // Track if we're already transitioning
+        this.errorRedirectScheduled = false;
     }
 
     preload() {
@@ -51,12 +52,12 @@ export default class LobbyScene extends Phaser.Scene {
 
         // FIX: Assets swapped. Bomb drone belongs to Aereo; Missile drone belongs to Naval.
 
-        // Naval side (left)
-        this.createSideButton(leftX, centerY, 'Naval', 'dron_misil_0', 
+        // Naval side (right)
+        this.createSideButton(rightX, centerY, 'Naval', 'dron_misil_0', 
             'Dron Misil\n\nDaño medio\nLargo alcance\nMovimiento rápido');
 
-        // Aereo side (right)
-        this.createSideButton(rightX, centerY, 'Aereo', 'dron_bomba_0',
+        // Aereo side (left)
+        this.createSideButton(leftX, centerY, 'Aereo', 'dron_bomba_0',
             'Dron Bomba\n\nAlto daño\nCorto alcance\nMovimiento lento');
 
         // Status text (hidden by default, only shown for player 1)
@@ -100,8 +101,8 @@ export default class LobbyScene extends Phaser.Scene {
         const lobbyId = sessionStorage.getItem("currentLobbyId");
 
         if (!lobbyId) {
-            console.error("No lobby ID found, redirecting to lobby browser");
-            window.location.href = '/lobby-browser';
+            console.error("No lobby ID found, redirecting to menu");
+            this.redirectToMenuOnError('Error de lobby. Volviendo al menu...', 600);
             return;
         }
 
@@ -114,7 +115,7 @@ export default class LobbyScene extends Phaser.Scene {
             // Don't set status text here - wait for welcome message
         }).catch(err => {
             console.error('[LobbyScene] === CONNECTION FAILED ===', err);
-            this.statusText.setText('Error de conexión');
+            this.redirectToMenuOnError('Error de conexion. Volviendo al menu...');
         });
     }
 
@@ -315,11 +316,8 @@ export default class LobbyScene extends Phaser.Scene {
 
         Network.on('error', (msg) => {
             console.error('[LobbyScene] Server error:', msg.message);
-            this.statusText.setText('Error: ' + msg.message);
-            const message = (msg?.message || '').toLowerCase();
-            if (message.includes('expirado') || message.includes('no existe')) {
-                this.redirectLobbyExpired();
-            }
+            const serverMessage = msg?.message ? `Error: ${msg.message}` : 'Error en lobby';
+            this.redirectToMenuOnError(`${serverMessage}. Volviendo al menu...`);
         });
     }
 
@@ -340,11 +338,19 @@ export default class LobbyScene extends Phaser.Scene {
     }
 
     redirectLobbyExpired() {
+        this.redirectToMenuOnError('El lobby expiro. Volviendo al menu...');
+    }
+
+    redirectToMenuOnError(message = 'Error en lobby. Volviendo al menu...', delayMs = 1200) {
+        if (this.errorRedirectScheduled) return;
+        this.errorRedirectScheduled = true;
         this.clearLobbyTtlTimer();
-        this.statusText.setVisible(true);
-        this.statusText.setText('El lobby expiró. Redirigiendo...');
-        this.time.delayedCall(1200, () => {
-            window.location.href = '/lobby-browser';
+        if (this.statusText && this.statusText.active && this.statusText.scene) {
+            this.statusText.setVisible(true);
+            this.statusText.setText(message);
+        }
+        this.time.delayedCall(delayMs, () => {
+            window.location.href = '/menu';
         });
     }
 }

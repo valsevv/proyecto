@@ -115,6 +115,6 @@ public class User {
     }
 
     private void recalculateScore() {
-        this.score = this.wins * 11 - this.losses * 5;
+        this.score = Math.max(0, this.wins * 11 - this.losses * 5);
     }
 }

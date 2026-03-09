@@ -1,27 +1,67 @@
 import Network from '../network/NetworkManager.js';
 
+function isAerialSide(side) {
+    const normalized = String(side ?? '').trim().toLowerCase();
+    return normalized === 'aereo' || normalized === 'aerial';
+}
+
+function resolveLocalPlayerIndex(scene) {
+    if (Number.isInteger(Network.playerIndex) && Network.playerIndex >= 0) {
+        return Network.playerIndex;
+    }
+
+    for (const pi in (scene.carriers || {})) {
+        const carrier = scene.carriers[pi];
+        if (carrier?.isLocal) {
+            return Number(pi);
+        }
+    }
+
+    for (const pi in (scene.drones || {})) {
+        const drones = scene.drones[pi] || [];
+        if (drones.some((d) => d?.isLocal)) {
+            return Number(pi);
+        }
+    }
+
+    return null;
+}
+
+function resolveLocalSide(scene, localIndex) {
+    const direct = scene.localSide;
+    if (direct) return direct;
+    const byPlayer = scene.playerSides?.[localIndex];
+    if (byPlayer) return byPlayer;
+    return 'Aereo';
+}
+
 export function getVisionRangeForSide(scene, side) {
-    return side === 'Aereo' ? scene.aereoVisionRange : scene.navalVisionRange;
+    return isAerialSide(side) ? scene.aereoVisionRange : scene.navalVisionRange;
 }
 
 export function getCarrierVisionRangeForSide(scene, side) {
-    return side === 'Aereo' ? scene.aereoCarrierVisionRange : scene.navalCarrierVisionRange;
+    return isAerialSide(side) ? scene.aereoCarrierVisionRange : scene.navalCarrierVisionRange;
 }
 
 function getLocalVisionSources(scene) {
     const sources = [];
-    const localSide = scene.localSide;
+    const localIndex = resolveLocalPlayerIndex(scene);
+    if (!Number.isInteger(localIndex)) {
+        return sources;
+    }
+
+    const localSide = resolveLocalSide(scene, localIndex);
     const droneVisionRange = getVisionRangeForSide(scene, localSide);
     const carrierVisionRange = getCarrierVisionRangeForSide(scene, localSide);
 
-    const myDrones = scene.drones[Network.playerIndex] || [];
+    const myDrones = scene.drones[localIndex] || [];
     for (const d of myDrones) {
         if (d?.isAlive() && d.sprite && d.deployed && droneVisionRange > 0) {
             sources.push({ sprite: d.sprite, visionRange: droneVisionRange });
         }
     }
 
-    const myCarrier = scene.carriers?.[Network.playerIndex];
+    const myCarrier = scene.carriers?.[localIndex];
     if (myCarrier?.sprite && !myCarrier.destroyed && carrierVisionRange > 0) {
         sources.push({ sprite: myCarrier.sprite, visionRange: carrierVisionRange });
     }
@@ -95,8 +135,8 @@ export function updateFogOfWar(scene) {
 
 export function updateVision(scene) {
     if (!scene.hexGrid) return;
-    const localIndex = Network.playerIndex;
-    if (typeof localIndex !== 'number') return;
+    const localIndex = resolveLocalPlayerIndex(scene);
+    if (!Number.isInteger(localIndex)) return;
 
     for (const pi in scene.drones) {
         const playerIndex = parseInt(pi);

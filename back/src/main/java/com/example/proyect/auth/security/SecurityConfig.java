@@ -69,6 +69,7 @@ public class SecurityConfig {
                 // Protected page routes - require authentication
                 .requestMatchers(
                     "/menu",
+                    "/credits",
                     "/lobby-browser", 
                     "/lobby-waiting",
                     "/game"

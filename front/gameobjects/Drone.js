@@ -128,11 +128,9 @@ export default class Drone {
         // Track UI state separate from Phaser visibility (needed for vision/fog).
         this.isTargetable = false;
 
-        // Make drone clickable
-        // Use a normal hit area instead of pixel-perfect clicks.
-        // Pixel-perfect became unreliable for some drone sprites (especially aerial),
-        // making attacks feel "bugged" because clicks were frequently ignored.
-        this.sprite.setInteractive({ useHandCursor: true });
+        // Make drone clickable using the visible sprite pixels.
+        // This keeps the hitbox aligned with the asset dimensions and transparency.
+        this.sprite.setInteractive({ useHandCursor: true, pixelPerfect: true, alphaTolerance: 1 });
         this.sprite.on('pointerup', (pointer) => {
             // Only trigger if it wasn't a camera drag
             if (scene.isDragging) return;

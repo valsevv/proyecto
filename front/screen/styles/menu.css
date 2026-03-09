@@ -24,7 +24,7 @@ body::before {
     width: 200%;
     height: 200%;
     background: url("/assets/mar.png") repeat;
-    background-size: 600px auto;
+    background-size: auto auto;
 
     animation: oceanMove 40s linear infinite;
     z-index: -2;
