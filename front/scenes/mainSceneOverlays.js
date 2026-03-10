@@ -54,6 +54,59 @@ export function showPlayerLeftOverlay(scene) {
     });
 }
 
+export function showMatchResultOverlay(scene, { result, isDraw } = {}) {
+    if (scene.matchResultOverlay) {
+        scene.matchResultOverlay.setVisible(true);
+        return;
+    }
+
+    const w = scene.scale?.width ?? 800;
+    const h = scene.scale?.height ?? 600;
+    const cx = w / 2;
+    const cy = h / 2;
+
+    const overlay = scene.add.container(0, 0).setDepth(10000).setScrollFactor(0);
+
+    const screenBlocker = scene.add.graphics();
+    screenBlocker.fillStyle(0x000000, 0.72);
+    screenBlocker.fillRect(0, 0, w, h);
+    overlay.add(screenBlocker);
+
+    const bannerW = 680;
+    const bannerH = 160;
+    const bannerX = cx - bannerW / 2;
+    const bannerY = cy - bannerH / 2;
+
+    const isWin = result === 'win';
+    const isResultDraw = Boolean(isDraw || result === 'draw');
+    const accent = isResultDraw ? 0xffc107 : (isWin ? 0x35d07f : 0xe35d5d);
+    const bannerLabel = isResultDraw ? 'EMPATE' : (isWin ? 'VICTORIA' : 'DERROTA');
+
+    const bannerBg = scene.add.graphics();
+    bannerBg.fillStyle(0x10141a, 0.96);
+    bannerBg.fillRoundedRect(bannerX, bannerY, bannerW, bannerH, 16);
+    bannerBg.lineStyle(3, accent, 1);
+    bannerBg.strokeRoundedRect(bannerX, bannerY, bannerW, bannerH, 16);
+    overlay.add(bannerBg);
+
+    const bannerText = scene.add.text(cx, cy - 16, bannerLabel, {
+        fontSize: '42px',
+        fill: '#fff8e1',
+        fontFamily: '"Orbitron", "Share Tech Mono", monospace',
+        fontStyle: 'bold'
+    }).setOrigin(0.5);
+    overlay.add(bannerText);
+
+    const subText = scene.add.text(cx, cy + 32, 'Volviendo al menu principal...', {
+        fontSize: '16px',
+        fill: '#c5cbd1',
+        fontFamily: '"Share Tech Mono", monospace'
+    }).setOrigin(0.5);
+    overlay.add(subText);
+
+    scene.matchResultOverlay = overlay;
+}
+
 export function showGameForfeitOverlay(scene, isLocalForfeiter) {
     if (scene.gameForfeitOverlay) {
         scene.gameForfeitOverlay.setVisible(true);
@@ -113,7 +166,7 @@ export function showGameForfeitOverlay(scene, isLocalForfeiter) {
 
     scene.gameForfeitOverlay = overlay;
 
-    scene.time.delayedCall(2600, () => {
+    scene.time.delayedCall(3000, () => {
         window.location.href = '/menu';
     });
 }

@@ -34,6 +34,7 @@ export default class SideImpactView {
         this._attackKind = null;
         this._pendingHideTimer = null;
         this._projectileTween = null;
+        this._missileLaunchSfx = null;
 
         // Ya no se dibuja el fondo con gráficos, se usa la imagen
     }
@@ -103,6 +104,11 @@ export default class SideImpactView {
             this._projectileTween.stop();
             this._projectileTween = null;
         }
+        if (this._missileLaunchSfx) {
+            this._missileLaunchSfx.stop();
+            this._missileLaunchSfx.destroy();
+            this._missileLaunchSfx = null;
+        }
 
         this.content.removeAll(true);
         this._attackerImg = null;
@@ -135,18 +141,22 @@ export default class SideImpactView {
         const leftX = -w / 4 + 10;
         const rightX = w / 4 - 10;
         const groundY = this.groundY;
+        const attackerKey = payload?.attackerKey || (kind === 'bomb' ? 'dron_bomba_0' : 'dron_misil_0');
+        const isBombAttacker = /^dron_bomba/i.test(String(attackerKey)) || kind === 'bomb';
 
         // Heights: top is "high altitude" for bomb, mid for missile.
-        const attackerY = kind === 'bomb' ? -h / 2 + 48 : -h / 2 + 70;
+        const attackerY = isBombAttacker ? -h / 2 + 48 : -h / 2 + 70;
         const targetYOffset = kind === 'bomb' ? 15 : 10;
         const targetY = groundY - targetYOffset;
 
-        const attackerKey = payload?.attackerKey || (kind === 'bomb' ? 'dron_bomba_0' : 'dron_misil_0');
+        // Bombers should appear directly above the target before dropping.
+        const attackerX = isBombAttacker ? rightX : leftX;
+        const bomberDropY = targetY - 58;
         const targetKey = payload?.targetKey || 'dron_bomba_0';
         const isCarrierTarget = /^porta_drones_/i.test(String(targetKey));
         const targetSize = isCarrierTarget ? 96 : 48;
 
-        this._attackerImg = this.scene.add.image(leftX, attackerY, attackerKey);
+        this._attackerImg = this.scene.add.image(attackerX, isBombAttacker ? bomberDropY : attackerY, attackerKey);
         this._attackerImg.setDisplaySize(48, 48);
         this.content.add(this._attackerImg);
 
@@ -158,7 +168,7 @@ export default class SideImpactView {
         this.content.add(this._trailGfx);
 
         const projectileKey = kind === 'bomb' ? 'bomba' : (payload?.projectileKey || 'misil_2');
-        this._projectileImg = this.scene.add.image(leftX, attackerY, projectileKey);
+        this._projectileImg = this.scene.add.image(attackerX, isBombAttacker ? bomberDropY + 8 : attackerY, projectileKey);
         this._projectileImg.setDisplaySize(kind === 'bomb' ? 28 : 30, kind === 'bomb' ? 28 : 18);
         this.content.add(this._projectileImg);
 
@@ -166,7 +176,7 @@ export default class SideImpactView {
         const travelMs = payload?.travelMs ?? (kind === 'bomb' ? 1350 : 1500);
 
         // Draw intended trajectory once.
-        this._drawTrajectory(leftX, attackerY, rightX, targetY, groundY);
+        this._drawTrajectory(attackerX, isBombAttacker ? bomberDropY + 8 : attackerY, rightX, targetY, groundY);
 
         this._projectileTween = this.scene.tweens.addCounter({
             from: 0,
@@ -176,16 +186,13 @@ export default class SideImpactView {
             ease: 'Linear',
             onUpdate: (tween) => {
                 const t = tween.getValue();
-                const x = Phaser.Math.Linear(leftX, rightX, t);
+                const x = isBombAttacker ? rightX : Phaser.Math.Linear(leftX, rightX, t);
 
                 let y;
-                if (kind === 'missile') {
+                if (!isBombAttacker) {
                     y = Phaser.Math.Linear(attackerY, targetY, t);
                 } else {
-                    // Free-fall style: height decays quadratically.
-                    const startHeight = groundY - attackerY;
-                    const heightNow = startHeight * (1 - t) * (1 - t);
-                    y = groundY - heightNow;
+                    y = Phaser.Math.Linear(bomberDropY + 8, targetY, t);
                 }
 
                 if (this._projectileImg) {
@@ -193,6 +200,11 @@ export default class SideImpactView {
                 }
             }
         });
+
+        if (kind === 'missile' && this.scene?.sound) {
+            this._missileLaunchSfx = this.scene.sound.add('missile_launch', { loop: true, volume: 0.6 });
+            this._missileLaunchSfx.play();
+        }
     }
 
     _drawTrajectory(startX, startY, endX, endY, groundY) {
@@ -206,22 +218,13 @@ export default class SideImpactView {
             this._trailGfx.moveTo(startX, startY);
             this._trailGfx.lineTo(endX, endY);
             this._trailGfx.strokePath();
-            this.scene.sound.play('missile_launch', { volume: 0.5 });
             return;
         }
 
-        // Bomb: sample free-fall curve.
+        // Bomb: straight vertical drop over the target.
         this._trailGfx.beginPath();
-        const steps = 28;
-        for (let i = 0; i <= steps; i++) {
-            const t = i / steps;
-            const x = Phaser.Math.Linear(startX, endX, t);
-            const startHeight = groundY - startY;
-            const heightNow = startHeight * (1 - t) * (1 - t);
-            const y = groundY - heightNow;
-            if (i === 0) this._trailGfx.moveTo(x, y);
-            else this._trailGfx.lineTo(x, y);
-        }
+        this._trailGfx.moveTo(endX, startY);
+        this._trailGfx.lineTo(endX, endY);
         this._trailGfx.strokePath();
     }
 
@@ -229,6 +232,12 @@ export default class SideImpactView {
         const kind = payload?.kind;
         if (!this.container.visible) return;
         if (kind !== this._attackKind) return;
+
+        if (this._missileLaunchSfx) {
+            this._missileLaunchSfx.stop();
+            this._missileLaunchSfx.destroy();
+            this._missileLaunchSfx = null;
+        }
 
         // Explosion at target.
         const w = this.width;

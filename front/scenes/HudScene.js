@@ -6,8 +6,7 @@ import { getGameConfig } from '../shared/gameConfig.js';
 const TEAM_COLORS = [0x00ff00, 0xff4444];
 
 /**
- * HudScene — overlay for UI elements (minimap, turn indicator, action buttons).
- * Runs in parallel with MainScene; not affected by camera scroll.
+  HudScene — overlay for UI elements (minimap, turn indicator, action buttons).
  */
 export default class HudScene extends Phaser.Scene {
     constructor() {
@@ -22,9 +21,7 @@ export default class HudScene extends Phaser.Scene {
         this.turnSecondsRemaining = this.turnDurationSeconds;
         this.selectionData = null;
         this.forfeitPending = false;
-        this.matchResultShown = false;
         this.forfeitRedirectFallback = null;
-        /** Phaser objects comprising the deploy panel */
         this.deployPanelElements = [];
     }
 
@@ -110,7 +107,6 @@ export default class HudScene extends Phaser.Scene {
         mainScene.events.on('deployPanelOpen', this.onDeployPanelOpen, this);
         mainScene.events.on('deployPanelClose', this.onDeployPanelClose, this);
         mainScene.events.on('combatMessage', this.onCombatMessage, this);
-        mainScene.events.on('matchResult', this.onMatchResult, this);
 
         // Attack side-view events
         this._onAttackAnimStart = (payload) => this.sideImpactView?.onAttackStart(payload);
@@ -143,13 +139,12 @@ export default class HudScene extends Phaser.Scene {
             if (this._onAttackAnimEnd) mainScene.events.off('attackAnimEnd', this._onAttackAnimEnd, this);
             mainScene.events.off('turnTimerUpdated', this.onTurnTimerUpdated, this);
             mainScene.events.off('combatMessage', this.onCombatMessage, this);
-            mainScene.events.off('matchResult', this.onMatchResult, this);
             if (this._onGameForfeited) networkManager.off('gameForfeited', this._onGameForfeited);
             if (this._onNetworkError) networkManager.off('error', this._onNetworkError);
         });
 
         this._onGameForfeited = () => {
-            this.clearForfeitPending({ preserveStatus: this.matchResultShown });
+            this.clearForfeitPending();
         };
         this._onNetworkError = () => {
             this.clearForfeitPending();
@@ -289,6 +284,8 @@ export default class HudScene extends Phaser.Scene {
             attackGlow: 0xff6666,
             recallFrame: 0x44ff44, // Green
             recallGlow: 0x66ff66,
+            deployFrame: 0xffc857,
+            deployGlow: 0xffdc85,
             endTurnFrame: 0x4ab3ff, // Blue
             endTurnGlow: 0x6ac8ff,
             disabledFrame: 0x2d3b3b,
@@ -302,6 +299,7 @@ export default class HudScene extends Phaser.Scene {
         this.attackSelected = false;
         this.attackHovered = false;
         this.recallHovered = false;
+        this.deployHovered = false;
         this.endTurnHovered = false;
 
         const btnDepth = 300;
@@ -395,8 +393,46 @@ export default class HudScene extends Phaser.Scene {
             this.recallHovered = false;
         });
 
+        // Deploy button background
+        const deployX = recallX + btnWidth + gap;
+        this.deployBtnGlow = this.add.graphics();
+        this.deployBtnBg = this.add.graphics();
+        this.deployBtnFrame = this.add.graphics();
+        this.drawRadarButton(this.deployBtnGlow, this.deployBtnBg, this.deployBtnFrame,
+            deployX - btnWidth / 2, y - btnHeight / 2, btnWidth, btnHeight, btnRadius,
+            this.grayColor, this.radarColors.deployFrame, this.radarColors.deployGlow, 1, 0.2);
+
+        this.deployBtnText = this.add.text(deployX, y, 'DESPLEGAR', {
+            fontSize: '15px',
+            fill: '#ffffff',
+            fontFamily: this.btnFontFamily,
+            stroke: '#000000',
+            strokeThickness: 3
+        }).setOrigin(0.5);
+        this.deployBtnGlow.setDepth(btnDepth);
+        this.deployBtnBg.setDepth(btnDepth + 1);
+        this.deployBtnFrame.setDepth(btnDepth + 2);
+        this.deployBtnText.setDepth(btnDepth + 10);
+        this.deployBtnText.setScrollFactor(0);
+
+        this.deployBtn = this.add.rectangle(deployX, y, btnWidth, btnHeight, 0x000000, 0.001)
+            .setInteractive({ useHandCursor: true });
+        this.deployBtn.setDepth(btnDepth + 4);
+
+        this.deployBtn.on('pointerup', () => {
+            const mainScene = this.scene.get('MainScene');
+            if (mainScene?.isDragging) return;
+            this.toggleDeployPanelFromHud();
+        });
+        this.deployBtn.on('pointerover', () => {
+            this.deployHovered = true;
+        });
+        this.deployBtn.on('pointerout', () => {
+            this.deployHovered = false;
+        });
+
         // End Turn button background
-        const endTurnX = recallX + btnWidth + gap;
+        const endTurnX = deployX + btnWidth + gap;
         this.endTurnBtnGlow = this.add.graphics();
         this.endTurnBtnBg = this.add.graphics();
         this.endTurnBtnFrame = this.add.graphics();
@@ -506,12 +542,13 @@ export default class HudScene extends Phaser.Scene {
             btnHeight: 40,
             gap: 10
         };
-        const totalWidth = btnWidth * 3 + gap * 2;
+        const totalWidth = btnWidth * 4 + gap * 3;
         const startX = (this.scale.width - totalWidth) / 2 + btnWidth / 2;
         const recallX = startX + btnWidth + gap;
-        const endTurnX = recallX + btnWidth + gap;
+        const deployX = recallX + btnWidth + gap;
+        const endTurnX = deployX + btnWidth + gap;
         const y = this.scale.height - margin - btnHeight / 2;
-        return { startX, recallX, endTurnX, y, btnWidth, btnHeight };
+        return { startX, recallX, deployX, endTurnX, y, btnWidth, btnHeight };
     }
 
     layoutActionButtons() {
@@ -524,6 +561,10 @@ export default class HudScene extends Phaser.Scene {
         if (this.recallBtn) {
             this.recallBtn.setPosition(layout.recallX, layout.y);
             this.recallBtnText.setPosition(layout.recallX, layout.y);
+        }
+        if (this.deployBtn) {
+            this.deployBtn.setPosition(layout.deployX, layout.y);
+            this.deployBtnText.setPosition(layout.deployX, layout.y);
         }
         this.endTurnBtn.setPosition(layout.endTurnX, layout.y);
         this.endTurnBtnText.setPosition(layout.endTurnX, layout.y);
@@ -750,21 +791,38 @@ export default class HudScene extends Phaser.Scene {
             }
         }
 
-        this.updateAttackPulse(canAttack && !this.attackSelected);
-    }
+        if (this.deployBtnBg) {
+            const canDeploy = !!(mainScene?.selectedCarrier && mainScene?.isMyTurn && (mainScene.myDrones || []).some(d => !d.deployed && d.isAlive()));
+            const isPanelOpen = this.deployPanelElements.length > 0;
+            const deployBase = canDeploy ? (isPanelOpen ? 0x7a5a1a : this.grayColor) : this.grayColor;
+            const deployAlpha = canDeploy ? 1 : 0.55;
+            const deployFrame = canDeploy ? this.radarColors.deployFrame : this.radarColors.disabledFrame;
+            const deployGlow = canDeploy ? this.radarColors.deployGlow : this.radarColors.disabledGlow;
+            const deployGlowAlpha = canDeploy ? (isPanelOpen ? 0.4 : (this.deployHovered ? 0.35 : 0.22)) : 0.12;
+            const deployX = layout.deployX ?? (layout.recallX + btnWidth + (this.actionBtnConfig?.gap ?? 10));
 
-    setButtonsVisible(visible) {
-        const btns = [
-            this.attackBtn, this.attackBtnText, this.attackBtnBg, this.attackBtnGlow, this.attackBtnFrame,
-            this.recallBtn, this.recallBtnText, this.recallBtnBg, this.recallBtnGlow, this.recallBtnFrame,
-            this.endTurnBtn, this.endTurnBtnText, this.endTurnBtnBg, this.endTurnBtnGlow, this.endTurnBtnFrame
-        ];
-        btns.forEach(btn => {
-            if (btn) {
-                btn.setVisible(visible);
-                if (visible && btn.setAlpha) btn.setAlpha(1);
+            this.drawRadarButton(
+                this.deployBtnGlow,
+                this.deployBtnBg,
+                this.deployBtnFrame,
+                deployX - btnWidth / 2,
+                y - btnHeight / 2,
+                btnWidth,
+                btnHeight,
+                btnRadius,
+                deployBase,
+                deployFrame,
+                deployGlow,
+                deployAlpha,
+                deployGlowAlpha
+            );
+            if (this.deployBtnText) {
+                this.deployBtnText.setColor(canDeploy ? this.btnTextColor : this.btnTextDisabledColor);
+                this.deployBtnText.setAlpha(1);
             }
-        });
+        }
+
+        this.updateAttackPulse(canAttack && !this.attackSelected);
     }
 
     updateAttackPulse(shouldPulse) {
@@ -919,6 +977,7 @@ export default class HudScene extends Phaser.Scene {
 
         // Hide fuel list while panel is open to avoid overlap
         if (this.fuelListText) this.fuelListText.setVisible(false);
+        this.updateButtonStates();
     }
 
     /** Remove the deploy panel from the screen. */
@@ -930,6 +989,35 @@ export default class HudScene extends Phaser.Scene {
         }
         this.deployPanelElements = [];
         if (this.fuelListText) this.fuelListText.setVisible(true);
+        this.updateButtonStates();
+    }
+
+    toggleDeployPanelFromHud() {
+        const mainScene = this.scene.get('MainScene');
+        if (!mainScene || !mainScene.isMyTurn) return;
+
+        if (this.deployPanelElements.length > 0) {
+            mainScene.events.emit('deployPanelClose');
+            return;
+        }
+
+        const carrier = mainScene.selectedCarrier;
+        if (!carrier || carrier.destroyed || !carrier.isLocal) return;
+
+        const undeployed = (mainScene.myDrones || []).filter((d) => !d.deployed && d.isAlive());
+        if (!undeployed.length) return;
+
+        mainScene.deployPanelCarrier = carrier;
+        mainScene.events.emit('deployPanelOpen', {
+            carrier,
+            drones: undeployed.map((d) => ({
+                droneIndex: mainScene.myDrones.indexOf(d),
+                fuel: d.fuel,
+                maxFuel: d.maxFuel,
+                missiles: d.missiles,
+                droneType: d.droneType
+            }))
+        });
     }
 
 
@@ -1008,6 +1096,13 @@ export default class HudScene extends Phaser.Scene {
             if (this.recallBtnFrame) this.recallBtnFrame.setVisible(visible);
             this.recallBtnText.setVisible(visible);
         }
+        if (this.deployBtn) {
+            this.deployBtn.setVisible(visible);
+            if (this.deployBtnGlow) this.deployBtnGlow.setVisible(visible);
+            this.deployBtnBg.setVisible(visible);
+            if (this.deployBtnFrame) this.deployBtnFrame.setVisible(visible);
+            this.deployBtnText.setVisible(visible);
+        }
         this.endTurnBtn.setVisible(visible);
         if (this.endTurnBtnGlow) this.endTurnBtnGlow.setVisible(visible);
         this.endTurnBtnBg.setVisible(visible);
@@ -1039,30 +1134,6 @@ export default class HudScene extends Phaser.Scene {
             this.forfeitRedirectFallback.remove(false);
             this.forfeitRedirectFallback = null;
         }
-    }
-
-    onMatchResult({ result, isDraw } = {}) {
-        if (!this.forfeitStatusText) return;
-
-        this.matchResultShown = true;
-
-        if (isDraw || result === 'draw') {
-            this.forfeitStatusText.setStyle({
-                fill: '#ffd166',
-                backgroundColor: '#2b1f00dd'
-            });
-            this.forfeitStatusText.setText('EMPATE');
-            this.forfeitStatusText.setVisible(true);
-            return;
-        }
-
-        const isWin = result === 'win';
-        this.forfeitStatusText.setStyle({
-            fill: isWin ? '#8dff8d' : '#ff9090',
-            backgroundColor: isWin ? '#113611dd' : '#3a1111dd'
-        });
-        this.forfeitStatusText.setText(isWin ? 'VICTORIA!' : 'DERROTA');
-        this.forfeitStatusText.setVisible(true);
     }
 
     showForfeitPendingStatus() {

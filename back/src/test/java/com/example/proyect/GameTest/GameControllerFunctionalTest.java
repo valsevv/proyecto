@@ -1,12 +1,11 @@
 package com.example.proyect.GameTest;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-
-import java.util.List;
-
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -82,7 +81,7 @@ public class GameControllerFunctionalTest {
         assertTrue(result2.isSuccess());
         assertTrue(gameController.isGameStarted("func_start_s1"));
         assertEquals(0, gameController.getCurrentTurn("func_start_s1"));
-        assertEquals(10, gameController.getActionsRemaining("func_start_s1"));
+        assertEquals(15, gameController.getActionsRemaining("func_start_s1"));
     }
 
     @Test
@@ -164,7 +163,7 @@ public class GameControllerFunctionalTest {
 
         assertTrue(result.isSuccess());
         assertEquals(1, gameController.getCurrentTurn("func_endturn_s1"));
-        assertEquals(10, gameController.getActionsRemaining("func_endturn_s1"));
+        assertEquals(15, gameController.getActionsRemaining("func_endturn_s1"));
     }
 
     @Test
@@ -207,6 +206,6 @@ public class GameControllerFunctionalTest {
         assertNotNull(state);
         assertTrue((Boolean) state.get("gameStarted"));
         assertEquals(0, state.get("currentTurn"));
-        assertEquals(10, state.get("actionsRemaining"));
+        assertEquals(15, state.get("actionsRemaining"));
     }
 }

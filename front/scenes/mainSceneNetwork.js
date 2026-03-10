@@ -1,6 +1,13 @@
 import Network from '../network/NetworkManager.js';
 import { showPlayerLeftOverlay } from './mainSceneOverlays.js';
 import { showGameForfeitOverlay } from './mainSceneOverlays.js';
+import { showMatchResultOverlay } from './mainSceneOverlays.js';
+import { getGameConfig } from '../shared/gameConfig.js';
+
+function getRecallAmmoByType(droneType) {
+    const cfg = getGameConfig();
+    return droneType === 'Naval' ? cfg.navalDroneMissiles : cfg.aerialDroneAmmo;
+}
 
 export function attachNetworkHandlers(scene, options = {}) {
     const modeMove = options.modeMove ?? 'move';
@@ -18,36 +25,17 @@ export function attachNetworkHandlers(scene, options = {}) {
         scene.clearSelections();
         scene.events.emit('turnChanged', { isMyTurn: false });
 
-        const winnerText = isDraw
-            ? 'La partida terminó en empate'
-            : (winnerPlayerIndex === Network.playerIndex ? '¡Ganaste la partida!' : 'Has sido derrotado');
+        const result = isDraw ? 'draw' : (winnerPlayerIndex === Network.playerIndex ? 'win' : 'loss');
 
         scene.events.emit('matchResult', {
-            result: isDraw ? 'draw' : (winnerPlayerIndex === Network.playerIndex ? 'win' : 'loss'),
+            result,
             winnerPlayerIndex,
             isDraw
         });
 
-        const camera = scene.cameras.main;
-        const panelWidth = 620;
-        const panelHeight = 220;
-        const panelX = camera.midPoint.x;
-        const panelY = camera.midPoint.y;
+        showMatchResultOverlay(scene, { result, isDraw });
 
-        scene.add.rectangle(panelX, panelY, panelWidth, panelHeight, 0x04111f, 0.92)
-            .setStrokeStyle(4, 0xffdd57, 1)
-            .setScrollFactor(0)
-            .setDepth(1000);
-
-        scene.add.text(panelX, panelY, `Finaliza partidas para ambos jugadores\n${winnerText}\nVolviendo al menu principal...`, {
-            fontSize: '30px',
-            fill: '#ffdd57',
-            align: 'center',
-            fontStyle: 'bold',
-            lineSpacing: 10
-        }).setOrigin(0.5).setScrollFactor(0).setDepth(1001);
-
-        scene.time.delayedCall(2500, () => {
+        scene.time.delayedCall(3000, () => {
             window.location.href = '/menu';
         });
         scene.updateVision();
@@ -377,7 +365,13 @@ export function attachNetworkHandlers(scene, options = {}) {
         drone.deployed = false;
         if (typeof fuel === 'number') drone.fuel = fuel;
         if (typeof maxFuel === 'number') drone.maxFuel = maxFuel;
-        if (typeof missiles === 'number') drone.missiles = missiles;
+        const recalledAmmo = getRecallAmmoByType(drone.droneType);
+        if (typeof recalledAmmo === 'number') {
+            // Recall should fully reload ammo regardless of current value.
+            drone.missiles = recalledAmmo;
+        } else if (typeof missiles === 'number') {
+            drone.missiles = missiles;
+        }
 
         drone.setLocalVisibility(false);
         drone.deselect();

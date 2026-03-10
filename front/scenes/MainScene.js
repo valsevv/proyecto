@@ -21,6 +21,12 @@ const INITIAL_CAMERA_ZOOM = 0.8;
 const MIN_CAMERA_ZOOM = 0.6;
 const MAX_CAMERA_ZOOM = 1.3;
 const CAMERA_ZOOM_STEP = 0.0005;
+const AERIAL_CARRIER_FLOAT_DISTANCE_PX = 8;
+const AERIAL_CARRIER_FLOAT_DURATION_MS = 1400;
+const NAVAL_CARRIER_BOB_DISTANCE_PX = 2;
+const NAVAL_CARRIER_BOB_DURATION_MS = 1800;
+const NAVAL_CARRIER_ROCK_ANGLE_DEG = 1.2;
+const NAVAL_CARRIER_ROCK_DURATION_MS = 2100;
 
 // Action modes
 const MODE_MOVE = 'move';
@@ -529,6 +535,7 @@ export default class MainScene extends Phaser.Scene {
         const spriteKey = side === 'Naval' ? NAVAL_CARRIER_SPRITES[0] : AEREAL_CARRIER_SPRITES[0];
 
         if (this.carriers[playerIndex]) {
+            this.stopCarrierIdleAnimation(this.carriers[playerIndex]);
             this.carriers[playerIndex].ring.destroy();
             this.carriers[playerIndex].targetRing?.destroy();
             this.carriers[playerIndex].healthBarBg?.destroy();
@@ -584,7 +591,11 @@ export default class MainScene extends Phaser.Scene {
             health: 5,
             maxHealth: 5,
             destroyed: false,
-            isTargetable: false
+            isTargetable: false,
+            anchorX: basePosition.x,
+            anchorY: basePosition.y,
+            idleBobTween: null,
+            idleRockTween: null
         };
 
         this.updateCarrierHealthBar(carrier);
@@ -597,6 +608,106 @@ export default class MainScene extends Phaser.Scene {
         });
 
         this.carriers[playerIndex] = carrier;
+        this.refreshCarrierIdleAnimation(carrier);
+    }
+
+    syncCarrierUiPositions(carrier) {
+        if (!carrier?.sprite) return;
+        const x = carrier.sprite.x;
+        const y = carrier.sprite.y;
+
+        carrier.ring?.setPosition(x, y);
+        carrier.targetRing?.setPosition(x, y);
+        carrier.healthBarBg?.setPosition(x, y - carrier.healthBarOffsetY);
+        carrier.healthBar?.setPosition(x - carrier.healthBarWidth / 2, y - carrier.healthBarOffsetY);
+    }
+
+    stopCarrierIdleAnimation(carrier, { resetToAnchor = true } = {}) {
+        if (!carrier) return;
+
+        if (carrier.idleBobTween) {
+            carrier.idleBobTween.stop();
+            carrier.idleBobTween = null;
+        }
+        if (carrier.idleRockTween) {
+            carrier.idleRockTween.stop();
+            carrier.idleRockTween = null;
+        }
+
+        if (!carrier.sprite?.active || !resetToAnchor) return;
+
+        if (typeof carrier.anchorX === 'number' && typeof carrier.anchorY === 'number') {
+            carrier.sprite.setPosition(carrier.anchorX, carrier.anchorY);
+        }
+        carrier.sprite.setAngle(0);
+        this.syncCarrierUiPositions(carrier);
+    }
+
+    startCarrierIdleAnimation(carrier) {
+        if (!carrier?.sprite?.active || carrier.destroyed || carrier.isMoving || !carrier.sprite.visible) return;
+
+        const hasAerialIdle = carrier.side === 'Aereo' && !!carrier.idleBobTween && !carrier.idleRockTween;
+        const hasNavalIdle = carrier.side === 'Naval' && !!carrier.idleBobTween && !!carrier.idleRockTween;
+        if (hasAerialIdle || hasNavalIdle) return;
+
+        this.stopCarrierIdleAnimation(carrier);
+
+        const bobTargets = [carrier.sprite, carrier.ring, carrier.targetRing, carrier.healthBarBg, carrier.healthBar].filter(Boolean);
+        const startDelay = Phaser.Math.Between(0, 600);
+
+        if (carrier.side === 'Aereo') {
+            carrier.idleBobTween = this.tweens.add({
+                targets: bobTargets,
+                y: `-=${AERIAL_CARRIER_FLOAT_DISTANCE_PX}`,
+                duration: AERIAL_CARRIER_FLOAT_DURATION_MS,
+                ease: 'Sine.easeInOut',
+                yoyo: true,
+                repeat: -1,
+                delay: startDelay,
+                onStop: () => {
+                    carrier.idleBobTween = null;
+                }
+            });
+            return;
+        }
+
+        carrier.idleBobTween = this.tweens.add({
+            targets: bobTargets,
+            y: `-=${NAVAL_CARRIER_BOB_DISTANCE_PX}`,
+            duration: NAVAL_CARRIER_BOB_DURATION_MS,
+            ease: 'Sine.easeInOut',
+            yoyo: true,
+            repeat: -1,
+            delay: startDelay,
+            onStop: () => {
+                carrier.idleBobTween = null;
+            }
+        });
+
+        carrier.idleRockTween = this.tweens.add({
+            targets: carrier.sprite,
+            angle: {
+                from: -NAVAL_CARRIER_ROCK_ANGLE_DEG,
+                to: NAVAL_CARRIER_ROCK_ANGLE_DEG
+            },
+            duration: NAVAL_CARRIER_ROCK_DURATION_MS,
+            ease: 'Sine.easeInOut',
+            yoyo: true,
+            repeat: -1,
+            delay: startDelay,
+            onStop: () => {
+                carrier.idleRockTween = null;
+            }
+        });
+    }
+
+    refreshCarrierIdleAnimation(carrier) {
+        if (!carrier?.sprite?.active) return;
+        if (!carrier.destroyed && !carrier.isMoving && carrier.sprite.visible) {
+            this.startCarrierIdleAnimation(carrier);
+            return;
+        }
+        this.stopCarrierIdleAnimation(carrier, { resetToAnchor: !carrier.isMoving });
     }
 
 
@@ -766,24 +877,6 @@ export default class MainScene extends Phaser.Scene {
         }
 
         this.selectCarrier(carrier);
-
-        // Show deploy panel if it's our turn and there are drones waiting to be deployed
-        if (this.isMyTurn && this.selectedCarrier === carrier) {
-            const undeployed = (this.myDrones || []).filter(d => !d.deployed && d.isAlive());
-            if (undeployed.length > 0) {
-                this.deployPanelCarrier = carrier;
-                this.events.emit('deployPanelOpen', {
-                    carrier,
-                    drones: undeployed.map(d => ({
-                        droneIndex: this.myDrones.indexOf(d),
-                        fuel: d.fuel,
-                        maxFuel: d.maxFuel,
-                        missiles: d.missiles,
-                        droneType: d.droneType
-                    }))
-                });
-            }
-        }
     }
 
     selectCarrier(carrier) {
@@ -831,7 +924,10 @@ export default class MainScene extends Phaser.Scene {
 
     moveCarrier(carrier, x, y) {
         if (carrier.isMoving || this.gameFinished) return;
+        this.stopCarrierIdleAnimation(carrier);
         carrier.isMoving = true;
+        carrier.anchorX = carrier.sprite.x;
+        carrier.anchorY = carrier.sprite.y;
         const dx = x - carrier.sprite.x;
         const dy = y - carrier.sprite.y;
         this.setCarrierSpriteDirection(carrier, this.getCarrierDirectionFromDelta(dx, dy));
@@ -853,8 +949,11 @@ export default class MainScene extends Phaser.Scene {
             },
             onComplete: () => {
                 carrier.isMoving = false;
+                carrier.anchorX = x;
+                carrier.anchorY = y;
                 this.setCarrierSpriteDirection(carrier, 0);
                 this.updateCarrierHealthBar(carrier);
+                this.refreshCarrierIdleAnimation(carrier);
                 this.updateVision();
             }
         });
@@ -882,6 +981,7 @@ export default class MainScene extends Phaser.Scene {
         const visible = !carrier.destroyed && carrier.sprite.visible;
         carrier.healthBarBg.setVisible(visible);
         carrier.healthBar.setVisible(visible);
+        this.refreshCarrierIdleAnimation(carrier);
     }
 
     destroyUndeployedDronesForPlayer(playerIndex) {
@@ -894,6 +994,8 @@ export default class MainScene extends Phaser.Scene {
 
     destroyCarrier(carrier, playExplosion = true) {
         if (!carrier || carrier._destructionHandled) return;
+
+        this.stopCarrierIdleAnimation(carrier);
 
         carrier.destroyed = true;
         carrier._destructionHandled = true;

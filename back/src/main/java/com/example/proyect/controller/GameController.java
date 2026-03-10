@@ -1201,7 +1201,7 @@ public class GameController {
         }
 
         int endingPlayer = room.getCurrentTurn();
-        List<Integer> destroyedByIdleIndexes = room.consumeIdleFuelForCurrentPlayer();
+        room.consumeIdleFuelForCurrentPlayer();
         room.endTurn();
 
         log.info("Turn ended in room {}. Now player {}'s turn with {} actions",
@@ -1213,17 +1213,27 @@ public class GameController {
             return GameResult.ok(turnPacket);
         }
 
-        if (destroyedByIdleIndexes.isEmpty()) {
-            return GameResult.turnStarted(room.getCurrentTurn(), room.getActionsRemaining());
+        List<Map<String, Object>> fuelUpdates = new ArrayList<>();
+        PlayerState endingPlayerState = room.getPlayerByIndex(endingPlayer);
+        if (endingPlayerState != null) {
+            List<Drone> endingDrones = endingPlayerState.getDrones();
+            for (int droneIndex = 0; droneIndex < endingDrones.size(); droneIndex++) {
+                Drone drone = endingDrones.get(droneIndex);
+                // Idle fuel is consumed only by deployed drones.
+                if (!drone.isDeployed()) {
+                    continue;
+                }
+                fuelUpdates.add(Packet.fuelUpdate(
+                    endingPlayer,
+                    droneIndex,
+                    drone.getFuel(),
+                    !drone.isAlive()
+                ).toMap());
+            }
         }
 
-        List<Map<String, Object>> fuelUpdates = new ArrayList<>();
-        for (Integer droneIndex : destroyedByIdleIndexes) {
-            Drone destroyedDrone = room.getDrone(endingPlayer, droneIndex);
-            if (destroyedDrone == null) {
-                continue;
-            }
-            fuelUpdates.add(Packet.fuelUpdate(endingPlayer, droneIndex, destroyedDrone.getFuel(), true).toMap());
+        if (fuelUpdates.isEmpty()) {
+            return GameResult.turnStarted(room.getCurrentTurn(), room.getActionsRemaining());
         }
 
         Map<String, Object> payload = new LinkedHashMap<>(turnPacket.getPayload());
@@ -1400,6 +1410,7 @@ public class GameController {
 
         state.setStatus(GameStatus.FINISHED);
         state.setTurn(winnerPlayerIndex + 1);
+        state.setMeta(null);
         game.setEndedAt(OffsetDateTime.now());
         gameService.saveGame(game.getPlayer1Id(), game.getPlayer2Id(), game);
     }
@@ -1422,6 +1433,7 @@ public class GameController {
 
         state.setStatus(GameStatus.FINISHED);
         state.setTurn(room.getCurrentTurn());
+        state.setMeta(null);
         game.setEndedAt(OffsetDateTime.now());
         gameService.saveGame(game.getPlayer1Id(), game.getPlayer2Id(), game);
     }
