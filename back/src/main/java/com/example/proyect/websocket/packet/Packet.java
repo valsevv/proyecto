@@ -187,7 +187,7 @@ public class Packet {
             attackerRemainingHealth, attackerDestroyed,
             attackerAmmo,
             targetCarrierHealth, targetCarrierDestroyed,
-            false, -1
+            false, -1, false
         );
     }
 
@@ -200,7 +200,7 @@ public class Packet {
                                        int attackerRemainingHealth, boolean attackerDestroyed,
                                        int attackerAmmo,
                                        int targetCarrierHealth, boolean targetCarrierDestroyed,
-                                       boolean gameFinished, int winnerPlayerIndex) {
+                                       boolean gameFinished, int winnerPlayerIndex, boolean isDraw) {
         Map<String, Object> payload = new HashMap<>();
         payload.put("attackerPlayer", attackerPlayer);
         payload.put("attackerDrone", attackerDrone);
@@ -221,6 +221,7 @@ public class Packet {
         payload.put("targetCarrierDestroyed", targetCarrierDestroyed);
         payload.put("gameFinished", gameFinished);
         payload.put("winnerPlayerIndex", winnerPlayerIndex);
+        payload.put("isDraw", isDraw);
         return new Packet(PacketType.ATTACK_RESULT, payload);
     }
 

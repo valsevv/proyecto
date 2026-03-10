@@ -5,7 +5,7 @@ import { showGameForfeitOverlay } from './mainSceneOverlays.js';
 export function attachNetworkHandlers(scene, options = {}) {
     const modeMove = options.modeMove ?? 'move';
 
-    const showGameEndedOverlay = (winnerPlayerIndex) => {
+    const showGameEndedOverlay = (winnerPlayerIndex, isDraw = false) => {
         if (scene.gameFinished) {
             return;
         }
@@ -18,8 +18,9 @@ export function attachNetworkHandlers(scene, options = {}) {
         scene.clearSelections();
         scene.events.emit('turnChanged', { isMyTurn: false });
 
-        const isLocalWinner = winnerPlayerIndex === Network.playerIndex;
-        const winnerText = isLocalWinner ? '¡Ganaste la partida!' : 'Has sido derrotado';
+        const winnerText = isDraw
+            ? 'La partida terminó en empate'
+            : (winnerPlayerIndex === Network.playerIndex ? '¡Ganaste la partida!' : 'Has sido derrotado');
 
         const camera = scene.cameras.main;
         const panelWidth = 620;
@@ -48,7 +49,7 @@ export function attachNetworkHandlers(scene, options = {}) {
 
     Network.on('turnStart', (msg) => {
         if (msg.gameFinished) {
-            showGameEndedOverlay(msg.winnerPlayerIndex);
+            showGameEndedOverlay(msg.winnerPlayerIndex, Boolean(msg.isDraw));
             return;
         }
         if (scene.gameFinished) {
@@ -85,7 +86,7 @@ export function attachNetworkHandlers(scene, options = {}) {
 
     Network.on('moveDrone', (msg) => {
         if (msg.gameFinished) {
-            showGameEndedOverlay(msg.winnerPlayerIndex);
+            showGameEndedOverlay(msg.winnerPlayerIndex, Boolean(msg.isDraw));
             return;
         }
 
@@ -275,7 +276,7 @@ export function attachNetworkHandlers(scene, options = {}) {
             scene.events.emit('attackModeEnded');
 
             if (msg.gameFinished) {
-                showGameEndedOverlay(msg.winnerPlayerIndex);
+                showGameEndedOverlay(msg.winnerPlayerIndex, Boolean(msg.isDraw));
                 return;
             }
 
