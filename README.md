@@ -110,7 +110,7 @@ Ejecutar desde la carpeta raiz del proyecto (`proyecto`), para que Spring pueda 
 ### Linux/macOS
 
 ```bash
-./back/mvnw -f ./back/pom.xml spring-boot:run
+./back/mvnw -f ./back/pom.xml spring-boot:run -Dspring-boot.run.workingDirectory=$(pwd)
 ```
 
 Cuando arranca bien, por defecto queda en `http://localhost:8080`.
