@@ -943,15 +943,20 @@ public class GameController {
             targetCarrierDestroyed
         );
 
-        Integer winnerPlayerIndex = resolveWinnerByElimination(room);
-        if (winnerPlayerIndex != null) {
+        MatchOutcome outcome = resolveMatchOutcome(room);
+        if (outcome.finished()) {
             if (!isPersistedGameFinished(room)) {
-                markGameAsFinished(room, winnerPlayerIndex);
-                PlayerState winner = room.getPlayerByIndex(winnerPlayerIndex);
-                PlayerState loser = room.getPlayerByIndex(winnerPlayerIndex == 0 ? 1 : 0);
-                registerMatchResult(resolveUserId(room, winner), resolveUserId(room, loser));
+                if (outcome.draw()) {
+                    markGameAsDraw(room);
+                } else {
+                    int winnerPlayerIndex = outcome.winnerPlayerIndex();
+                    markGameAsFinished(room, winnerPlayerIndex);
+                    PlayerState winner = room.getPlayerByIndex(winnerPlayerIndex);
+                    PlayerState loser = room.getPlayerByIndex(winnerPlayerIndex == 0 ? 1 : 0);
+                    registerMatchResult(resolveUserId(room, winner), resolveUserId(room, loser));
+                }
             }
-            log.info("A player has been fully eliminated in room {}. Winner: {}", room.getRoomId(), winnerPlayerIndex);
+            log.info("Match finished in room {}. draw={}, winner={}", room.getRoomId(), outcome.draw(), outcome.winnerPlayerIndex());
             Packet finishedAttackPacket = Packet.attackResult(
                 attacker.getPlayerIndex(), attackerIndex,
                 targetPlayerIndex, targetDroneIndex,
@@ -964,7 +969,8 @@ public class GameController {
                 targetCarrierHealth,
                 targetCarrierDestroyed,
                 true,
-                winnerPlayerIndex
+                outcome.winnerPlayerIndex() == null ? -1 : outcome.winnerPlayerIndex(),
+                outcome.draw()
             );
             return GameResult.ok(finishedAttackPacket);
         }
@@ -1300,7 +1306,7 @@ public class GameController {
         return room.isGameStarted();
     }
 
-    private boolean isPlayerDefeated(GameRoom room, int playerIndex) {
+    private boolean areAllDronesDestroyed(GameRoom room, int playerIndex) {
         PlayerState player = room.getPlayerByIndex(playerIndex);
         if (player == null) return false;
         
@@ -1310,24 +1316,32 @@ public class GameController {
         return true;
     }
 
-    private Integer resolveWinnerByElimination(GameRoom room) {
+    private MatchOutcome resolveMatchOutcome(GameRoom room) {
         if (room == null) {
-            return null;
+            return MatchOutcome.ongoing();
         }
 
-        boolean player0Defeated = isPlayerDefeated(room, 0);
-        boolean player1Defeated = isPlayerDefeated(room, 1);
+        boolean player0CarrierDestroyed = room.isCarrierDestroyed(0);
+        boolean player1CarrierDestroyed = room.isCarrierDestroyed(1);
+        boolean player0NoDrones = areAllDronesDestroyed(room, 0);
+        boolean player1NoDrones = areAllDronesDestroyed(room, 1);
+
+        if (player0NoDrones && player1NoDrones && !player0CarrierDestroyed && !player1CarrierDestroyed) {
+            return MatchOutcome.draw();
+        }
+
+        boolean player0Defeated = player0CarrierDestroyed && player0NoDrones;
+        boolean player1Defeated = player1CarrierDestroyed && player1NoDrones;
 
         if (!player0Defeated && !player1Defeated) {
-            return null;
+            return MatchOutcome.ongoing();
         }
 
         if (player0Defeated && player1Defeated) {
-            int currentTurn = room.getCurrentTurn();
-            return currentTurn == 0 ? 1 : 0;
+            return MatchOutcome.draw();
         }
 
-        return player0Defeated ? 1 : 0;
+        return MatchOutcome.winner(player0Defeated ? 1 : 0);
     }
 
     private Packet finalizeByEliminationIfNeeded(GameRoom room, Packet basePacket) {
@@ -1335,20 +1349,40 @@ public class GameController {
             return basePacket;
         }
 
-        Integer winnerPlayerIndex = resolveWinnerByElimination(room);
-        if (winnerPlayerIndex == null) {
+        MatchOutcome outcome = resolveMatchOutcome(room);
+        if (!outcome.finished()) {
             return basePacket;
         }
 
-        markGameAsFinished(room, winnerPlayerIndex);
-        PlayerState winner = room.getPlayerByIndex(winnerPlayerIndex);
-        PlayerState loser = room.getPlayerByIndex(winnerPlayerIndex == 0 ? 1 : 0);
-        registerMatchResult(resolveUserId(room, winner), resolveUserId(room, loser));
+        if (outcome.draw()) {
+            markGameAsDraw(room);
+        } else {
+            int winnerPlayerIndex = outcome.winnerPlayerIndex();
+            markGameAsFinished(room, winnerPlayerIndex);
+            PlayerState winner = room.getPlayerByIndex(winnerPlayerIndex);
+            PlayerState loser = room.getPlayerByIndex(winnerPlayerIndex == 0 ? 1 : 0);
+            registerMatchResult(resolveUserId(room, winner), resolveUserId(room, loser));
+        }
 
         Map<String, Object> payload = new LinkedHashMap<>(basePacket.getPayload());
         payload.put("gameFinished", true);
-        payload.put("winnerPlayerIndex", winnerPlayerIndex);
+        payload.put("winnerPlayerIndex", outcome.winnerPlayerIndex());
+        payload.put("isDraw", outcome.draw());
         return Packet.of(basePacket.getType(), payload);
+    }
+
+    private record MatchOutcome(boolean finished, boolean draw, Integer winnerPlayerIndex) {
+        private static MatchOutcome ongoing() {
+            return new MatchOutcome(false, false, null);
+        }
+
+        private static MatchOutcome draw() {
+            return new MatchOutcome(true, true, null);
+        }
+
+        private static MatchOutcome winner(int winnerPlayerIndex) {
+            return new MatchOutcome(true, false, winnerPlayerIndex);
+        }
     }
 
 
@@ -1370,6 +1404,28 @@ public class GameController {
 
         state.setStatus(GameStatus.FINISHED);
         state.setTurn(winnerPlayerIndex + 1);
+        game.setEndedAt(OffsetDateTime.now());
+        gameService.saveGame(game.getPlayer1Id(), game.getPlayer2Id(), game);
+    }
+
+    private void markGameAsDraw(GameRoom room) {
+        Long gameId = roomToGame.get(room.getRoomId());
+        if (gameId == null) return;
+
+        Game game = games.get(gameId);
+        if (game == null) {
+            game = gameService.getById(gameId);
+            games.put(gameId, game);
+        }
+
+        GameState state = game.getState();
+        if (state == null) {
+            state = new GameState();
+            game.setState(state);
+        }
+
+        state.setStatus(GameStatus.FINISHED);
+        state.setTurn(room.getCurrentTurn());
         game.setEndedAt(OffsetDateTime.now());
         gameService.saveGame(game.getPlayer1Id(), game.getPlayer2Id(), game);
     }

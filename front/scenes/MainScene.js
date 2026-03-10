@@ -950,12 +950,15 @@ export default class MainScene extends Phaser.Scene {
         const player0Alive = aliveCount(0);
         const player1Alive = aliveCount(1);
 
-        if (player0Alive > 0 && player1Alive > 0) {
+        if (player0Alive > 0 || player1Alive > 0) {
             return;
         }
 
-        const winnerPlayerIndex = player0Alive > 0 ? 0 : 1;
-        const isLocalWinner = winnerPlayerIndex === Network.playerIndex;
+        const carrier0Alive = Boolean(this.carriers?.[0] && !this.carriers[0].destroyed);
+        const carrier1Alive = Boolean(this.carriers?.[1] && !this.carriers[1].destroyed);
+        if (!carrier0Alive || !carrier1Alive) {
+            return;
+        }
 
         this.gameFinished = true;
         this.isMyTurn = false;
@@ -966,8 +969,7 @@ export default class MainScene extends Phaser.Scene {
         this.clearSelections();
         this.events.emit('turnChanged', { isMyTurn: false });
 
-        const winnerText = isLocalWinner ? '¡Ganaste la partida!' : 'Has sido derrotado';
-        const message = `${winnerText}
+        const message = `La partida terminó en empate
 Volvé al lobby para iniciar otra partida`;
 
         this.add.text(400, 300, message, {
