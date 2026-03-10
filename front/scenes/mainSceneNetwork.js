@@ -22,6 +22,12 @@ export function attachNetworkHandlers(scene, options = {}) {
             ? 'La partida terminó en empate'
             : (winnerPlayerIndex === Network.playerIndex ? '¡Ganaste la partida!' : 'Has sido derrotado');
 
+        scene.events.emit('matchResult', {
+            result: isDraw ? 'draw' : (winnerPlayerIndex === Network.playerIndex ? 'win' : 'loss'),
+            winnerPlayerIndex,
+            isDraw
+        });
+
         const camera = scene.cameras.main;
         const panelWidth = 620;
         const panelHeight = 220;
@@ -155,6 +161,10 @@ export function attachNetworkHandlers(scene, options = {}) {
         const hit = msg.hit !== false;
         const attackerDrone = scene.drones[msg.attackerPlayer]?.[msg.attackerDrone];
         const targetCarrier = scene.carriers?.[msg.targetPlayer];
+        const sideViewTarget = targetDrone
+            ?? (targetCarrier?.sprite?.texture?.key
+                ? { sprite: { texture: { key: targetCarrier.sprite.texture.key } } }
+                : null);
         const attackerPlayerIndex = Number.isInteger(msg.attackerPlayer)
             ? msg.attackerPlayer
             : attackerDrone?.playerIndex;
@@ -188,11 +198,11 @@ export function attachNetworkHandlers(scene, options = {}) {
                     impactTarget.y,
                     msg.attackerX,
                     msg.attackerY,
-                    targetDrone ?? null
+                    sideViewTarget
                 );
             } else if (isNavalAttacker) {
                 const targetPos = targetDrone?.sprite || { x: msg.lineX, y: msg.lineY };
-                attackerDrone.launchMissile(targetPos.x, targetPos.y, targetDrone ?? null);
+                attackerDrone.launchMissile(targetPos.x, targetPos.y, sideViewTarget);
             } else if (targetDrone) {
                 scene.playMissileShot(attackerDrone, targetDrone, hit, msg.lineX, msg.lineY);
             }
@@ -345,6 +355,17 @@ export function attachNetworkHandlers(scene, options = {}) {
         scene.events.emit('turnChanged', { isMyTurn: false });
 
         const isLocalForfeiter = msg.forfeitingPlayerIndex === Network.playerIndex;
+        const winnerPlayerIndex = isLocalForfeiter
+            ? (Network.playerIndex === 0 ? 1 : 0)
+            : Network.playerIndex;
+
+        scene.events.emit('matchResult', {
+            result: isLocalForfeiter ? 'loss' : 'win',
+            winnerPlayerIndex,
+            isDraw: false,
+            byForfeit: true
+        });
+
         showGameForfeitOverlay(scene, isLocalForfeiter);
     });
 

@@ -143,13 +143,15 @@ export default class SideImpactView {
 
         const attackerKey = payload?.attackerKey || (kind === 'bomb' ? 'dron_bomba_0' : 'dron_misil_0');
         const targetKey = payload?.targetKey || 'dron_bomba_0';
+        const isCarrierTarget = /^porta_drones_/i.test(String(targetKey));
+        const targetSize = isCarrierTarget ? 96 : 48;
 
         this._attackerImg = this.scene.add.image(leftX, attackerY, attackerKey);
         this._attackerImg.setDisplaySize(48, 48);
         this.content.add(this._attackerImg);
 
         this._targetImg = this.scene.add.image(rightX, targetY, targetKey);
-        this._targetImg.setDisplaySize(48, 48);
+        this._targetImg.setDisplaySize(targetSize, targetSize);
         this.content.add(this._targetImg);
 
         this._trailGfx = this.scene.add.graphics();

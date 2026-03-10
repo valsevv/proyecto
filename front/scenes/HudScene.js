@@ -22,6 +22,7 @@ export default class HudScene extends Phaser.Scene {
         this.turnSecondsRemaining = this.turnDurationSeconds;
         this.selectionData = null;
         this.forfeitPending = false;
+        this.matchResultShown = false;
         this.forfeitRedirectFallback = null;
         /** Phaser objects comprising the deploy panel */
         this.deployPanelElements = [];
@@ -109,6 +110,7 @@ export default class HudScene extends Phaser.Scene {
         mainScene.events.on('deployPanelOpen', this.onDeployPanelOpen, this);
         mainScene.events.on('deployPanelClose', this.onDeployPanelClose, this);
         mainScene.events.on('combatMessage', this.onCombatMessage, this);
+        mainScene.events.on('matchResult', this.onMatchResult, this);
 
         // Attack side-view events
         this._onAttackAnimStart = (payload) => this.sideImpactView?.onAttackStart(payload);
@@ -141,12 +143,13 @@ export default class HudScene extends Phaser.Scene {
             if (this._onAttackAnimEnd) mainScene.events.off('attackAnimEnd', this._onAttackAnimEnd, this);
             mainScene.events.off('turnTimerUpdated', this.onTurnTimerUpdated, this);
             mainScene.events.off('combatMessage', this.onCombatMessage, this);
+            mainScene.events.off('matchResult', this.onMatchResult, this);
             if (this._onGameForfeited) networkManager.off('gameForfeited', this._onGameForfeited);
             if (this._onNetworkError) networkManager.off('error', this._onNetworkError);
         });
 
         this._onGameForfeited = () => {
-            this.clearForfeitPending();
+            this.clearForfeitPending({ preserveStatus: this.matchResultShown });
         };
         this._onNetworkError = () => {
             this.clearForfeitPending();
@@ -1027,13 +1030,39 @@ export default class HudScene extends Phaser.Scene {
         if (this.forfeitBtnText) this.forfeitBtnText.setVisible(visible);
     }
 
-    clearForfeitPending() {
+    clearForfeitPending({ preserveStatus = false } = {}) {
         this.forfeitPending = false;
-        this.hideForfeitPendingStatus();
+        if (!preserveStatus) {
+            this.hideForfeitPendingStatus();
+        }
         if (this.forfeitRedirectFallback) {
             this.forfeitRedirectFallback.remove(false);
             this.forfeitRedirectFallback = null;
         }
+    }
+
+    onMatchResult({ result, isDraw } = {}) {
+        if (!this.forfeitStatusText) return;
+
+        this.matchResultShown = true;
+
+        if (isDraw || result === 'draw') {
+            this.forfeitStatusText.setStyle({
+                fill: '#ffd166',
+                backgroundColor: '#2b1f00dd'
+            });
+            this.forfeitStatusText.setText('EMPATE');
+            this.forfeitStatusText.setVisible(true);
+            return;
+        }
+
+        const isWin = result === 'win';
+        this.forfeitStatusText.setStyle({
+            fill: isWin ? '#8dff8d' : '#ff9090',
+            backgroundColor: isWin ? '#113611dd' : '#3a1111dd'
+        });
+        this.forfeitStatusText.setText(isWin ? 'VICTORIA!' : 'DERROTA');
+        this.forfeitStatusText.setVisible(true);
     }
 
     showForfeitPendingStatus() {
