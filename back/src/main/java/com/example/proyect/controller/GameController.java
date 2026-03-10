@@ -10,7 +10,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -81,9 +80,6 @@ public class GameController {
     private final Map<String, ScheduledFuture<?>> pendingDisconnectForfeits = new ConcurrentHashMap<>();
     private final ScheduledExecutorService disconnectForfeitScheduler = Executors.newSingleThreadScheduledExecutor();
     private long disconnectForfeitGraceMs = 8_000L;
-
-    //
-    private final AtomicInteger roomCounter = new AtomicInteger(1);
 
     public GameController(
             LobbyService lobbyService,
@@ -946,7 +942,7 @@ public class GameController {
         MatchOutcome outcome = resolveMatchOutcome(room);
         if (outcome.finished()) {
             if (!isPersistedGameFinished(room)) {
-                if (outcome.draw()) {
+                if (outcome.isDraw()) {
                     markGameAsDraw(room);
                 } else {
                     int winnerPlayerIndex = outcome.winnerPlayerIndex();
@@ -956,7 +952,7 @@ public class GameController {
                     registerMatchResult(resolveUserId(room, winner), resolveUserId(room, loser));
                 }
             }
-            log.info("Match finished in room {}. draw={}, winner={}", room.getRoomId(), outcome.draw(), outcome.winnerPlayerIndex());
+            log.info("Match finished in room {}. draw={}, winner={}", room.getRoomId(), outcome.isDraw(), outcome.winnerPlayerIndex());
             Packet finishedAttackPacket = Packet.attackResult(
                 attacker.getPlayerIndex(), attackerIndex,
                 targetPlayerIndex, targetDroneIndex,
@@ -970,7 +966,7 @@ public class GameController {
                 targetCarrierDestroyed,
                 true,
                 outcome.winnerPlayerIndex() == null ? -1 : outcome.winnerPlayerIndex(),
-                outcome.draw()
+                outcome.isDraw()
             );
             return GameResult.ok(finishedAttackPacket);
         }
@@ -1327,7 +1323,7 @@ public class GameController {
         boolean player1NoDrones = areAllDronesDestroyed(room, 1);
 
         if (player0NoDrones && player1NoDrones && !player0CarrierDestroyed && !player1CarrierDestroyed) {
-            return MatchOutcome.draw();
+            return MatchOutcome.ofDraw();
         }
 
         boolean player0Defeated = player0CarrierDestroyed && player0NoDrones;
@@ -1338,7 +1334,7 @@ public class GameController {
         }
 
         if (player0Defeated && player1Defeated) {
-            return MatchOutcome.draw();
+            return MatchOutcome.ofDraw();
         }
 
         return MatchOutcome.winner(player0Defeated ? 1 : 0);
@@ -1354,7 +1350,7 @@ public class GameController {
             return basePacket;
         }
 
-        if (outcome.draw()) {
+        if (outcome.isDraw()) {
             markGameAsDraw(room);
         } else {
             int winnerPlayerIndex = outcome.winnerPlayerIndex();
@@ -1367,16 +1363,16 @@ public class GameController {
         Map<String, Object> payload = new LinkedHashMap<>(basePacket.getPayload());
         payload.put("gameFinished", true);
         payload.put("winnerPlayerIndex", outcome.winnerPlayerIndex());
-        payload.put("isDraw", outcome.draw());
+        payload.put("isDraw", outcome.isDraw());
         return Packet.of(basePacket.getType(), payload);
     }
 
-    private record MatchOutcome(boolean finished, boolean draw, Integer winnerPlayerIndex) {
+    private record MatchOutcome(boolean finished, boolean isDraw, Integer winnerPlayerIndex) {
         private static MatchOutcome ongoing() {
             return new MatchOutcome(false, false, null);
         }
 
-        private static MatchOutcome draw() {
+        private static MatchOutcome ofDraw() {
             return new MatchOutcome(true, true, null);
         }
 
