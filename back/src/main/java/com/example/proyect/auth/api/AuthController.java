@@ -76,10 +76,10 @@ public class AuthController {
 
         ResponseCookie cookie = ResponseCookie.from("authToken", token)
                 .httpOnly(true)
-                .secure(true) // Required for HTTPS (ngrok)
+                .secure(false) // True para usar ngrok Required for HTTPS (ngrok)
                 .path("/")
                 .maxAge(3600) // 1 hora de duracion
-                .sameSite("None") // Required for cross-origin cookies
+                .sameSite("lax") //  Para ngrok usar"None" Required for cross-origin cookies
                 .build();
         
         return ResponseEntity.ok()

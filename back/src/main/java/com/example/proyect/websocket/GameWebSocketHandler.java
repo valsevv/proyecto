@@ -78,9 +78,32 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
         sessions.remove(session.getId());
         int removedIndex = gameController.removePlayer(session.getId());
+        cleanupLobbyForDisconnectedSession(session);
         if (removedIndex >= 0) {
             // Broadcast player left to remaining players
             broadcastSafe(Packet.playerLeft(removedIndex));
+        }
+    }
+
+    @Override
+    public void handleTransportError(WebSocketSession session, Throwable exception) {
+        log.warn("Transport error on session {}: {}", session.getId(), exception.getMessage());
+        cleanupLobbyForDisconnectedSession(session);
+    }
+
+    private void cleanupLobbyForDisconnectedSession(WebSocketSession session) {
+        if (session == null) {
+            return;
+        }
+
+        Long userId = (Long) session.getAttributes().get("userId");
+        if (userId == null) {
+            userId = gameController.getUserIdBySession(session.getId());
+        }
+
+        if (userId != null) {
+            lobbyService.leaveLobby(userId);
+            log.info("Lobby cleanup on disconnect for userId={} sessionId={}", userId, session.getId());
         }
     }
 

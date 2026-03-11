@@ -78,6 +78,9 @@ public class GameController {
     private final Map<String, Long> roomToGame = new ConcurrentHashMap<>();
     private final Map<Long, Lock> gameLocks = new ConcurrentHashMap<>();
     private final Map<String, ScheduledFuture<?>> pendingDisconnectForfeits = new ConcurrentHashMap<>();
+    
+    // Lock para evitar race condition al asignar sesiones a salas
+    private final Lock sessionLock = new ReentrantLock();
     private final ScheduledExecutorService disconnectForfeitScheduler = Executors.newSingleThreadScheduledExecutor();
     private long disconnectForfeitGraceMs = 8_000L;
 
@@ -195,10 +198,6 @@ public class GameController {
 
    public GameResult joinGame(String sessionId, String lobbyId, Long userId) { //mete al jugador en el lobby y devuelve packet de bienvenida
 
-        if (sessionToRoom.containsKey(sessionId)) {
-            return GameResult.error("Already in a game");
-        }
-
         Lobby lobby = lobbyService.getLobbyById(lobbyId).orElse(null);
         if (lobby == null) return GameResult.error("Lobby not found");
 
@@ -206,65 +205,94 @@ public class GameController {
             return GameResult.error("You are not in this lobby");
         }
 
-        sessionToUserId.put(sessionId, userId);
-
-        GameRoom room = findOrCreateRoomForLobby(lobby);
-        boolean isLoadGame = lobby.isLoadGameLobby();
-
-        PlayerState player;
-
-        if (!isLoadGame) {
-            // PARTIDA NUEVA
-            player = tryRebindPlayerSession(room, lobby, userId, sessionId);
-            if (player == null) {
-                player = room.addPlayer(sessionId);
+        // OPERACIÓN ATÓMICA: Verificar y asignar sessionId a sala
+        // Esto previene race condition donde dos threads agregan la misma sesión a diferentes salas
+        sessionLock.lock();
+        try {
+            if (sessionToRoom.containsKey(sessionId)) {
+                return GameResult.error("Already in a game");
             }
-            if (player == null) return GameResult.error("Game is full");
+            // Pre-reservar la sesión inmediatamente para bloquear la race condition
+            sessionToRoom.put(sessionId, "pending");
+        } finally {
+            sessionLock.unlock();
+        }
 
-        } else {
-            // PARTIDA CARGADA
-            // Cargar snapshot solo una vez
-            if (room.getPlayers().isEmpty()) {
+        try {
+            sessionToUserId.put(sessionId, userId);
+            GameRoom room = findOrCreateRoomForLobby(lobby);
+            boolean isLoadGame = lobby.isLoadGameLobby();
+
+            PlayerState player;
+
+            if (!isLoadGame) {
+                // PARTIDA NUEVA
+                player = tryRebindPlayerSession(room, lobby, userId, sessionId);
+                if (player == null) {
+                    player = room.addPlayer(sessionId);
+                }
+                if (player == null) {
+                    // Liberar la reserva si falla
+                    sessionToRoom.remove(sessionId);
+                    return GameResult.error("Game is full");
+                }
+
+            } else {
+                // PARTIDA CARGADA
+                // Cargar snapshot solo una vez
+                if (room.getPlayers().isEmpty()) {
+                    try {
+                        loadSavedGameIntoRoom(lobby.getGameId(), room);
+                    } catch (IllegalStateException ex) {
+                        // Liberar la reserva si falla
+                        sessionToRoom.remove(sessionId);
+                        return GameResult.error(ex.getMessage());
+                    }
+                }
+
                 try {
-                    loadSavedGameIntoRoom(lobby.getGameId(), room);
+                    player = bindLoadedPlayerSession(room, lobby.getGameId(), userId, sessionId);
                 } catch (IllegalStateException ex) {
+                    // Liberar la reserva si falla
+                    sessionToRoom.remove(sessionId);
                     return GameResult.error(ex.getMessage());
+                }
+
+                if (player == null) {
+                    // Liberar la reserva si falla
+                    sessionToRoom.remove(sessionId);
+                    return GameResult.error("User not part of saved game");
                 }
             }
 
-            try {
-                player = bindLoadedPlayerSession(room, lobby.getGameId(), userId, sessionId);
-            } catch (IllegalStateException ex) {
-                return GameResult.error(ex.getMessage());
+            // Ahora asignar el roomId real
+            sessionToRoom.put(sessionId, room.getRoomId());
+            cancelPendingDisconnectForfeit(room.getRoomId(), player.getPlayerIndex());
+
+            Packet welcome = Packet.welcome(
+                sessionId,
+                player.getPlayerIndex(),
+                isLoadGame,
+                lobby.getGameId()
+            );
+
+            // =========================
+            // empieza uego si esta pronto
+            // =========================
+
+            if (room.allPlayersConnected()) {
+                if (isLoadGame) {
+                    lobby.markStarted();
+                    return GameResult.gameReady(welcome);
+                }
             }
 
-            if (player == null) {
-                return GameResult.error("User not part of saved game");
-            }
+            return GameResult.ok(welcome);
+        } catch (Exception ex) {
+            // En caso de error inesperado, liberar la reserva
+            sessionToRoom.remove(sessionId);
+            throw ex;
         }
-
-        sessionToRoom.put(sessionId, room.getRoomId());
-        cancelPendingDisconnectForfeit(room.getRoomId(), player.getPlayerIndex());
-
-        Packet welcome = Packet.welcome(
-            sessionId,
-            player.getPlayerIndex(),
-            isLoadGame,
-            lobby.getGameId()
-        );
-
-        // =========================
-        // empieza uego si esta pronto
-        // =========================
-
-        if (room.allPlayersConnected()) {
-            if (isLoadGame) {
-                lobby.markStarted();
-                return GameResult.gameReady(welcome);
-            }
-        }
-
-        return GameResult.ok(welcome);
     }
 
     private PlayerState bindLoadedPlayerSession(GameRoom room, Long gameId, Long userId, String sessionId) {
@@ -451,8 +479,13 @@ public class GameController {
             } else {
             // Grace window for transient disconnects (refresh/F5, short network drops).
                 room.assignSessionToPlayer(leavingPlayer.getPlayerIndex(), null);
-                sessionToRoom.remove(sessionId);
-                sessionToUserId.remove(sessionId);
+                sessionLock.lock();
+                try {
+                    sessionToRoom.remove(sessionId);
+                    sessionToUserId.remove(sessionId);
+                } finally {
+                    sessionLock.unlock();
+                }
                 scheduleDisconnectForfeit(room.getRoomId(), leavingPlayer.getPlayerIndex());
                 return -1;
             }
@@ -461,8 +494,13 @@ public class GameController {
         PlayerState removed = room.removePlayer(sessionId);
         if (removed != null) {
             log.info("Player {} (index {}) left room {}", sessionId, removed.getPlayerIndex(), room.getRoomId());
-            sessionToRoom.remove(sessionId);
-            sessionToUserId.remove(sessionId);
+            sessionLock.lock();
+            try {
+                sessionToRoom.remove(sessionId);
+                sessionToUserId.remove(sessionId);
+            } finally {
+                sessionLock.unlock();
+            }
             clearLoadedGameMapping(linkedGameId, room.getRoomId());
             room.reset();
             
