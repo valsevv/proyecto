@@ -113,7 +113,9 @@ public class SecurityConfig {
             "http://127.0.0.1:3000",
             "http://localhost:5173",
             "http://127.0.0.1:5173",
-            "https://camilla-traplike-scribbly.ngrok-free.dev"
+            "https://*.ngrok-free.dev",
+            "https://camilla-traplike-scribbly.ngrok-free.dev/",
+            "https://developable-roderick-unjokingly.ngrok-free.dev/"
         ));
         cfg.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         cfg.setAllowedHeaders(List.of(
@@ -127,22 +129,3 @@ public class SecurityConfig {
         return source;
     }
 }
-
-
-// @Configuration
-// public class FilterConfig {
-
-//     @Bean
-//     public FilterRegistrationBean<JwtAuthenticationFilter> jwtFilter(
-//             JwtAuthenticationFilter filter) {
-
-//         FilterRegistrationBean<JwtAuthenticationFilter> registration =
-//                 new FilterRegistrationBean<>();
-
-//         registration.setFilter(filter);
-//         registration.addUrlPatterns("/api/*");
-//         registration.setOrder(1);
-
-//         return registration;
-//     }
-// }

@@ -1,9 +1,5 @@
-//export const WS_URL = 'wss://developable-roderick-unjokingly.ngrok-free.dev/ws' // wss://developable-roderick-unjokingly.ngrok-free.dev/ws'
-
-//export const API_BASE = 'https://developable-roderick-unjokingly.ngrok-free.dev/api';
-//Para probar local dejar los localhost
-export const API_BASE = 'http://localhost:8080';
-export const WS_URL = 'ws://localhost:8080/ws'
+export const API_BASE = window.location.origin + '/api';
+export const WS_URL = (window.location.protocol === 'https:' ? window.location.origin.replace('https:', 'wss:') : window.location.origin.replace('http:', 'ws:')) + '/ws';
 
 export const WORLD_WIDTH = 3200;
 export const WORLD_HEIGHT = 2400;
