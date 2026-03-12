@@ -241,9 +241,7 @@ export function attachNetworkHandlers(scene, options = {}) {
                     const damage = Number.isFinite(msg.damage) ? msg.damage : 0;
                     if (msg.targetCarrierDestroyed) {
                         combatMessage = `Impacto! Portadrones destruido (${damage})`;
-                    } else if (targetDrone?.destroyed || (typeof msg.remainingHealth === 'number' && msg.remainingHealth <= 0)) {
-                        combatMessage = `Impacto! Dron destruido (${damage})`;
-                    } else {
+                    } else  {
                         combatMessage = `Impacto confirmado (${damage})`;
                     }
                 }

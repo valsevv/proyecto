@@ -104,7 +104,7 @@ Ejecutar desde la carpeta raiz del proyecto (`proyecto`), para que Spring pueda 
 ### Windows (PowerShell)
 
 ```powershell
-.\back\mvnw.cmd -f .\back\pom.xml spring-boot:run
+.\back\mvnw.cmd -f .\back\pom.xml spring-boot:run "-Dspring-boot.run.workingDirectory=$PWD"
 ```
 
 ### Linux/macOS
